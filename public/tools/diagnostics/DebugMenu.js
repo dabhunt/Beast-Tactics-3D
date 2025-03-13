@@ -187,6 +187,7 @@ export class DebugMenu {
       { id: "lighting", label: "Lighting" },
       { id: "grid", label: "Grid" },
       { id: "camera", label: "Camera" },
+      { id: "arrow", label: "Arrow Debugger" }, // Add Arrow Debugger tab
     ];
 
     // Create content areas for each tab

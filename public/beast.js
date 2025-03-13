@@ -150,53 +150,50 @@ export class Beast {
    * @private
    */
   _createDirectionalIndicators() {
-    debugLog(`Creating directional indicators for ${this.type} Beast`);
+    console.log("[BEAST] Creating directional movement arrows");
 
-    // Arrow heads for six directions - based on flat-topped hex geometry
-    this.directionalArrows = [];
-
-    // Simplified hex directions with evenly spaced angles
-    // Each has a movement offset but we'll position them in a cleaner layout
+    // Define hex coordinate directions
     const hexDirections = [
-      { q: 1, r: 0, name: "E", angle: 0 }, // East
-      { q: 0, r: -1, name: "NE", angle: Math.PI / 3 }, // Northeast
-      { q: -1, r: 0, name: "NW", angle: 2 * Math.PI / 3 }, // Northwest
-      { q: -1, r: 1, name: "W", angle: Math.PI }, // West
-      { q: 0, r: 1, name: "SW", angle: 4 * Math.PI / 3 }, // Southwest
-      { q: 1, r: -1, name: "SE", angle: 5 * Math.PI / 3 }, // Southeast
+      { q: 1, r: 0, name: "E", angle: 0 },                    // East
+      { q: 0, r: -1, name: "NE", angle: Math.PI / 3 },          // Northeast
+      { q: -1, r: 0, name: "NW", angle: 2 * Math.PI / 3 },      // Northwest
+      { q: -1, r: 1, name: "W", angle: Math.PI },              // West
+      { q: 0, r: 1, name: "SW", angle: 4 * Math.PI / 3 },      // Southwest
+      { q: 1, r: -1, name: "SE", angle: 5 * Math.PI / 3 },      // Southeast
     ];
 
-    // Distance from beast to place arrows
+    // Store this for easy access
+    this.hexDirections = hexDirections;
+
+    // Create triangle geometry for arrow
+    const arrowGeometry = new THREE.ConeGeometry(0.2, 0.5, 3);
+
+    // Material for arrows
+    const arrowMaterial = new THREE.MeshPhongMaterial({
+      color: 0xffcc00,
+      transparent: true,
+      opacity: 0.8,
+      emissive: 0x996600,
+      specular: 0xffffff
+    });
+
+    // Set arrow distance
     const arrowDistance = 1.2;
-    
-    // Create arrows for each direction
-    hexDirections.forEach((direction) => {
-      // Use simple trig to place arrows in a nice circle around the beast
-      // This is more intuitive and cleaner than trying to place them exactly on adjacent hexes
+
+    // Create an array to store arrow references for debugging
+    this.directionalArrows = [];
+
+    // Create an arrow for each direction
+    hexDirections.forEach(direction => {
+      // Calculate position from center
       const x = arrowDistance * Math.cos(direction.angle);
       const z = arrowDistance * Math.sin(direction.angle);
-      
-      console.log(`[BEAST] Calculating position for ${direction.name} arrow:`, {
-        moveOffset: { q: direction.q, r: direction.r },
-        angle: (direction.angle * 180 / Math.PI).toFixed(1) + '°',
-        calculatedPosition: { x, z }
-      });
-      
-      // Create triangle geometry for arrow - slightly larger for better visibility
-      const arrowGeometry = new THREE.ConeGeometry(0.2, 0.5, 3);
-      const arrowMaterial = new THREE.MeshBasicMaterial({
-        color: 0xff8800, // Bright orange-yellow
-        transparent: true,
-        opacity: 0.9,
-        depthTest: false, // Always show even if behind tiles
-      });
 
+      // Create arrow mesh
       const arrow = new THREE.Mesh(arrowGeometry, arrowMaterial);
-
-      // Position the arrow in a circular pattern around the beast
       arrow.position.set(
         x,
-        0.7, // Higher above the base for better visibility
+        0.7, // Height above ground
         z,
       );
 
@@ -207,32 +204,32 @@ export class Beast {
       );
       debugSphere.position.set(x + 0.3 * Math.cos(direction.angle), 0.7, z + 0.3 * Math.sin(direction.angle));
       this.group.add(debugSphere);
-      
+
       // Rotation: Use quaternion for more precise control
       // We need to:
       // 1. First rotate 90 degrees around X to make cone point horizontally
       // 2. Then rotate around Y by the direction angle
-      
+
       // Create rotation quaternion
       const quaternion = new THREE.Quaternion();
-      
+
       // Set up rotation axes
       const xAxis = new THREE.Vector3(1, 0, 0);
       const yAxis = new THREE.Vector3(0, 1, 0);
-      
+
       // Apply X rotation first (90 degrees to make horizontal)
       quaternion.setFromAxisAngle(xAxis, Math.PI / 2);
-      
+
       // Create temporary quaternion for Y rotation
       const yRotation = new THREE.Quaternion();
       yRotation.setFromAxisAngle(yAxis, direction.angle);
-      
+
       // Combine rotations (order matters!)
       quaternion.premultiply(yRotation);
-      
+
       // Apply the combined rotation
       arrow.setRotationFromQuaternion(quaternion);
-      
+
       // Add extensive debug logs for arrow positioning and rotation
       console.log(`[BEAST] Positioned ${direction.name} arrow at:`, {
         x: x.toFixed(2),
@@ -259,20 +256,34 @@ export class Beast {
         isMovementArrow: true
       };
 
-      // Add arrow to group
+      // Add to the group
       this.group.add(arrow);
 
-      // Store reference with additional data
+      // Store arrow reference for debugging
       this.directionalArrows.push({
         mesh: arrow,
         direction: direction.name,
-        moveOffset: { q: direction.q, r: direction.r }
+        coordinates: {q: direction.q, r: direction.r},
+        angle: direction.angle
       });
-
-      debugLog(`Created ${direction.name} direction indicator with movement data`);
     });
 
-    debugLog(`All directional indicators created`);
+    // Connect to arrow debugger if available
+    this._connectToArrowDebugger();
+  }
+
+  /**
+   * Connect this beast to the arrow debugger
+   * @private
+   */
+  _connectToArrowDebugger() {
+    // Check if debug menu is available globally
+    if (window.gameDebugMenu) {
+      console.log("[BEAST] Connecting to arrow debugger");
+      window.gameDebugMenu.updateArrowDebuggerBeast(this);
+    } else {
+      console.log("[BEAST] Debug menu not available, arrow debugging disabled");
+    }
   }
 
   /**
@@ -282,22 +293,22 @@ export class Beast {
   setupClickHandling(hexagons) {
     // Store the hexagons reference for movement
     this.hexagons = hexagons;
-    
+
     // Create raycaster for click detection
     this.raycaster = new THREE.Raycaster();
-    
+
     // Current hex position in axial coordinates
     this.currentAxialPos = { q: 0, r: 0 };
-    
+
     // Find the hexagon we're currently on
     this._updateCurrentHexPosition();
-    
+
     // Set up click listener
     window.addEventListener('click', this._handleClick.bind(this));
-    
+
     debugLog(`Click handling set up for ${this.type} Beast`);
   }
-  
+
   /**
    * Handle click events for beast movement
    * @private
@@ -305,36 +316,36 @@ export class Beast {
   _handleClick(event) {
     // Only process if beast is loaded
     if (!this.isLoaded) return;
-    
+
     // Calculate mouse position in normalized device coordinates (-1 to +1)
     const mouse = new THREE.Vector2();
     mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
     mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-    
+
     // Update the picking ray
     this.raycaster.setFromCamera(mouse, this.camera);
-    
+
     // Find intersections with directional arrows
     const arrowMeshes = this.directionalArrows.map(arrow => arrow.mesh);
     const intersects = this.raycaster.intersectObjects(arrowMeshes, false);
-    
+
     // If an arrow was clicked
     if (intersects.length > 0) {
       const clickedArrow = intersects[0].object;
-      
+
       // Log click info for debugging
       console.log(`[BEAST] Arrow clicked:`, {
         direction: clickedArrow.userData.direction,
         offset: clickedArrow.userData.moveOffset
       });
-      
+
       // Calculate the new axial position
       const newQ = this.currentAxialPos.q + clickedArrow.userData.moveOffset.q;
       const newR = this.currentAxialPos.r + clickedArrow.userData.moveOffset.r;
-      
+
       // Find the corresponding hex at this position
       const targetHex = this._findHexAtAxialPosition(newQ, newR);
-      
+
       if (targetHex) {
         // Move to the new hex position
         this.moveTo({
@@ -342,46 +353,46 @@ export class Beast {
           y: targetHex.position.y + 0.7, // Offset above the hex
           z: targetHex.position.z
         });
-        
+
         // Update current axial position
         this.currentAxialPos = { q: newQ, r: newR };
-        
+
         debugLog(`Moving to new hex at q=${newQ}, r=${newR}`);
       } else {
         console.warn(`[BEAST] No hex found at q=${newQ}, r=${newR}`);
       }
     }
   }
-  
+
   /**
    * Update the beast's current hex position
    * @private
    */
   _updateCurrentHexPosition() {
     if (!this.hexagons) return;
-    
+
     // Find the closest hex to the beast's current position
     let closestHex = null;
     let closestDistance = Infinity;
-    
+
     this.hexagons.forEach(hex => {
       const distance = Math.sqrt(
         Math.pow(hex.position.x - this.group.position.x, 2) +
         Math.pow(hex.position.z - this.group.position.z, 2)
       );
-      
+
       if (distance < closestDistance) {
         closestDistance = distance;
         closestHex = hex;
       }
     });
-    
+
     if (closestHex) {
       this.currentAxialPos = { q: closestHex.userData.q, r: closestHex.userData.r };
       debugLog(`Beast is on hex at q=${this.currentAxialPos.q}, r=${this.currentAxialPos.r}`);
     }
   }
-  
+
   /**
    * Find a hex at specified axial coordinates
    * @param {number} q - q axial coordinate
@@ -391,7 +402,7 @@ export class Beast {
    */
   _findHexAtAxialPosition(q, r) {
     if (!this.hexagons) return null;
-    
+
     return this.hexagons.find(hex => 
       hex.userData.q === q && hex.userData.r === r
     );

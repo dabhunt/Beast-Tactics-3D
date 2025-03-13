@@ -639,6 +639,12 @@ try {
       // Set up click handling for beast movement
       fireBeast.setupClickHandling(hexagons);
 
+      // Connect beast to arrow debugger if debug menu exists
+      if (window.gameDebugMenu) {
+        debugLog("Connecting Fire Beast to Arrow Debugger");
+        window.gameDebugMenu.initArrowDebugger(fireBeast);
+      }
+
       // Log the hex where the beast spawned
       debugLog(`Fire Beast spawned on hex`, {
         position: hex.position,
