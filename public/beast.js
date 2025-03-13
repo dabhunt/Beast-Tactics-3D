@@ -33,7 +33,7 @@ export class Beast {
    * @param {Object} position - The initial position {x, y, z}
    * @param {number} scale - Scale factor for the beast (default: 3)
    */
-  constructor(type, scene, camera, position, scale = 3) {
+  constructor(type, scene, camera, position, scale = 1.5) {
     debugLog(`Creating ${type} Beast`, position);
     
     this.type = type;
@@ -88,7 +88,12 @@ export class Beast {
         (texture) => {
           debugLog(`Successfully loaded ${this.type} Beast texture`);
           
-          // Create material with the loaded texture
+          // Configure texture for crisp pixel art rendering
+          texture.magFilter = THREE.NearestFilter;
+          texture.minFilter = THREE.NearestFilter;
+          texture.generateMipmaps = false;
+          
+          // Create material with the loaded texture configured for pixel art
           const material = new THREE.SpriteMaterial({ 
             map: texture,
             transparent: true,
@@ -100,6 +105,9 @@ export class Beast {
           
           // Scale sprite (3x upres for pixel art)
           this.sprite.scale.set(this.scale, this.scale, 1);
+          
+          // Log pixel art optimization
+          console.log(`[BEAST] Applied pixel art optimizations for ${this.type} Beast`);
           
           // Add sprite to group
           this.group.add(this.sprite);
@@ -155,31 +163,40 @@ export class Beast {
       { x: Math.cos(5*Math.PI/3), y: 0, z: Math.sin(5*Math.PI/3), name: 'SE' }  // Southeast (300°)
     ];
     
-    // Distance from center to arrow
-    const arrowDistance = 1.2;
+    // Distance from center to arrow - increased to match hex grid spacing
+    const arrowDistance = 1.5;
     
     // Create arrows for each direction
     hexDirections.forEach((direction, index) => {
-      // Create triangle geometry for arrow
-      const arrowGeometry = new THREE.ConeGeometry(0.2, 0.5, 3);
+      // Create triangle geometry for arrow - smaller and more visible
+      const arrowGeometry = new THREE.ConeGeometry(0.15, 0.4, 3);
       const arrowMaterial = new THREE.MeshBasicMaterial({ 
-        color: 0xffff00,
+        color: 0xff8800, // Brighter orange-yellow for better visibility
         transparent: true,
-        opacity: 0.8
+        opacity: 0.9,
+        // Disable depth test so arrows always show even if behind tiles
+        depthTest: false
       });
       
       const arrow = new THREE.Mesh(arrowGeometry, arrowMaterial);
       
-      // Position the arrow in the right direction
+      // Position the arrow in the right direction - slightly higher for visibility
       arrow.position.set(
         direction.x * arrowDistance,
-        0.5, // Slightly above the base
+        0.7, // Higher above the base for better visibility
         direction.z * arrowDistance
       );
       
-      // Rotate to point in the right direction
+      // Rotate to point outward from center (away from beast)
       arrow.rotation.y = -Math.atan2(direction.z, direction.x);
-      arrow.rotation.x = Math.PI/2; // Point downward
+      arrow.rotation.x = Math.PI/4; // Angled to be more visible
+      
+      // Add debug log for arrow positioning
+      console.log(`[BEAST] Positioned ${direction.name} arrow at:`, {
+        x: direction.x * arrowDistance,
+        y: 0.7,
+        z: direction.z * arrowDistance
+      });
       
       // Add arrow to group
       this.group.add(arrow);
