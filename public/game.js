@@ -2,7 +2,7 @@
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js";
 import { CameraManager } from "./camera.js";
 import { DebugMenu } from "./tools/diagnostics/DebugMenu.js";
-
+import { Beast, findRandomHexOfElement } from "./beast.js";
 // Logging setup
 console.log("Beast Tactics script loaded and starting...");
 
@@ -40,7 +40,9 @@ try {
   // Scene setup
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x111926); // Slightly blue-tinted dark background for better contrast
-  debugLog("Scene created with dark blue-tinted background for better contrast");
+  debugLog(
+    "Scene created with dark blue-tinted background for better contrast",
+  );
 
   // Renderer setup with anti-aliasing
   debugLog("Creating WebGL renderer...");
@@ -77,14 +79,20 @@ try {
   // Brighter ambient light with warmer tone
   lights.ambient = new THREE.AmbientLight(0xfffcf0, 0.85); // Increased intensity, slightly warmer
   scene.add(lights.ambient);
-  debugLog("Created enhanced ambient light with intensity:", lights.ambient.intensity);
+  debugLog(
+    "Created enhanced ambient light with intensity:",
+    lights.ambient.intensity,
+  );
 
   // Primary directional light (sun-like) with warmer color
   lights.directional = new THREE.DirectionalLight(0xfff0d0, 1.2); // Warmer color and higher intensity
   lights.directional.position.set(5, 15, 5);
   lights.directional.castShadow = true;
   scene.add(lights.directional);
-  debugLog("Created enhanced directional light with intensity:", lights.directional.intensity);
+  debugLog(
+    "Created enhanced directional light with intensity:",
+    lights.directional.intensity,
+  );
 
   // Secondary fill light from opposite side with complementary cooler tint
   lights.fill = new THREE.DirectionalLight(0xd0e8ff, 0.5); // Slightly higher intensity
@@ -101,7 +109,9 @@ try {
   lights.rim.position.set(0, 3, -12);
   scene.add(lights.rim);
 
-  debugLog("Enhanced lighting setup complete with main, fill, and point lights");
+  debugLog(
+    "Enhanced lighting setup complete with main, fill, and point lights",
+  );
 
   // Hexagonal grid setup
   const hexRadius = 1;
@@ -117,23 +127,23 @@ try {
 
   // Define all element types
   const elementTypes = [
-    'Combat',
-    'Corrosion',
-    'Dark',
-    'Earth',
-    'Electric',
-    'Fire',
-    'Light',
-    'Metal',
-    'Plant',
-    'Spirit',
-    'Water',
-    'Wind'
+    "Combat",
+    "Corrosion",
+    "Dark",
+    "Earth",
+    "Electric",
+    "Fire",
+    "Light",
+    "Metal",
+    "Plant",
+    "Spirit",
+    "Water",
+    "Wind",
   ];
 
   // Create URLs for local assets
   const elemUrls = {};
-  elementTypes.forEach(element => {
+  elementTypes.forEach((element) => {
     elemUrls[element] = `/assets/BiomeTiles/${element}.png`;
   });
 
@@ -148,29 +158,77 @@ try {
     total: elementTypes.length,
     loaded: 0,
     failed: 0,
-    textures: {}
+    textures: {},
   };
 
   // Texture configuration (reverted to default)
   const textureConfig = {
     verticalMarginRatio: 0, // No margin adjustment
-    debug: true // Set to true to see debugging logs about texture adjustments
+    debug: true, // Set to true to see debugging logs about texture adjustments
   };
 
   // Default fallback material (used if textures fail to load)
   const fallbackMaterials = [
-    new THREE.MeshPhongMaterial({ color: 0xff5733, shininess: 50, specular: 0x555555 }), // Combat
-    new THREE.MeshPhongMaterial({ color: 0x7cfc00, shininess: 50, specular: 0x555555 }), // Corrosion
-    new THREE.MeshPhongMaterial({ color: 0x581845, shininess: 50, specular: 0x555555 }), // Dark
-    new THREE.MeshPhongMaterial({ color: 0x964b00, shininess: 50, specular: 0x555555 }), // Earth
-    new THREE.MeshPhongMaterial({ color: 0xffff00, shininess: 50, specular: 0x555555 }), // Electric
-    new THREE.MeshPhongMaterial({ color: 0xff4500, shininess: 50, specular: 0x555555 }), // Fire
-    new THREE.MeshPhongMaterial({ color: 0xffffff, shininess: 50, specular: 0x555555 }), // Light
-    new THREE.MeshPhongMaterial({ color: 0xc0c0c0, shininess: 50, specular: 0x555555 }), // Metal
-    new THREE.MeshPhongMaterial({ color: 0x2ecc71, shininess: 50, specular: 0x555555 }), // Plant
-    new THREE.MeshPhongMaterial({ color: 0xd8bfd8, shininess: 50, specular: 0x555555 }), // Spirit
-    new THREE.MeshPhongMaterial({ color: 0x3498db, shininess: 50, specular: 0x555555 }), // Water
-    new THREE.MeshPhongMaterial({ color: 0xc6e2ff, shininess: 50, specular: 0x555555 })  // Wind
+    new THREE.MeshPhongMaterial({
+      color: 0xff5733,
+      shininess: 50,
+      specular: 0x555555,
+    }), // Combat
+    new THREE.MeshPhongMaterial({
+      color: 0x7cfc00,
+      shininess: 50,
+      specular: 0x555555,
+    }), // Corrosion
+    new THREE.MeshPhongMaterial({
+      color: 0x581845,
+      shininess: 50,
+      specular: 0x555555,
+    }), // Dark
+    new THREE.MeshPhongMaterial({
+      color: 0x964b00,
+      shininess: 50,
+      specular: 0x555555,
+    }), // Earth
+    new THREE.MeshPhongMaterial({
+      color: 0xffff00,
+      shininess: 50,
+      specular: 0x555555,
+    }), // Electric
+    new THREE.MeshPhongMaterial({
+      color: 0xff4500,
+      shininess: 50,
+      specular: 0x555555,
+    }), // Fire
+    new THREE.MeshPhongMaterial({
+      color: 0xffffff,
+      shininess: 50,
+      specular: 0x555555,
+    }), // Light
+    new THREE.MeshPhongMaterial({
+      color: 0xc0c0c0,
+      shininess: 50,
+      specular: 0x555555,
+    }), // Metal
+    new THREE.MeshPhongMaterial({
+      color: 0x2ecc71,
+      shininess: 50,
+      specular: 0x555555,
+    }), // Plant
+    new THREE.MeshPhongMaterial({
+      color: 0xd8bfd8,
+      shininess: 50,
+      specular: 0x555555,
+    }), // Spirit
+    new THREE.MeshPhongMaterial({
+      color: 0x3498db,
+      shininess: 50,
+      specular: 0x555555,
+    }), // Water
+    new THREE.MeshPhongMaterial({
+      color: 0xc6e2ff,
+      shininess: 50,
+      specular: 0x555555,
+    }), // Wind
   ];
 
   // Load all textures
@@ -181,7 +239,9 @@ try {
     const loaded = textureLoadingTracker.loaded;
     const failed = textureLoadingTracker.failed;
 
-    debugLog(`Texture loading progress: ${loaded}/${total} loaded, ${failed} failed`);
+    debugLog(
+      `Texture loading progress: ${loaded}/${total} loaded, ${failed} failed`,
+    );
 
     // Check if all textures are processed (either loaded or failed)
     if (loaded + failed === total) {
@@ -210,7 +270,7 @@ try {
           console.log(`[TEXTURE] Applied texture offset for ${element}:`, {
             verticalMargin: textureConfig.verticalMarginRatio,
             repeat: texture.repeat.toArray(),
-            offset: texture.offset.toArray()
+            offset: texture.offset.toArray(),
           });
         }
 
@@ -223,17 +283,20 @@ try {
           emissiveIntensity: 0.4, // Doubled emissive intensity to enhance colors
           transparent: true,
           side: THREE.DoubleSide, // Ensure both sides render properly
-          color: 0xffffff // Full brightness base color to avoid muting
+          color: 0xffffff, // Full brightness base color to avoid muting
         });
 
         // Log material creation with enhanced properties
         if (textureConfig.debug) {
-          console.log(`[MATERIAL] Created enhanced material for ${element} with properties:`, {
-            shininess: material.shininess,
-            specular: material.specular.getHexString(),
-            emissive: material.emissive.getHexString(),
-            emissiveIntensity: material.emissiveIntensity
-          });
+          console.log(
+            `[MATERIAL] Created enhanced material for ${element} with properties:`,
+            {
+              shininess: material.shininess,
+              specular: material.specular.getHexString(),
+              emissive: material.emissive.getHexString(),
+              emissiveIntensity: material.emissiveIntensity,
+            },
+          );
         }
 
         // Store the material
@@ -257,7 +320,7 @@ try {
         textureLoadingTracker.failed++;
 
         updateLoadingStatus();
-      }
+      },
     );
   });
 
@@ -270,7 +333,8 @@ try {
   // Function to create individual hexagons
   function createHex(q, r, horizontalSpacing = 1.5, verticalFactor = 1.0) {
     // Assign element type - for now, random selection
-    const randomElement = elementTypes[Math.floor(Math.random() * elementTypes.length)];
+    const randomElement =
+      elementTypes[Math.floor(Math.random() * elementTypes.length)];
 
     // Get appropriate material based on element type
     const hexMaterial = hexMaterials[randomElement] || fallbackMaterials[0];
@@ -295,11 +359,13 @@ try {
     // x = hexRadius * 3/2 * q
     // z = hexRadius * sqrt(3) * (r + q/2)
     const x = hexRadius * horizontalSpacing * q;
-    const z = hexRadius * Math.sqrt(3) * verticalFactor * (r + q/2);
+    const z = hexRadius * Math.sqrt(3) * verticalFactor * (r + q / 2);
     hex.position.set(x, 0, z);
 
     // Debug rotation values for troubleshooting
-    debugLog(`Creating hex at (${q},${r}) with position (${x},0,${z}) - Element: ${randomElement}`);
+    debugLog(
+      `Creating hex at (${q},${r}) with position (${x},0,${z}) - Element: ${randomElement}`,
+    );
 
     // In THREE.js, cylinders stand upright along Y axis by default
     // We need to rotate them 30 degrees (π/6 radians) around the Y axis
@@ -322,16 +388,20 @@ try {
   function generateHexagonGrid(horizontalSpacing = 1.5, verticalFactor = 1.0) {
     // Generate grid (radius 7 - about 3x as many hexagons as radius 4)
     const gridRadius = 7;
-    debugLog(`Generating hex grid with radius ${gridRadius}, spacing: h=${horizontalSpacing}, v=${verticalFactor}`);
+    debugLog(
+      `Generating hex grid with radius ${gridRadius}, spacing: h=${horizontalSpacing}, v=${verticalFactor}`,
+    );
 
     // Track element distribution for debugging
     const elementDistribution = {};
-    elementTypes.forEach(element => { elementDistribution[element] = 0; });
+    elementTypes.forEach((element) => {
+      elementDistribution[element] = 0;
+    });
 
     // Clear any existing hexagons if we're regenerating
     if (hexagons.length > 0) {
       debugLog("Clearing existing hexagons before regeneration");
-      hexagons.forEach(hex => {
+      hexagons.forEach((hex) => {
         scene.remove(hex);
       });
       hexagons.length = 0;
@@ -377,10 +447,10 @@ try {
     const debugMenu = new DebugMenu(
       scene,
       camera,
-      renderer, 
+      renderer,
       hexagons,
       lights,
-      textureLoadingTracker.textures
+      textureLoadingTracker.textures,
     );
 
     // Connect camera manager to debug menu
@@ -496,12 +566,26 @@ try {
     const texturesElement = document.getElementById("debug-textures");
 
     if (fpsElement) fpsElement.textContent = "FPS: " + currentFps;
-    if (hexCountElement) hexCountElement.textContent = "Hexagons: " + hexagons.length;
+    if (hexCountElement)
+      hexCountElement.textContent = "Hexagons: " + hexagons.length;
     if (cameraElement) {
-      cameraElement.textContent = "Camera: X:" + camera.position.x.toFixed(1) + " Y:" + camera.position.y.toFixed(1) + " Z:" + camera.position.z.toFixed(1);
+      cameraElement.textContent =
+        "Camera: X:" +
+        camera.position.x.toFixed(1) +
+        " Y:" +
+        camera.position.y.toFixed(1) +
+        " Z:" +
+        camera.position.z.toFixed(1);
     }
     if (texturesElement) {
-      texturesElement.textContent = "Textures: " + textureLoadingTracker.loaded + "/" + textureLoadingTracker.total + " loaded, " + textureLoadingTracker.failed + " failed";
+      texturesElement.textContent =
+        "Textures: " +
+        textureLoadingTracker.loaded +
+        "/" +
+        textureLoadingTracker.total +
+        " loaded, " +
+        textureLoadingTracker.failed +
+        " failed";
     }
   }
 
@@ -514,9 +598,6 @@ try {
     loadingElement.classList.add("hidden");
     debugLog("Loading screen hidden");
   }
-
-  // Import Beast functionality
-  import { Beast, findRandomHexOfElement } from "./beast.js";
 
   // Add Beast to scene after grid generation
   let fireBeast = null;
@@ -531,7 +612,7 @@ try {
     }
 
     // Find a random Fire hex
-    const fireHex = findRandomHexOfElement(hexagons, 'Fire');
+    const fireHex = findRandomHexOfElement(hexagons, "Fire");
 
     if (!fireHex) {
       console.warn("No Fire hexagons found, using first available hex instead");
@@ -547,26 +628,26 @@ try {
       const beastPosition = {
         x: hex.position.x,
         y: hex.position.y + 1.2, // Raise above the hex
-        z: hex.position.z
+        z: hex.position.z,
       };
 
       debugLog(`Creating Fire Beast at position`, beastPosition);
 
       // Create the beast
-      fireBeast = new Beast('Fire', scene, camera, beastPosition, 3);
+      fireBeast = new Beast("Fire", scene, camera, beastPosition, 3);
 
       // Log the hex where the beast spawned
       debugLog(`Fire Beast spawned on hex`, {
         position: hex.position,
         element: hex.userData.element,
-        coords: { q: hex.userData.q, r: hex.userData.r }
+        coords: { q: hex.userData.q, r: hex.userData.r },
       });
     }
   }
 
   // Add beast update to animation loop
   let originalAnimate = animate;
-  
+
   // Create enhanced animation function with beast updates
   function enhancedAnimate() {
     // Call original animation function first
