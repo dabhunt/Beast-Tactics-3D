@@ -10,7 +10,7 @@ const mouseState = {
   isDragging: false,
   lastX: 0,
   lastY: 0,
-  dragSensitivity: 0.01,
+  dragSensitivity: 0.003, // Reduced sensitivity (was 0.01)
   zoomSensitivity: 0.1,
   minZoom: 5,
   maxZoom: 50
@@ -227,9 +227,16 @@ try {
       const deltaY = event.clientY - mouseState.lastY;
       
       // Update camera position based on mouse movement
-      // Move camera in the opposite direction of mouse drag for natural feel
-      camera.position.x -= deltaX * mouseState.dragSensitivity * camera.position.y;
-      camera.position.z += deltaY * mouseState.dragSensitivity * camera.position.y;
+      // Move camera in the same direction as mouse drag for a "grab and move" feel
+      camera.position.x += deltaX * mouseState.dragSensitivity * camera.position.y;
+      camera.position.z -= deltaY * mouseState.dragSensitivity * camera.position.y;
+      
+      // Log camera movement for debugging
+      debugLog("Camera position updated:", { 
+        x: camera.position.x.toFixed(2),
+        y: camera.position.y.toFixed(2),
+        z: camera.position.z.toFixed(2)
+      });
       
       // Update lookAt point to maintain camera orientation
       const lookAtPoint = new THREE.Vector3(
