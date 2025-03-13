@@ -5,6 +5,23 @@ import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.m
 // Logging setup
 console.log("Beast Tactics script loaded and starting...");
 
+// Track mouse state for camera controls
+const mouseState = {
+  isDragging: false,
+  lastX: 0,
+  lastY: 0,
+  dragSensitivity: 0.01,
+  zoomSensitivity: 0.1,
+  minZoom: 5,
+  maxZoom: 50
+};
+
+// Debug function to log mouse control events
+function logMouseControl(action, data) {
+  if (!DEBUG) return;
+  console.log(`[MOUSE] ${action}`, data);
+}
+
 // Global error handler for debugging
 window.addEventListener('error', (event) => {
   console.error("Global error caught:", {
@@ -164,15 +181,18 @@ try {
   const hexagons = [];
   let hexCount = 0;
   
-  // Generate grid (radius 4)
-  for (let q = -4; q <= 4; q++) {
-    for (let r = Math.max(-4, -q - 4); r <= Math.min(4, -q + 4); r++) {
+  // Generate grid (radius 7 - about 3x as many hexagons as radius 4)
+  const gridRadius = 7;
+  debugLog(`Generating hex grid with radius ${gridRadius}`);
+  
+  for (let q = -gridRadius; q <= gridRadius; q++) {
+    for (let r = Math.max(-gridRadius, -q - gridRadius); r <= Math.min(gridRadius, -q + gridRadius); r++) {
       const hex = createHex(q, r);
       hexagons.push(hex);
       hexCount++;
       
-      // Log progress every 10 hexagons
-      if (hexCount % 10 === 0) {
+      // Log progress every 20 hexagons
+      if (hexCount % 20 === 0) {
         debugLog(`Created ${hexCount} hexagons so far...`);
       }
     }
@@ -180,10 +200,87 @@ try {
   
   debugLog(`Grid generation complete: ${hexagons.length} hexagons created`);
   
-  // Position camera to view the entire grid
-  camera.position.set(0, 15, 15);
+  // Position camera to view the entire grid - increased height for larger map
+  camera.position.set(0, 25, 25);
   camera.lookAt(0, 0, 0);
   debugLog("Camera positioned at:", camera.position);
+  
+  // Set up camera controls for mouse interaction
+  
+  // Mouse down handler to start drag
+  window.addEventListener('mousedown', (event) => {
+    // Middle mouse button (wheel click) for panning
+    if (event.button === 1) {
+      mouseState.isDragging = true;
+      mouseState.lastX = event.clientX;
+      mouseState.lastY = event.clientY;
+      logMouseControl("Pan started", { x: event.clientX, y: event.clientY });
+      event.preventDefault(); // Prevent default browser behavior
+    }
+  });
+  
+  // Mouse move handler for dragging
+  window.addEventListener('mousemove', (event) => {
+    if (mouseState.isDragging) {
+      // Calculate how much the mouse has moved
+      const deltaX = event.clientX - mouseState.lastX;
+      const deltaY = event.clientY - mouseState.lastY;
+      
+      // Update camera position based on mouse movement
+      // Move camera in the opposite direction of mouse drag for natural feel
+      camera.position.x -= deltaX * mouseState.dragSensitivity * camera.position.y;
+      camera.position.z += deltaY * mouseState.dragSensitivity * camera.position.y;
+      
+      // Update lookAt point to maintain camera orientation
+      const lookAtPoint = new THREE.Vector3(
+        camera.position.x,
+        0,
+        camera.position.z - 10 // Look 10 units ahead of camera position
+      );
+      camera.lookAt(lookAtPoint);
+      
+      // Update last position
+      mouseState.lastX = event.clientX;
+      mouseState.lastY = event.clientY;
+      
+      // Log camera movement periodically to avoid console spam
+      if (Math.abs(deltaX) + Math.abs(deltaY) > 10) {
+        logMouseControl("Panning camera", { 
+          deltaX, 
+          deltaY, 
+          newPos: { ...camera.position }
+        });
+      }
+    }
+  });
+  
+  // Mouse up handler to end drag
+  window.addEventListener('mouseup', (event) => {
+    if (event.button === 1 && mouseState.isDragging) {
+      mouseState.isDragging = false;
+      logMouseControl("Pan ended", null);
+    }
+  });
+  
+  // Mouse wheel handler for zoom
+  window.addEventListener('wheel', (event) => {
+    event.preventDefault(); // Prevent default scroll
+    
+    // Determine zoom direction and calculate new position
+    const zoomAmount = event.deltaY * mouseState.zoomSensitivity;
+    
+    // Modify camera y position (height) for zoom
+    const newY = camera.position.y + zoomAmount;
+    
+    // Enforce zoom limits
+    if (newY > mouseState.minZoom && newY < mouseState.maxZoom) {
+      camera.position.y = newY;
+      logMouseControl("Zooming camera", { 
+        delta: event.deltaY, 
+        newHeight: camera.position.y 
+      });
+    }
+  }, { passive: false }); // Important for preventing scroll
   
   // Animation loop with performance tracking
   let frameCount = 0;
