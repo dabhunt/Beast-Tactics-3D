@@ -200,20 +200,56 @@ export class Beast {
         z,
       );
 
-      // Rotation: point outward from beast (away from center)
-      // This matches the movement direction more intuitively
+      // DEBUGGING: Create a small colored sphere to visualize the direction
+      const debugSphere = new THREE.Mesh(
+        new THREE.SphereGeometry(0.1),
+        new THREE.MeshBasicMaterial({ color: 0x00ff00 })
+      );
+      debugSphere.position.set(x + 0.3 * Math.cos(direction.angle), 0.7, z + 0.3 * Math.sin(direction.angle));
+      this.group.add(debugSphere);
       
-      // Apply rotation - pointing outward (cone points up by default)
-      arrow.rotation.x = Math.PI / 2; // First rotate to point horizontally (90 degrees)
-      arrow.rotation.y = direction.angle; // Then rotate to point outward
+      // Rotation: Use quaternion for more precise control
+      // We need to:
+      // 1. First rotate 90 degrees around X to make cone point horizontally
+      // 2. Then rotate around Y by the direction angle
       
-      // Add debug log for arrow positioning and rotation
+      // Create rotation quaternion
+      const quaternion = new THREE.Quaternion();
+      
+      // Set up rotation axes
+      const xAxis = new THREE.Vector3(1, 0, 0);
+      const yAxis = new THREE.Vector3(0, 1, 0);
+      
+      // Apply X rotation first (90 degrees to make horizontal)
+      quaternion.setFromAxisAngle(xAxis, Math.PI / 2);
+      
+      // Create temporary quaternion for Y rotation
+      const yRotation = new THREE.Quaternion();
+      yRotation.setFromAxisAngle(yAxis, direction.angle);
+      
+      // Combine rotations (order matters!)
+      quaternion.premultiply(yRotation);
+      
+      // Apply the combined rotation
+      arrow.setRotationFromQuaternion(quaternion);
+      
+      // Add extensive debug logs for arrow positioning and rotation
       console.log(`[BEAST] Positioned ${direction.name} arrow at:`, {
         x: x.toFixed(2),
         y: 0.7,
         z: z.toFixed(2),
-        rotationY: (arrow.rotation.y * 180 / Math.PI).toFixed(1) + '°',
-        pointingDirection: direction.name
+        angle: (direction.angle * 180 / Math.PI).toFixed(1) + '°',
+        direction: {
+          x: Math.cos(direction.angle).toFixed(2),
+          z: Math.sin(direction.angle).toFixed(2)
+        },
+        pointingDirection: direction.name,
+        quaternion: {
+          x: quaternion.x.toFixed(3),
+          y: quaternion.y.toFixed(3),
+          z: quaternion.z.toFixed(3),
+          w: quaternion.w.toFixed(3)
+        }
       });
 
       // Make arrow interactive
