@@ -67,82 +67,198 @@ export class Beast {
   _loadTextures() {
     debugLog(`Loading textures for ${this.type} Beast`);
 
-    // Create texture loader with error handling
-    const textureLoader = new THREE.TextureLoader();
-
     try {
-      // Load beast texture
-      const beastUrl = `/assets/Beasts/${this.type}.gif`;
-      debugLog(`Loading beast texture from: ${beastUrl}`);
-
-      textureLoader.load(
-        // URL
-        beastUrl,
-
-        // onLoad callback
-        (texture) => {
-          debugLog(`Successfully loaded ${this.type} Beast texture`);
-
-          // Configure texture for crisp pixel art rendering
-          texture.magFilter = THREE.NearestFilter;
-          texture.minFilter = THREE.NearestFilter;
-          texture.generateMipmaps = false;
-
-          // Create material with the loaded texture configured for pixel art
-          const material = new THREE.SpriteMaterial({
-            map: texture,
-            transparent: true,
-            alphaTest: 0.1, // Reduce alpha test for better edges
-          });
-
-          // Create sprite
-          this.sprite = new THREE.Sprite(material);
-
-          // Scale sprite (3x upres for pixel art)
-          this.sprite.scale.set(this.scale, this.scale, 1);
-
-          // Log pixel art optimization
-          console.log(
-            `[BEAST] Applied pixel art optimizations for ${this.type} Beast`,
+      // Import the animated GIF loader on-demand
+      import('./tools/AnimatedGIFLoader.js')
+        .then(module => {
+          const { gifLoader } = module;
+          
+          // Load beast texture as animated GIF
+          const beastUrl = `/assets/Beasts/${this.type}.gif`;
+          debugLog(`Loading beast texture as animated GIF from: ${beastUrl}`);
+          
+          // Set animation speed (higher for more fluid animation)
+          gifLoader.setFPS(15);
+          
+          // Use GIF loader to handle animation
+          gifLoader.load(
+            // URL
+            beastUrl,
+            
+            // onComplete callback
+            (texture) => {
+              debugLog(`Successfully loaded ${this.type} Beast texture as animated GIF`);
+              
+              // Store reference to texture for later cleanup
+              this.beastTexture = texture;
+              
+              // Create material with the animated texture
+              const material = new THREE.SpriteMaterial({
+                map: texture,
+                transparent: true,
+                alphaTest: 0.1, // Reduce alpha test for better edges
+              });
+              
+              // Create sprite
+              this.sprite = new THREE.Sprite(material);
+              
+              // Scale sprite for pixel art
+              this.sprite.scale.set(this.scale, this.scale, 1);
+              
+              // Log animation setup
+              console.log(
+                `[BEAST] Applied animated GIF setup for ${this.type} Beast`,
+                { 
+                  animated: true,
+                  url: beastUrl
+                }
+              );
+              
+              // Add sprite to group
+              this.group.add(this.sprite);
+              
+              // Mark as loaded
+              this.isLoaded = true;
+              
+              debugLog(`${this.type} Beast animated sprite created`);
+            },
+            
+            // onError callback
+            (error) => {
+              console.error(
+                `Failed to load animated GIF for ${this.type} Beast:`,
+                error
+              );
+              
+              // Fall back to static texture loader
+              debugLog(`Falling back to static texture loader`);
+              this._loadStaticTexture(beastUrl);
+            }
           );
-
-          // Add sprite to group
-          this.group.add(this.sprite);
-
-          // Mark as loaded
-          this.isLoaded = true;
-
-          debugLog(`${this.type} Beast sprite created`);
-        },
-
-        // onProgress callback (not used)
-        undefined,
-
-        // onError callback
-        (error) => {
-          console.error(
-            `Failed to load texture for ${this.type} Beast:`,
-            error,
-          );
-          // Create fallback colored sprite
-          const fallbackMaterial = new THREE.SpriteMaterial({
-            color: 0xff4500, // Fire color as fallback
-          });
-
-          this.sprite = new THREE.Sprite(fallbackMaterial);
-          this.sprite.scale.set(this.scale, this.scale, 1);
-          this.group.add(this.sprite);
-          this.isLoaded = true;
-
-          debugLog(
-            `Created fallback sprite for ${this.type} Beast due to loading error`,
-          );
-        },
-      );
+        })
+        .catch(err => {
+          console.error(`Failed to import AnimatedGIFLoader:`, err);
+          
+          // Fall back to regular texture loading if module import fails
+          const beastUrl = `/assets/Beasts/${this.type}.gif`;
+          this._loadStaticTexture(beastUrl);
+        });
     } catch (err) {
       console.error(`Error in texture loading for ${this.type} Beast:`, err);
       debugLog(`Beast creation failed with error: ${err.message}`);
+      
+      // Create emergency fallback with colored sprite
+      this._createFallbackSprite();
     }
+  }
+  
+  /**
+   * Load a static texture as fallback when animation fails
+   * @param {string} url - URL to load texture from
+   * @private
+   */
+  _loadStaticTexture(url) {
+    debugLog(`Loading static texture fallback from: ${url}`);
+    
+    // Create texture loader with error handling
+    const textureLoader = new THREE.TextureLoader();
+    
+    textureLoader.load(
+      // URL
+      url,
+      
+      // onLoad callback
+      (texture) => {
+        debugLog(`Successfully loaded ${this.type} Beast static texture`);
+        
+        // Store reference to texture
+        this.beastTexture = texture;
+        
+        // Configure texture for crisp pixel art rendering
+        texture.magFilter = THREE.NearestFilter;
+        texture.minFilter = THREE.NearestFilter;
+        texture.generateMipmaps = false;
+        
+        // Create material with the texture
+        const material = new THREE.SpriteMaterial({
+          map: texture,
+          transparent: true,
+          alphaTest: 0.1,
+        });
+        
+        // Create sprite
+        this.sprite = new THREE.Sprite(material);
+        
+        // Scale sprite
+        this.sprite.scale.set(this.scale, this.scale, 1);
+        
+        // Log fallback
+        console.log(
+          `[BEAST] Applied static texture fallback for ${this.type} Beast`,
+          { 
+            animated: false, 
+            url: url
+          }
+        );
+        
+        // Add sprite to group
+        this.group.add(this.sprite);
+        
+        // Mark as loaded
+        this.isLoaded = true;
+        
+        debugLog(`${this.type} Beast static sprite created`);
+      },
+      
+      // onProgress callback (not used)
+      undefined,
+      
+      // onError callback
+      (error) => {
+        console.error(`Failed to load static texture for ${this.type} Beast:`, error);
+        this._createFallbackSprite();
+      }
+    );
+  }
+  
+  /**
+   * Create a colored fallback sprite when all texture loading fails
+   * @private
+   */
+  _createFallbackSprite() {
+    debugLog(`Creating colored fallback sprite for ${this.type} Beast`);
+    
+    // Element color mapping
+    const elementColors = {
+      'Fire': 0xff4500,
+      'Water': 0x3498db,
+      'Earth': 0x964b00,
+      'Wind': 0xc6e2ff,
+      'Electric': 0xffff00,
+      'Plant': 0x2ecc71,
+      'Metal': 0xc0c0c0,
+      'Light': 0xffffff,
+      'Dark': 0x581845,
+      'Combat': 0xff5733,
+      'Spirit': 0xd8bfd8,
+      'Corrosion': 0x7cfc00
+    };
+    
+    // Get appropriate color or default to fire color
+    const color = elementColors[this.type] || 0xff4500;
+    
+    // Create fallback colored sprite
+    const fallbackMaterial = new THREE.SpriteMaterial({
+      color: color,
+      transparent: true
+    });
+    
+    this.sprite = new THREE.Sprite(fallbackMaterial);
+    this.sprite.scale.set(this.scale, this.scale, 1);
+    this.group.add(this.sprite);
+    this.isLoaded = true;
+    
+    debugLog(`Created colored fallback sprite for ${this.type} Beast`, { color: color.toString(16) });
   }
 
   /**
@@ -497,10 +613,36 @@ export class Beast {
   dispose() {
     debugLog(`Disposing ${this.type} Beast`);
 
+    // Dispose animated texture if exists
+    if (this.beastTexture) {
+      // Try to use GIF loader's dispose method if available
+      import('./tools/AnimatedGIFLoader.js')
+        .then(module => {
+          const { gifLoader } = module;
+          try {
+            gifLoader.dispose(this.beastTexture);
+            debugLog(`Disposed animated texture for ${this.type} Beast`);
+          } catch (err) {
+            console.warn(`Could not dispose animated texture:`, err);
+            this.beastTexture.dispose();
+          }
+        })
+        .catch(() => {
+          // Fallback to regular dispose
+          if (this.beastTexture.dispose) {
+            this.beastTexture.dispose();
+          }
+        });
+      
+      this.beastTexture = null;
+    }
+
     // Remove and dispose sprite
     if (this.sprite) {
       this.group.remove(this.sprite);
-      this.sprite.material.dispose();
+      if (this.sprite.material) {
+        this.sprite.material.dispose();
+      }
       this.sprite = null;
     }
 
@@ -508,14 +650,18 @@ export class Beast {
     if (this.directionalArrows) {
       this.directionalArrows.forEach((arrow) => {
         this.group.remove(arrow.mesh);
-        arrow.mesh.geometry.dispose();
-        arrow.mesh.material.dispose();
+        if (arrow.mesh) {
+          if (arrow.mesh.geometry) arrow.mesh.geometry.dispose();
+          if (arrow.mesh.material) arrow.mesh.material.dispose();
+        }
       });
       this.directionalArrows = [];
     }
 
     // Remove group from scene
-    this.scene.remove(this.group);
+    if (this.group && this.scene) {
+      this.scene.remove(this.group);
+    }
     this.group = null;
 
     debugLog(`${this.type} Beast disposed`);
