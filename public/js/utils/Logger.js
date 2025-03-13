@@ -145,3 +145,125 @@ export const Logger = {
     return levelNames[currentLogLevel];
   }
 };
+/**
+ * Logger.js
+ * Centralized logging utility with different levels and formatting
+ */
+
+export class Logger {
+  // Log levels
+  static LEVELS = {
+    DEBUG: 0,
+    INFO: 1,
+    WARN: 2,
+    ERROR: 3,
+    NONE: 4  // Use to disable logging
+  };
+  
+  // Current log level - can be changed at runtime
+  static currentLevel = Logger.LEVELS.DEBUG;
+  
+  /**
+   * Log a debug message
+   * @param {String} source - Source component/module name
+   * @param {String} message - Message to log
+   * @param {Object} [data=null] - Optional data to include
+   */
+  static debug(source, message, data = null) {
+    if (Logger.currentLevel <= Logger.LEVELS.DEBUG) {
+      if (data) {
+        console.log(`[DEBUG][${source}] ${message}`, data);
+      } else {
+        console.log(`[DEBUG][${source}] ${message}`);
+      }
+    }
+  }
+  
+  /**
+   * Log an info message
+   * @param {String} source - Source component/module name
+   * @param {String} message - Message to log
+   * @param {Object} [data=null] - Optional data to include
+   */
+  static info(source, message, data = null) {
+    if (Logger.currentLevel <= Logger.LEVELS.INFO) {
+      if (data) {
+        console.info(`[INFO][${source}] ${message}`, data);
+      } else {
+        console.info(`[INFO][${source}] ${message}`);
+      }
+    }
+  }
+  
+  /**
+   * Log a warning message
+   * @param {String} source - Source component/module name
+   * @param {String} message - Message to log
+   * @param {Object} [data=null] - Optional data to include
+   */
+  static warn(source, message, data = null) {
+    if (Logger.currentLevel <= Logger.LEVELS.WARN) {
+      if (data) {
+        console.warn(`[WARN][${source}] ${message}`, data);
+      } else {
+        console.warn(`[WARN][${source}] ${message}`);
+      }
+    }
+  }
+  
+  /**
+   * Log an error message
+   * @param {String} source - Source component/module name
+   * @param {String} message - Message to log
+   * @param {Object} [data=null] - Optional data to include
+   */
+  static error(source, message, data = null) {
+    if (Logger.currentLevel <= Logger.LEVELS.ERROR) {
+      if (data instanceof Error) {
+        console.error(`[ERROR][${source}] ${message}`, {
+          name: data.name,
+          message: data.message,
+          stack: data.stack
+        });
+      } else if (data) {
+        console.error(`[ERROR][${source}] ${message}`, data);
+      } else {
+        console.error(`[ERROR][${source}] ${message}`);
+      }
+    }
+  }
+  
+  /**
+   * Set the current log level
+   * @param {Number} level - Log level from Logger.LEVELS
+   */
+  static setLevel(level) {
+    Logger.currentLevel = level;
+    console.log(`Log level set to: ${Object.keys(Logger.LEVELS).find(key => Logger.LEVELS[key] === level)}`);
+  }
+  
+  /**
+   * Group related log messages together
+   * @param {String} source - Source component/module name
+   * @param {String} label - Group label
+   * @param {Function} callback - Function containing logs to group
+   * @param {Boolean} [collapsed=false] - Whether group should start collapsed
+   */
+  static group(source, label, callback, collapsed = false) {
+    if (Logger.currentLevel <= Logger.LEVELS.DEBUG) {
+      const groupLabel = `[${source}] ${label}`;
+      
+      if (collapsed) {
+        console.groupCollapsed(groupLabel);
+      } else {
+        console.group(groupLabel);
+      }
+      
+      callback();
+      console.groupEnd();
+    } else {
+      // Just call the callback without grouping if logging is disabled
+      callback();
+    }
+  }
+}

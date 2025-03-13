@@ -49,6 +49,9 @@ initializeGameArchitecture().then(manager => {
   console.error("Game architecture initialization failed:", error);
 });
 
+// Import our HexGridRenderer
+import { HexGridRenderer, BiomeTypes } from "./js/rendering/HexGridRenderer.js";
+
 // Track mouse state for camera controls
 const mouseState = {
   leftDragging: false, // For panning
@@ -99,11 +102,16 @@ function debugLog(message, data = null) {
 
 debugLog("Setting up THREE.js scene...");
 
+// Track loading state
+let texturesLoaded = false;
+let hexGridRenderer = null;
+let hexagons = [];
+
 try {
   // Scene setup
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x222222);
-  //debugLog("Scene created with dark background");
+  debugLog("Scene created with dark background");
 
   // Camera setup with logging of parameters
   const cameraParams = {
@@ -112,7 +120,7 @@ try {
     near: 0.1,
     far: 1000,
   };
-  //debugLog("Creating camera with parameters:", cameraParams);
+  debugLog("Creating camera with parameters:", cameraParams);
 
   const camera = new THREE.PerspectiveCamera(
     cameraParams.fov,
@@ -148,114 +156,45 @@ try {
   dirLight.position.set(5, 10, 5);
   scene.add(dirLight);
 
-  // Hexagonal grid setup
-  const hexRadius = 1;
-  const hexHeight = 0.2;
-  debugLog("Creating hexagonal grid with radius:", hexRadius);
-
-  const hexGeometry = new THREE.CylinderGeometry(
-    hexRadius,
-    hexRadius,
-    hexHeight,
-    6,
-  );
-
-  // Define color palette for hexagons
-  const colorPalette = [
-    0xff5733, // Vibrant orange
-    0xc70039, // Crimson
-    0x900c3f, // Dark pink
-    0x581845, // Dark purple
-    0xffc300, // Bright yellow
-    0x2ecc71, // Green
-    0x3498db, // Blue
-  ];
-  debugLog("Color palette defined with", colorPalette.length, "colors");
-
-  // Create materials with different colors
-  const hexMaterials = colorPalette.map(
-    (color) =>
-      new THREE.MeshPhongMaterial({
-        color: color,
-        shininess: 30,
-        specular: 0x222222,
-      }),
-  );
-
-  // Add side material (edges of hexagons)
-  const edgeMaterial = new THREE.MeshPhongMaterial({
-    color: 0x333333,
-    shininess: 10,
-  });
-
-  // Function to create individual hexagons
-  function createHex(q, r) {
-    // Pick a random material from our palette
-    const materialIndex = Math.floor(Math.random() * hexMaterials.length);
-    const hexMaterial = hexMaterials[materialIndex];
-
-    // Create multi-material for top/bottom and side
-    const materials = [
-      edgeMaterial, // Side
-      hexMaterial, // Top
-      hexMaterial, // Bottom
-    ];
-
-    // Create mesh with geometry and materials
-    const hex = new THREE.Mesh(hexGeometry, materials);
-
-    // Position hexagon in grid
-    const x = hexRadius * 1.75 * q;
-    const z = hexRadius * Math.sqrt(3) * (r + q / 2);
-    hex.position.set(x, 0, z);
-
-    // Debug rotation values for troubleshooting
-    debugLog(`Creating hex at (${q},${r}) with position (${x},0,${z})`);
-
-    // In THREE.js, cylinders stand upright along Y axis by default
-    // We need to rotate them 30 degrees (π/6 radians) around the Y axis
-    // for the hexagons to align properly in the grid
-    hex.rotation.x = 0;
-    hex.rotation.y = Math.PI / 6; // 30 degrees rotation
-    hex.rotation.z = 0;
-
-    // Log rotation for verification
-    debugLog(
-      `Hex rotation set to Y: ${hex.rotation.y} radians (${(hex.rotation.y * 180) / Math.PI} degrees)`,
-    );
-
-    // Add to scene
-    scene.add(hex);
-
-    return hex;
-  }
-
-  debugLog("Starting to generate hexagon grid...");
-  const hexagons = [];
-  let hexCount = 0;
-
-  // Generate grid (radius 7 - about 3x as many hexagons as radius 4)
-  const gridRadius = 7;
-  debugLog(`Generating hex grid with radius ${gridRadius}`);
-
-  for (let q = -gridRadius; q <= gridRadius; q++) {
-    for (
-      let r = Math.max(-gridRadius, -q - gridRadius);
-      r <= Math.min(gridRadius, -q + gridRadius);
-      r++
-    ) {
-      const hex = createHex(q, r);
-      hexagons.push(hex);
-      hexCount++;
-
-      // Log progress every 20 hexagons
-      if (hexCount % 20 === 0) {
-        debugLog(`Created ${hexCount} hexagons so far...`);
-      }
+  // Set up hex grid renderer with biome distribution from game config
+  hexGridRenderer = new HexGridRenderer({
+    gridRadius: 7,
+    hexRadius: 1,
+    hexHeight: 0.2,
+    scene: scene,
+    biomeDistribution: {
+      plains: 0.3,
+      forest: 0.25,
+      mountains: 0.2,
+      desert: 0.15,
+      water: 0.1
     }
-  }
-
-  debugLog(`Grid generation complete: ${hexagons.length} hexagons created`);
+  });
+  
+  // Load textures and create grid when textures are ready
+  debugLog("Loading biome textures...");
+  hexGridRenderer.loadTextures().then(success => {
+    if (success) {
+      debugLog("Textures loaded successfully, generating grid...");
+      hexGridRenderer.createGrid();
+      hexagons = hexGridRenderer.getHexagons();
+      texturesLoaded = true;
+      
+      // Hide loading screen once the grid is ready
+      const loadingElement = document.getElementById("loading");
+      if (loadingElement) {
+        loadingElement.classList.add("hidden");
+        debugLog("Loading screen hidden");
+      }
+      
+      // Additional debug info
+      debugLog(`Grid generation complete: ${hexagons.length} hexagons created with biome textures`);
+    } else {
+      console.error("Failed to load all textures, grid may not render correctly");
+    }
+  }).catch(error => {
+    console.error("Error during texture loading:", error);
+  });
 
   // Position camera more top-down with slight angle
   camera.position.set(0, 30, 10);
@@ -445,13 +384,10 @@ try {
         lastTime = currentTime;
       }
 
-      // Add some movement to make it clear rendering is working
-      hexagons.forEach((hex, index) => {
-        // Make hexagons gently bob up and down
-        if (index % 3 === 0) {
-          hex.position.y = Math.sin(currentTime * 0.001 + index * 0.1) * 0.2;
-        }
-      });
+      // Update hexagon animations if grid is loaded
+      if (texturesLoaded && hexGridRenderer) {
+        hexGridRenderer.update(currentTime);
+      }
 
       // Render the scene
       renderer.render(scene, camera);
