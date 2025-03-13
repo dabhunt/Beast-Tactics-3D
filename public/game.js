@@ -463,12 +463,31 @@ try {
   document.addEventListener('DOMContentLoaded', function() {
     console.log('Initializing Beast Tactics...');
 
-    // Start the game (assuming 'Game' is defined elsewhere)
-    const game = new Game(); //This line needs to be adapted to your actual game initialization
-    game.init();
+    // Create a simple Game class for testing if not already defined
+    class Game {
+      constructor() {
+        console.log('Game instance created');
+        this.gridRenderer = hexGridRenderer; // Use existing hex grid renderer
+      }
+      
+      init() {
+        console.log('Game initialized');
+      }
+    }
 
-    // Import system check diagnostic
-    import { createSystemCheckUI } from '../tools/diagnostics/SystemCheck.js';
+    // Initialize the game
+    const game = new Game();
+    game.init();
+    
+    // Load diagnostic tools asynchronously
+    import('../tools/diagnostics/SystemCheck.js')
+      .then(module => {
+        window.createSystemCheckUI = module.createSystemCheckUI;
+        console.log('System check diagnostic loaded');
+      })
+      .catch(err => {
+        console.error('Failed to load system check diagnostic:', err);
+      });
     
     // Add debug keyboard shortcuts
     document.addEventListener('keydown', (e) => {

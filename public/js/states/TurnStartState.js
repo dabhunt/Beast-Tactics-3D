@@ -1,18 +1,23 @@
+
 /**
  * TurnStartState.js
- * Implements turn start processing
+ * State that handles the beginning of each turn
  */
 
 import { Logger } from '../utils/Logger.js';
 import { GameStates } from '../models/GameStates.js';
 
-export export class TurnStartState {
+export class TurnStartState {
   /**
    * Create a new turn start state
    * @param {GameManager} gameManager - Reference to the game manager
    */
   constructor(gameManager) {
     this._gameManager = gameManager;
+    
+    // Log construction for debugging
+    console.log('TurnStartState: Constructed');
+    Logger.debug('TurnStartState', 'Instance created');
   }
 
   /**
