@@ -7,13 +7,16 @@ console.log("Beast Tactics script loaded and starting...");
 
 // Track mouse state for camera controls
 const mouseState = {
-  isDragging: false,
+  leftDragging: false,  // For panning
+  rightDragging: false, // For camera angle rotation
   lastX: 0,
   lastY: 0,
-  dragSensitivity: 0.003, // Reduced sensitivity (was 0.01)
+  panSensitivity: 0.003,     // Sensitivity for panning
+  rotateSensitivity: 0.005,  // Sensitivity for rotation
   zoomSensitivity: 0.1,
   minZoom: 5,
-  maxZoom: 50
+  maxZoom: 50,
+  target: new THREE.Vector3(0, 0, 0) // Camera look target
 };
 
 // Debug function to log mouse control events
@@ -200,72 +203,122 @@ try {
   
   debugLog(`Grid generation complete: ${hexagons.length} hexagons created`);
   
-  // Position camera to view the entire grid - increased height for larger map
-  camera.position.set(0, 25, 25);
-  camera.lookAt(0, 0, 0);
+  // Position camera more top-down with slight angle
+  camera.position.set(0, 30, 10);
+  mouseState.target.set(0, 0, 0);
+  camera.lookAt(mouseState.target);
   debugLog("Camera positioned at:", camera.position);
   
   // Set up camera controls for mouse interaction
   
   // Mouse down handler to start drag
   window.addEventListener('mousedown', (event) => {
-    // Middle mouse button (wheel click) for panning
-    if (event.button === 1) {
-      mouseState.isDragging = true;
+    if (event.button === 1) { // Middle mouse button for panning
+      mouseState.leftDragging = true;
       mouseState.lastX = event.clientX;
       mouseState.lastY = event.clientY;
       logMouseControl("Pan started", { x: event.clientX, y: event.clientY });
       event.preventDefault(); // Prevent default browser behavior
+    } else if (event.button === 2) { // Right mouse button for rotation
+      mouseState.rightDragging = true;
+      mouseState.lastX = event.clientX;
+      mouseState.lastY = event.clientY;
+      logMouseControl("Rotation started", { x: event.clientX, y: event.clientY });
+      event.preventDefault(); // Prevent default context menu
     }
+  });
+  
+  // Prevent context menu on right click
+  window.addEventListener('contextmenu', (event) => {
+    event.preventDefault();
   });
   
   // Mouse move handler for dragging
   window.addEventListener('mousemove', (event) => {
-    if (mouseState.isDragging) {
-      // Calculate how much the mouse has moved
-      const deltaX = event.clientX - mouseState.lastX;
-      const deltaY = event.clientY - mouseState.lastY;
+    // Calculate how much the mouse has moved
+    const deltaX = event.clientX - mouseState.lastX;
+    const deltaY = event.clientY - mouseState.lastY;
+    
+    // Handle panning (middle mouse button)
+    if (mouseState.leftDragging) {
+      // Update camera position and target together to maintain orientation
+      // The negative signs create the "grab world" effect (drag right, world moves right)
+      const moveX = -deltaX * mouseState.panSensitivity * camera.position.y;
+      const moveZ = deltaY * mouseState.panSensitivity * camera.position.y;
       
-      // Update camera position based on mouse movement
-      // Move camera in the same direction as mouse drag for a "grab and move" feel
-      camera.position.x += deltaX * mouseState.dragSensitivity * camera.position.y;
-      camera.position.z -= deltaY * mouseState.dragSensitivity * camera.position.y;
+      camera.position.x += moveX;
+      camera.position.z += moveZ;
+      mouseState.target.x += moveX;
+      mouseState.target.z += moveZ;
       
-      // Log camera movement for debugging
-      debugLog("Camera position updated:", { 
-        x: camera.position.x.toFixed(2),
-        y: camera.position.y.toFixed(2),
-        z: camera.position.z.toFixed(2)
-      });
+      // Apply the new orientation
+      camera.lookAt(mouseState.target);
       
-      // Update lookAt point to maintain camera orientation
-      const lookAtPoint = new THREE.Vector3(
-        camera.position.x,
-        0,
-        camera.position.z - 10 // Look 10 units ahead of camera position
-      );
-      camera.lookAt(lookAtPoint);
-      
-      // Update last position
-      mouseState.lastX = event.clientX;
-      mouseState.lastY = event.clientY;
-      
-      // Log camera movement periodically to avoid console spam
-      if (Math.abs(deltaX) + Math.abs(deltaY) > 10) {
+      if (Math.abs(deltaX) + Math.abs(deltaY) > 20) {
         logMouseControl("Panning camera", { 
           deltaX, 
           deltaY, 
-          newPos: { ...camera.position }
+          newPos: { 
+            x: camera.position.x.toFixed(1),
+            y: camera.position.y.toFixed(1),
+            z: camera.position.z.toFixed(1)
+          }
         });
       }
     }
+    
+    // Handle camera rotation (right mouse button)
+    if (mouseState.rightDragging) {
+      // Orbit the camera around the target point
+      const theta = deltaX * mouseState.rotateSensitivity; // Horizontal rotation
+      const phi = deltaY * mouseState.rotateSensitivity;   // Vertical rotation
+      
+      // Get current camera vector from target
+      const offset = new THREE.Vector3().subVectors(camera.position, mouseState.target);
+      
+      // Convert to spherical coordinates
+      const radius = offset.length();
+      let polarAngle = Math.atan2(Math.sqrt(offset.x * offset.x + offset.z * offset.z), offset.y);
+      let azimuthAngle = Math.atan2(offset.z, offset.x);
+      
+      // Apply rotation
+      azimuthAngle -= theta;
+      polarAngle = Math.max(0.1, Math.min(Math.PI - 0.1, polarAngle + phi));
+      
+      // Convert back to Cartesian coordinates
+      offset.x = radius * Math.sin(polarAngle) * Math.cos(azimuthAngle);
+      offset.y = radius * Math.cos(polarAngle);
+      offset.z = radius * Math.sin(polarAngle) * Math.sin(azimuthAngle);
+      
+      // Update camera position
+      camera.position.copy(mouseState.target).add(offset);
+      camera.lookAt(mouseState.target);
+      
+      if (Math.abs(deltaX) + Math.abs(deltaY) > 20) {
+        logMouseControl("Rotating camera", { 
+          deltaX, 
+          deltaY, 
+          rotation: { 
+            azimuth: (azimuthAngle * 180 / Math.PI).toFixed(1), 
+            polar: (polarAngle * 180 / Math.PI).toFixed(1) 
+          }
+        });
+      }
+    }
+    
+    // Update last position
+    mouseState.lastX = event.clientX;
+    mouseState.lastY = event.clientY;
   });
   
   // Mouse up handler to end drag
   window.addEventListener('mouseup', (event) => {
-    if (event.button === 1 && mouseState.isDragging) {
-      mouseState.isDragging = false;
+    if (event.button === 1) {
+      mouseState.leftDragging = false;
       logMouseControl("Pan ended", null);
+    } else if (event.button === 2) {
+      mouseState.rightDragging = false;
+      logMouseControl("Rotation ended", null);
     }
   });
   
@@ -276,15 +329,22 @@ try {
     // Determine zoom direction and calculate new position
     const zoomAmount = event.deltaY * mouseState.zoomSensitivity;
     
-    // Modify camera y position (height) for zoom
-    const newY = camera.position.y + zoomAmount;
+    // Get direction vector from camera to target
+    const direction = new THREE.Vector3().subVectors(camera.position, mouseState.target);
+    
+    // Scale the direction vector based on zoom
+    const scaleFactor = 1 + zoomAmount / direction.length();
+    direction.multiplyScalar(scaleFactor);
+    
+    // Calculate new camera position
+    const newPosition = new THREE.Vector3().copy(mouseState.target).add(direction);
     
     // Enforce zoom limits
-    if (newY > mouseState.minZoom && newY < mouseState.maxZoom) {
-      camera.position.y = newY;
+    if (newPosition.y > mouseState.minZoom && newPosition.y < mouseState.maxZoom) {
+      camera.position.copy(newPosition);
       logMouseControl("Zooming camera", { 
         delta: event.deltaY, 
-        newHeight: camera.position.y 
+        distance: direction.length().toFixed(1)
       });
     }
   }, { passive: false }); // Important for preventing scroll
