@@ -694,6 +694,71 @@ export class DebugMenu {
     this.gridGeneratorFn = gridGeneratorFn;
     console.log("[DEBUG] Grid generator function connected to debug menu");
   }
+  
+  /**
+   * Initialize the Arrow Debugger tab
+   * @param {Object} beast - The beast object to debug arrows for
+   */
+  initArrowDebugger(beast) {
+    console.log("[DEBUG] Initializing Arrow Debugger with beast:", beast);
+    
+    try {
+      // Dynamically import the ArrowDebugger class
+      import('./ArrowDebugger.js')
+        .then(module => {
+          const { ArrowDebugger } = module;
+          
+          // Get or create the container for the arrow debugger
+          const container = this.tabContents["arrow"];
+          
+          if (!container) {
+            console.error("[DEBUG] Arrow debugger tab container not found");
+            return;
+          }
+          
+          // Clear any existing content
+          container.innerHTML = '';
+          
+          // Create and store the arrow debugger instance
+          this.arrowDebugger = new ArrowDebugger(beast, container);
+          console.log("[DEBUG] Arrow debugger initialized successfully");
+          
+          // Store reference to this instance globally for easy access
+          window.gameDebugMenu = this;
+        })
+        .catch(error => {
+          console.error("[DEBUG] Failed to load ArrowDebugger module:", error);
+          
+          // Show error message in the tab
+          const container = this.tabContents["arrow"];
+          if (container) {
+            container.innerHTML = `
+              <div style="color: red; padding: 20px;">
+                <h3>Error Loading Arrow Debugger</h3>
+                <p>${error.message}</p>
+                <pre>${error.stack}</pre>
+              </div>
+            `;
+          }
+        });
+    } catch (err) {
+      console.error("[DEBUG] Error initializing arrow debugger:", err);
+    }
+  }
+  
+  /**
+   * Update beast reference in ArrowDebugger
+   * @param {Object} beast - Beast object to connect to the debugger
+   */
+  updateArrowDebuggerBeast(beast) {
+    console.log("[DEBUG] Updating beast reference in Arrow Debugger");
+    if (this.arrowDebugger) {
+      this.arrowDebugger.setBeast(beast);
+    } else {
+      console.log("[DEBUG] Arrow Debugger not initialized yet, will initialize it");
+      this.initArrowDebugger(beast);
+    }
+  }
 
   /**
    * Create a panel for the debug menu
@@ -744,9 +809,9 @@ export class DebugMenu {
     return panel;
   }
 
-    _saveCurrentSettings() {
-        //Implementation to save settings to local storage or server.
-        console.log("[DEBUG] Saving current settings.  Implementation needed.");
-    }
+  _saveCurrentSettings() {
+    //Implementation to save settings to local storage or server.
+    console.log("[DEBUG] Saving current settings.  Implementation needed.");
+  }
 
 }

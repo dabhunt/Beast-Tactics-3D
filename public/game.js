@@ -643,6 +643,11 @@ try {
       if (window.gameDebugMenu) {
         debugLog("Connecting Fire Beast to Arrow Debugger");
         window.gameDebugMenu.initArrowDebugger(fireBeast);
+      } else if (debugMenu) {
+        debugLog("Connecting Fire Beast to local debugMenu instance");
+        debugMenu.initArrowDebugger(fireBeast);
+        // Make the debug menu globally accessible for other components
+        window.gameDebugMenu = debugMenu;
       }
 
       // Log the hex where the beast spawned

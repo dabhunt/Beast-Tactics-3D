@@ -277,12 +277,24 @@ export class Beast {
    * @private
    */
   _connectToArrowDebugger() {
+    console.log("[BEAST] Attempting to connect to arrow debugger");
+    
     // Check if debug menu is available globally
     if (window.gameDebugMenu) {
-      console.log("[BEAST] Connecting to arrow debugger");
+      console.log("[BEAST] Debug menu found, connecting to arrow debugger");
       window.gameDebugMenu.updateArrowDebuggerBeast(this);
     } else {
-      console.log("[BEAST] Debug menu not available, arrow debugging disabled");
+      console.log("[BEAST] Debug menu not available yet, will retry in 1 second");
+      
+      // Retry after a short delay to allow debug menu to initialize
+      setTimeout(() => {
+        if (window.gameDebugMenu) {
+          console.log("[BEAST] Debug menu now available, connecting to arrow debugger");
+          window.gameDebugMenu.updateArrowDebuggerBeast(this);
+        } else {
+          console.log("[BEAST] Debug menu still not available, arrow debugging disabled");
+        }
+      }, 1000);
     }
   }
 
