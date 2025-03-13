@@ -63,9 +63,6 @@
     <div>Loading Beast Tactics...</div>
   </div>
   
-  <!-- Import Three.js from CDN -->
-  <script src="https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.min.js"></script>
-  
   <script>
     // Log page load events for debugging
     console.log("Page loading started");
@@ -78,6 +75,7 @@
     });
   </script>
   
-  <script src="game.js"></script>
+  <!-- Load game.js as a module -->
+  <script type="module" src="game.js"></script>
 </body>
 </html>
