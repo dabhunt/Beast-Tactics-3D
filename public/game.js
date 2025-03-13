@@ -515,6 +515,100 @@ try {
     debugLog("Loading screen hidden");
   }
 
+  // Import Beast functionality
+  import { Beast, findRandomHexOfElement } from "./beast.js";
+  
+  // Add Beast to scene after grid generation
+  let fireBeast = null;
+  
+  // Function to spawn a Fire Beast on a random Fire tile
+  function spawnFireBeast() {
+    debugLog("Attempting to spawn Fire Beast on a random Fire tile");
+    
+    if (hexagons.length === 0) {
+      console.warn("Cannot spawn beast: No hexagons in scene");
+      return null;
+    }
+    
+    // Find a random Fire hex
+    const fireHex = findRandomHexOfElement(hexagons, 'Fire');
+    
+    if (!fireHex) {
+      console.warn("No Fire hexagons found, using first available hex instead");
+      // Fallback to any hex
+      const randomHex = hexagons[Math.floor(Math.random() * hexagons.length)];
+      createBeastAtHex(randomHex);
+    } else {
+      createBeastAtHex(fireHex);
+    }
+    
+    function createBeastAtHex(hex) {
+      // Create beast at hex position (slightly elevated)
+      const beastPosition = {
+        x: hex.position.x,
+        y: hex.position.y + 1.2, // Raise above the hex
+        z: hex.position.z
+      };
+      
+      debugLog(`Creating Fire Beast at position`, beastPosition);
+      
+      // Create the beast
+      fireBeast = new Beast('Fire', scene, camera, beastPosition, 3);
+      
+      // Log the hex where the beast spawned
+      debugLog(`Fire Beast spawned on hex`, {
+        position: hex.position,
+        element: hex.userData.element,
+        coords: { q: hex.userData.q, r: hex.userData.r }
+      });
+    }
+  }
+  
+  // Add beast update to animation loop
+  const originalAnimate = animate;
+  function enhancedAnimate() {
+    // Call original animation function
+    originalAnimate();
+    
+    // Update beast if it exists
+    if (fireBeast) {
+      fireBeast.update();
+    }
+  }
+  
+  // Replace the animate function with our enhanced version
+  animate = enhancedAnimate;
+  
+  // Trigger beast spawn after grid is generated
+  debugLog("Setting up Fire Beast spawn after grid generation");
+  
+  // Modified version of updateLoadingStatus to spawn beast when ready
+  const originalUpdateLoadingStatus = updateLoadingStatus;
+  function enhancedUpdateLoadingStatus() {
+    // Call original function
+    originalUpdateLoadingStatus();
+    
+    // Check if grid is generated
+    const total = textureLoadingTracker.total;
+    const loaded = textureLoadingTracker.loaded;
+    const failed = textureLoadingTracker.failed;
+    
+    // If all textures processed, grid should be generated
+    if (loaded + failed === total && hexagons.length > 0) {
+      // Wait a bit to make sure grid is fully set up
+      setTimeout(() => {
+        if (!fireBeast) {
+          debugLog("Grid generation complete, spawning Fire Beast");
+          spawnFireBeast();
+        }
+      }, 1000);
+    }
+  }
+  
+  // Replace the updateLoadingStatus function
+  updateLoadingStatus = enhancedUpdateLoadingStatus;
+  
+  debugLog("Fire Beast integration complete");
   debugLog("Three.js setup complete - game should be visible now");
 } catch (error) {
   console.error("CRITICAL ERROR:", error);

@@ -69,8 +69,7 @@ export class DebugMenu {
    * @private
    */
   _createUI() {
-    // Basic UI stub - to be expanded
-    console.log("[DEBUG] Creating debug UI");
+    console.log("[DEBUG] Creating debug UI with maximize functionality");
 
     // Create main container
     this.container = document.createElement('div');
@@ -84,19 +83,79 @@ export class DebugMenu {
     this.container.style.borderRadius = '5px';
     this.container.style.fontFamily = 'monospace';
     this.container.style.zIndex = '1000';
-
-    // Create a simple header
+    this.container.style.maxHeight = '40vh';
+    this.container.style.width = '300px';
+    this.container.style.overflowY = 'auto';
+    this.container.style.transition = 'all 0.3s ease';
+    
+    // Create header container for title and buttons
+    const headerContainer = document.createElement('div');
+    headerContainer.style.display = 'flex';
+    headerContainer.style.justifyContent = 'space-between';
+    headerContainer.style.alignItems = 'center';
+    headerContainer.style.marginBottom = '10px';
+    headerContainer.style.borderBottom = '1px solid #444';
+    headerContainer.style.paddingBottom = '5px';
+    
+    // Create header
     const header = document.createElement('h3');
     header.textContent = 'Debug Menu';
-    this.container.appendChild(header);
+    header.style.margin = '0';
+    headerContainer.appendChild(header);
+    
+    // Create button container
+    const buttonContainer = document.createElement('div');
+    
+    // Create maximize/minimize button
+    this.maximizeButton = document.createElement('button');
+    this.maximizeButton.textContent = '[ + ]';
+    this.maximizeButton.style.background = 'none';
+    this.maximizeButton.style.border = '1px solid #666';
+    this.maximizeButton.style.color = 'white';
+    this.maximizeButton.style.padding = '2px 6px';
+    this.maximizeButton.style.cursor = 'pointer';
+    this.maximizeButton.style.borderRadius = '3px';
+    this.maximizeButton.style.marginLeft = '5px';
+    
+    // Track expanded state
+    this.isExpanded = false;
+    
+    // Add maximize/minimize functionality
+    this.maximizeButton.addEventListener('click', () => {
+      console.log("[DEBUG] Toggle debug menu expansion");
+      if (this.isExpanded) {
+        // Minimize
+        this.container.style.width = '300px';
+        this.container.style.maxHeight = '40vh';
+        this.maximizeButton.textContent = '[ + ]';
+        this.isExpanded = false;
+      } else {
+        // Maximize
+        this.container.style.width = '80vw';
+        this.container.style.maxHeight = '80vh';
+        this.maximizeButton.textContent = '[ - ]';
+        this.isExpanded = true;
+      }
+    });
+    
+    buttonContainer.appendChild(this.maximizeButton);
+    headerContainer.appendChild(buttonContainer);
+    this.container.appendChild(headerContainer);
 
+    // Create content area for all controls
+    this.contentArea = document.createElement('div');
+    this.container.appendChild(this.contentArea);
+    
     // Add a simple status display
     const status = document.createElement('div');
     status.textContent = 'Debug tools initialized';
-    this.container.appendChild(status);
+    status.style.marginBottom = '10px';
+    this.contentArea.appendChild(status);
 
     // Add to document
     document.body.appendChild(this.container);
+    
+    console.log("[DEBUG] Debug UI created with maximize functionality");
   }
 
   /**
