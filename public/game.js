@@ -627,14 +627,14 @@ try {
       // Create beast at hex position (slightly elevated)
       const beastPosition = {
         x: hex.position.x,
-        y: hex.position.y + 1.2, // Raise above the hex
+        y: hex.position.y + 0.7, // Raise above the hex
         z: hex.position.z,
       };
 
       debugLog(`Creating Fire Beast at position`, beastPosition);
 
       // Create the beast
-      fireBeast = new Beast("Fire", scene, camera, beastPosition, 3);
+      fireBeast = new Beast("Fire", scene, camera, beastPosition, 1);
 
       // Log the hex where the beast spawned
       debugLog(`Fire Beast spawned on hex`, {
