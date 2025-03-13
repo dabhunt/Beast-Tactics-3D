@@ -1,28 +1,10 @@
 // Import Three.js from CDN
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js";
+import { CameraManager } from "./camera.js";
+import { DebugMenu } from "../tools/diagnostics/DebugMenu.js";
 
 // Logging setup
 console.log("Beast Tactics script loaded and starting...");
-
-// Track mouse state for camera controls
-const mouseState = {
-  leftDragging: false, // For panning
-  rightDragging: false, // For camera angle rotation
-  lastX: 0,
-  lastY: 0,
-  panSensitivity: 0.003, // Sensitivity for panning
-  rotateSensitivity: 0.005, // Sensitivity for rotation
-  zoomSensitivity: 0.01,
-  minZoom: 5,
-  maxZoom: 50,
-  target: new THREE.Vector3(0, 0, 0), // Camera look target
-};
-
-// Debug function to log mouse control events
-function logMouseControl(action, data) {
-  if (!DEBUG) return;
-  console.log(`[MOUSE] ${action}`, data);
-}
 
 // Global error handler for debugging
 window.addEventListener("error", (event) => {
@@ -60,22 +42,6 @@ try {
   scene.background = new THREE.Color(0x111926); // Slightly blue-tinted dark background for better contrast
   debugLog("Scene created with dark blue-tinted background for better contrast");
 
-  // Camera setup with logging of parameters
-  const cameraParams = {
-    fov: 75,
-    aspect: window.innerWidth / window.innerHeight,
-    near: 0.1,
-    far: 1000,
-  };
-  debugLog("Creating camera with parameters:", cameraParams);
-
-  const camera = new THREE.PerspectiveCamera(
-    cameraParams.fov,
-    cameraParams.aspect,
-    cameraParams.near,
-    cameraParams.far,
-  );
-
   // Renderer setup with anti-aliasing
   debugLog("Creating WebGL renderer...");
   const renderer = new THREE.WebGLRenderer({
@@ -95,37 +61,45 @@ try {
   document.body.appendChild(renderer.domElement);
   debugLog("Renderer canvas added to document");
 
+  // Initialize camera manager
+  debugLog("Initializing camera manager...");
+  const cameraManager = new CameraManager(scene);
+  const camera = cameraManager.camera; // Get the camera instance for use in the render loop
+  
   // Add enhanced lighting setup for better visibility
   debugLog("Setting up enhanced lighting...");
+  
+  // Create a lights container to organize and reference lights
+  const lights = {};
   
   // Enhanced lighting configuration for better color vibrancy
   
   // Brighter ambient light with warmer tone
-  const ambientLight = new THREE.AmbientLight(0xfffcf0, 0.85); // Increased intensity, slightly warmer
-  scene.add(ambientLight);
-  debugLog("Created enhanced ambient light with intensity:", ambientLight.intensity);
+  lights.ambient = new THREE.AmbientLight(0xfffcf0, 0.85); // Increased intensity, slightly warmer
+  scene.add(lights.ambient);
+  debugLog("Created enhanced ambient light with intensity:", lights.ambient.intensity);
 
   // Primary directional light (sun-like) with warmer color
-  const dirLight = new THREE.DirectionalLight(0xfff0d0, 1.2); // Warmer color and higher intensity
-  dirLight.position.set(5, 15, 5);
-  dirLight.castShadow = true;
-  scene.add(dirLight);
-  debugLog("Created enhanced directional light with intensity:", dirLight.intensity);
+  lights.directional = new THREE.DirectionalLight(0xfff0d0, 1.2); // Warmer color and higher intensity
+  lights.directional.position.set(5, 15, 5);
+  lights.directional.castShadow = true;
+  scene.add(lights.directional);
+  debugLog("Created enhanced directional light with intensity:", lights.directional.intensity);
   
   // Secondary fill light from opposite side with complementary cooler tint
-  const fillLight = new THREE.DirectionalLight(0xd0e8ff, 0.5); // Slightly higher intensity
-  fillLight.position.set(-5, 8, -5);
-  scene.add(fillLight);
+  lights.fill = new THREE.DirectionalLight(0xd0e8ff, 0.5); // Slightly higher intensity
+  lights.fill.position.set(-5, 8, -5);
+  scene.add(lights.fill);
   
   // Small overhead point light for specular highlights - brighter
-  const pointLight = new THREE.PointLight(0xffffff, 0.7, 50); // Increased intensity
-  pointLight.position.set(0, 15, 0);
-  scene.add(pointLight);
+  lights.point = new THREE.PointLight(0xffffff, 0.7, 50); // Increased intensity
+  lights.point.position.set(0, 15, 0);
+  scene.add(lights.point);
   
   // Add an additional low rim light for edge definition
-  const rimLight = new THREE.DirectionalLight(0xffe8d0, 0.3);
-  rimLight.position.set(0, 3, -12);
-  scene.add(rimLight);
+  lights.rim = new THREE.DirectionalLight(0xffe8d0, 0.3);
+  lights.rim.position.set(0, 3, -12);
+  scene.add(lights.rim);
   
   debugLog("Enhanced lighting setup complete with main, fill, and point lights");
 
@@ -294,7 +268,7 @@ try {
   });
 
   // Function to create individual hexagons
-  function createHex(q, r) {
+  function createHex(q, r, horizontalSpacing = 1.5, verticalFactor = 1.0) {
     // Assign element type - for now, random selection
     const randomElement = elementTypes[Math.floor(Math.random() * elementTypes.length)];
     
@@ -320,8 +294,8 @@ try {
     // For perfect fit in axial coordinate system:
     // x = hexRadius * 3/2 * q
     // z = hexRadius * sqrt(3) * (r + q/2)
-    const x = hexRadius * 1.5 * q;
-    const z = hexRadius * Math.sqrt(3) * (r + q/2);
+    const x = hexRadius * horizontalSpacing * q;
+    const z = hexRadius * Math.sqrt(3) * verticalFactor * (r + q/2);
     hex.position.set(x, 0, z);
 
     // Debug rotation values for troubleshooting
@@ -345,10 +319,10 @@ try {
   let hexCount = 0;
 
   // Function to generate the entire grid
-  function generateHexagonGrid() {
+  function generateHexagonGrid(horizontalSpacing = 1.5, verticalFactor = 1.0) {
     // Generate grid (radius 7 - about 3x as many hexagons as radius 4)
     const gridRadius = 7;
-    debugLog(`Generating hex grid with radius ${gridRadius}`);
+    debugLog(`Generating hex grid with radius ${gridRadius}, spacing: h=${horizontalSpacing}, v=${verticalFactor}`);
     
     // Track element distribution for debugging
     const elementDistribution = {};
@@ -370,7 +344,7 @@ try {
         r <= Math.min(gridRadius, -q + gridRadius);
         r++
       ) {
-        const hex = createHex(q, r);
+        const hex = createHex(q, r, horizontalSpacing, verticalFactor);
         hexagons.push(hex);
         hexCount++;
         
@@ -394,215 +368,24 @@ try {
   // The grid will be generated from the updateLoadingStatus function
   // when all textures are processed
 
-  // Position camera more top-down with slight angle
-  camera.position.set(0, 30, 10);
-  mouseState.target.set(0, 0, 0);
-  camera.lookAt(mouseState.target);
-  debugLog("Camera positioned at:", camera.position);
-
-  // Set up camera controls for mouse interaction
-
-  // Mouse down handler to start drag
-  window.addEventListener("mousedown", (event) => {
-    if (event.button === 1) {
-      // Middle mouse button for panning
-      mouseState.leftDragging = true;
-      mouseState.lastX = event.clientX;
-      mouseState.lastY = event.clientY;
-      logMouseControl("Pan started", { x: event.clientX, y: event.clientY });
-      event.preventDefault(); // Prevent default browser behavior
-    } else if (event.button === 2) {
-      // Right mouse button for rotation
-      mouseState.rightDragging = true;
-      mouseState.lastX = event.clientX;
-      mouseState.lastY = event.clientY;
-      logMouseControl("Rotation started", {
-        x: event.clientX,
-        y: event.clientY,
-      });
-      event.preventDefault(); // Prevent default context menu
-    }
-  });
-
-  // Prevent context menu on right click
-  window.addEventListener("contextmenu", (event) => {
-    event.preventDefault();
-  });
-
-  // Mouse move handler for dragging
-  window.addEventListener("mousemove", (event) => {
-    // Calculate how much the mouse has moved
-    const deltaX = event.clientX - mouseState.lastX;
-    const deltaY = event.clientY - mouseState.lastY;
-
-    // Handle panning (middle mouse button)
-    if (mouseState.leftDragging) {
-      // Calculate the camera's right and forward vectors
-      // For camera-relative panning that respects rotation
-      const cameraDirection = new THREE.Vector3();
-      camera.getWorldDirection(cameraDirection);
-      cameraDirection.y = 0; // Keep movement in the horizontal plane
-      cameraDirection.normalize();
-      
-      // Camera right vector (perpendicular to direction)
-      const cameraRight = new THREE.Vector3(-cameraDirection.z, 0, cameraDirection.x);
-      
-      // Scale the movement based on camera height
-      const moveFactor = mouseState.panSensitivity * camera.position.y;
-      
-      // Calculate movement vectors (negative to create natural "grab world" feel)
-      const moveRight = cameraRight.multiplyScalar(-deltaX * moveFactor);
-      const moveForward = cameraDirection.multiplyScalar(deltaY * moveFactor);
-      
-      // Create combined movement vector
-      const movement = new THREE.Vector3().addVectors(moveRight, moveForward);
-      
-      // Apply movement to both camera and target
-      camera.position.add(movement);
-      mouseState.target.add(movement);
-      
-      // Update camera orientation
-      camera.lookAt(mouseState.target);
-      
-      // Debug logging for significant movements
-      if (Math.abs(deltaX) + Math.abs(deltaY) > 20) {
-        logMouseControl("Panning camera", {
-          deltaX,
-          deltaY,
-          newPos: {
-            x: camera.position.x.toFixed(1),
-            y: camera.position.y.toFixed(1),
-            z: camera.position.z.toFixed(1),
-          },
-          moveVector: {
-            x: movement.x.toFixed(2),
-            y: movement.y.toFixed(2), 
-            z: movement.z.toFixed(2)
-          }
-        });
-      }
-    }
-
-    // Handle camera rotation (right mouse button)
-    if (mouseState.rightDragging) {
-      // Orbit the camera around the target point
-      const theta = deltaX * mouseState.rotateSensitivity; // Horizontal rotation
-      const phi = deltaY * mouseState.rotateSensitivity; // Vertical rotation
-
-      // Get current camera vector from target
-      const offset = new THREE.Vector3().subVectors(
-        camera.position,
-        mouseState.target,
-      );
-
-      // Convert to spherical coordinates
-      const radius = offset.length();
-      let polarAngle = Math.atan2(
-        Math.sqrt(offset.x * offset.x + offset.z * offset.z),
-        offset.y,
-      );
-      let azimuthAngle = Math.atan2(offset.z, offset.x);
-
-      // Camera constraints configuration
-      const cameraConstraints = {
-        minPolarAngle: 0.1,           // Minimum angle (rad) - close to top-down
-        maxPolarAngle: Math.PI * 0.6, // Maximum angle (rad) - prevents looking from below
-        minAzimuthAngle: -Infinity,   // No constraint on horizontal rotation
-        maxAzimuthAngle: Infinity     // No constraint on horizontal rotation
-      };
-      
-      // Apply rotation with constraints
-      azimuthAngle -= theta;
-      
-      // Constrain polar angle to prevent looking from below the map
-      polarAngle = Math.max(
-        cameraConstraints.minPolarAngle, 
-        Math.min(cameraConstraints.maxPolarAngle, polarAngle + phi)
-      );
-      
-      // Log constraint application if significant angle adjustment made
-      if (DEBUG && Math.abs(polarAngle - (polarAngle + phi)) > 0.1) {
-        console.log("[CAMERA] Polar angle constrained:", { 
-          requested: ((polarAngle + phi) * 180/Math.PI).toFixed(1),
-          constrained: (polarAngle * 180/Math.PI).toFixed(1)
-        });
-      }
-
-      // Convert back to Cartesian coordinates
-      offset.x = radius * Math.sin(polarAngle) * Math.cos(azimuthAngle);
-      offset.y = radius * Math.cos(polarAngle);
-      offset.z = radius * Math.sin(polarAngle) * Math.sin(azimuthAngle);
-
-      // Update camera position
-      camera.position.copy(mouseState.target).add(offset);
-      camera.lookAt(mouseState.target);
-
-      if (Math.abs(deltaX) + Math.abs(deltaY) > 20) {
-        logMouseControl("Rotating camera", {
-          deltaX,
-          deltaY,
-          rotation: {
-            azimuth: ((azimuthAngle * 180) / Math.PI).toFixed(1),
-            polar: ((polarAngle * 180) / Math.PI).toFixed(1),
-          },
-        });
-      }
-    }
-
-    // Update last position
-    mouseState.lastX = event.clientX;
-    mouseState.lastY = event.clientY;
-  });
-
-  // Mouse up handler to end drag
-  window.addEventListener("mouseup", (event) => {
-    if (event.button === 1) {
-      mouseState.leftDragging = false;
-      logMouseControl("Pan ended", null);
-    } else if (event.button === 2) {
-      mouseState.rightDragging = false;
-      logMouseControl("Rotation ended", null);
-    }
-  });
-
-  // Mouse wheel handler for zoom
-  window.addEventListener(
-    "wheel",
-    (event) => {
-      event.preventDefault(); // Prevent default scroll
-
-      // Determine zoom direction and calculate new position
-      const zoomAmount = event.deltaY * mouseState.zoomSensitivity;
-
-      // Get direction vector from camera to target
-      const direction = new THREE.Vector3().subVectors(
-        camera.position,
-        mouseState.target,
-      );
-
-      // Scale the direction vector based on zoom
-      const scaleFactor = 1 + zoomAmount / direction.length();
-      direction.multiplyScalar(scaleFactor);
-
-      // Calculate new camera position
-      const newPosition = new THREE.Vector3()
-        .copy(mouseState.target)
-        .add(direction);
-
-      // Enforce zoom limits
-      if (
-        newPosition.y > mouseState.minZoom &&
-        newPosition.y < mouseState.maxZoom
-      ) {
-        camera.position.copy(newPosition);
-        logMouseControl("Zooming camera", {
-          delta: event.deltaY,
-          distance: direction.length().toFixed(1),
-        });
-      }
-    },
-    { passive: false },
-  ); // Important for preventing scroll
+  // Initialize the debug menu after all components are created
+  debugLog("Initializing debug menu...");
+  const debugMenu = new DebugMenu(
+    scene,
+    camera,
+    renderer, 
+    hexagons,
+    lights,
+    textureLoadingTracker.textures
+  );
+  
+  // Connect camera manager to debug menu
+  debugMenu.setCameraManager(cameraManager);
+  
+  // Connect grid generator to debug menu
+  debugMenu.setGridGenerator(generateHexagonGrid);
+  
+  debugLog("Debug menu initialized and connected to game components");
 
   // Animation loop with performance tracking
   let frameCount = 0;
@@ -665,8 +448,10 @@ try {
       height: window.innerHeight,
     });
 
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
+    // Update camera aspect ratio via camera manager
+    cameraManager.updateAspect(window.innerWidth, window.innerHeight);
+    
+    // Update renderer size
     renderer.setSize(window.innerWidth, window.innerHeight);
     debugLog("Renderer and camera updated for new dimensions");
   });
