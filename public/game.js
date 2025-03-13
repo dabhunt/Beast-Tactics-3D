@@ -141,8 +141,15 @@ try {
     const z = hexRadius * Math.sqrt(3) * (r + q / 2);
     hex.position.set(x, 0, z);
     
-    // Rotate to lay flat
-    hex.rotation.x = Math.PI / 2;
+    // Debug rotation values for troubleshooting
+    debugLog(`Creating hex at (${q},${r}) with position (${x},0,${z})`);
+    
+    // For cylinders to lie flat (disk facing up), we need to rotate 90 degrees around X-axis
+    // PI/2 = 90 degrees in radians
+    hex.rotation.x = -Math.PI / 2;
+    
+    // Log rotation for verification
+    debugLog(`Hex rotation set to: ${hex.rotation.x} radians (${hex.rotation.x * 180 / Math.PI} degrees)`);
     
     // Add to scene
     scene.add(hex);
