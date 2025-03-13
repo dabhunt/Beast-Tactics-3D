@@ -155,8 +155,8 @@ export class Beast {
     // Arrow heads for six directions - based on flat-topped hex geometry
     this.directionalArrows = [];
 
-    // Hex directions - these should match your hex grid layout
-    // Using axial coordinates offsets for flat-topped hexes
+    // Simplified hex directions with evenly spaced angles
+    // Each has a movement offset but we'll position them in a cleaner layout
     const hexDirections = [
       { q: 1, r: 0, name: "E", angle: 0 }, // East
       { q: 0, r: -1, name: "NE", angle: Math.PI / 3 }, // Northeast
@@ -166,24 +166,24 @@ export class Beast {
       { q: 1, r: -1, name: "SE", angle: 5 * Math.PI / 3 }, // Southeast
     ];
 
-    // Distance from center to adjacent hex center (matches hex spacing in game.js)
-    const horizontalSpacing = 1.5; // Should match the hex grid spacing
-    const hexRadius = 1; // Should match the hex radius in game.js
+    // Distance from beast to place arrows
+    const arrowDistance = 1.2;
     
     // Create arrows for each direction
     hexDirections.forEach((direction) => {
-      // Calculate position of the arrow to be over the adjacent hex
-      // For a flat-topped hex grid using axial coordinates
-      const x = horizontalSpacing * direction.q;
-      const z = hexRadius * Math.sqrt(3) * (direction.r + direction.q/2);
+      // Use simple trig to place arrows in a nice circle around the beast
+      // This is more intuitive and cleaner than trying to place them exactly on adjacent hexes
+      const x = arrowDistance * Math.cos(direction.angle);
+      const z = arrowDistance * Math.sin(direction.angle);
       
       console.log(`[BEAST] Calculating position for ${direction.name} arrow:`, {
         moveOffset: { q: direction.q, r: direction.r },
+        angle: (direction.angle * 180 / Math.PI).toFixed(1) + '°',
         calculatedPosition: { x, z }
       });
       
-      // Create triangle geometry for arrow
-      const arrowGeometry = new THREE.ConeGeometry(0.15, 0.4, 3);
+      // Create triangle geometry for arrow - slightly larger for better visibility
+      const arrowGeometry = new THREE.ConeGeometry(0.2, 0.5, 3);
       const arrowMaterial = new THREE.MeshBasicMaterial({
         color: 0xff8800, // Bright orange-yellow
         transparent: true,
@@ -193,30 +193,27 @@ export class Beast {
 
       const arrow = new THREE.Mesh(arrowGeometry, arrowMaterial);
 
-      // Position the arrow at the center of the adjacent hex
+      // Position the arrow in a circular pattern around the beast
       arrow.position.set(
         x,
         0.7, // Higher above the base for better visibility
         z,
       );
 
-      // Calculate rotation to point TOWARDS the current beast hex (opposite of direction angle)
-      // We need to rotate the cone so its tip points toward our current hex
-      // This means pointing in the opposite direction of the movement direction
-      const pointingAngle = (direction.angle + Math.PI) % (2 * Math.PI);
+      // Rotation: point outward from beast (away from center)
+      // This matches the movement direction more intuitively
       
-      // Apply rotation - need to rotate cone to point in right direction (cone points up by default)
+      // Apply rotation - pointing outward (cone points up by default)
       arrow.rotation.x = Math.PI / 2; // First rotate to point horizontally (90 degrees)
-      arrow.rotation.y = pointingAngle; // Then rotate to point in the correct direction
+      arrow.rotation.y = direction.angle; // Then rotate to point outward
       
       // Add debug log for arrow positioning and rotation
       console.log(`[BEAST] Positioned ${direction.name} arrow at:`, {
-        x: x,
+        x: x.toFixed(2),
         y: 0.7,
-        z: z,
-        rotationY: arrow.rotation.y,
-        pointingAngle: (pointingAngle * 180 / Math.PI).toFixed(1) + '°',
-        pointingTo: { q: -direction.q, r: -direction.r }
+        z: z.toFixed(2),
+        rotationY: (arrow.rotation.y * 180 / Math.PI).toFixed(1) + '°',
+        pointingDirection: direction.name
       });
 
       // Make arrow interactive
