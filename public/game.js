@@ -168,10 +168,9 @@ try {
     textures: {}
   };
   
-  // Texture offset configuration to handle transparent margins
+  // Texture configuration (reverted to default)
   const textureConfig = {
-    // 17px transparent margins at top and bottom of png tiles
-    verticalMarginRatio: 0.17, // Approximation - adjust based on actual image dimensions
+    verticalMarginRatio: 0, // No margin adjustment
     debug: true // Set to true to see debugging logs about texture adjustments
   };
   
@@ -220,9 +219,9 @@ try {
       (texture) => {
         debugLog(`Successfully loaded ${element} texture`);
         
-        // Apply texture offset to account for transparent margins
-        texture.repeat.set(1, 1 - (textureConfig.verticalMarginRatio * 2));
-        texture.offset.set(0, textureConfig.verticalMarginRatio);
+        // Use default texture mapping (no offset)
+        texture.repeat.set(1, 1);
+        texture.offset.set(0, 0);
         
         if (textureConfig.debug) {
           console.log(`[TEXTURE] Applied texture offset for ${element}:`, {
@@ -298,8 +297,11 @@ try {
     hex.userData.r = r;
 
     // Position hexagon in grid
-    const x = hexRadius * 1.75 * q;
-    const z = hexRadius * Math.sqrt(3) * (r + q / 2);
+    // For perfect fit in axial coordinate system:
+    // x = hexRadius * 3/2 * q
+    // z = hexRadius * sqrt(3) * (r + q/2)
+    const x = hexRadius * 1.5 * q;
+    const z = hexRadius * Math.sqrt(3) * (r + q/2);
     hex.position.set(x, 0, z);
 
     // Debug rotation values for troubleshooting
