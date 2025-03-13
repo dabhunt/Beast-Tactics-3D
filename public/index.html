@@ -83,7 +83,13 @@
     </script>
 
     <script type="module" src="game.js"></script>
-    <!-- Debug tools loaded via the main game.js import system -->
+    <script type="module">
+        import { DebugMenu } from './tools/diagnostics/DebugMenu.js';
+        window.DebugMenu = DebugMenu;
+
+        // Make THREE available globally for the arrow debugger
+        import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js";
+        window.THREE = THREE;
+    </script>
   </body>
 </html>
-<line_number>28</line_number>
