@@ -415,19 +415,34 @@ try {
 
     // Handle panning (middle mouse button)
     if (mouseState.leftDragging) {
-      // Update camera position and target together to maintain orientation
-      // The negative signs create the "grab world" effect (drag right, world moves right)
-      const moveX = -deltaX * mouseState.panSensitivity * camera.position.y;
-      const moveZ = -deltaY * mouseState.panSensitivity * camera.position.y;
-
-      camera.position.x += moveX;
-      camera.position.z += moveZ;
-      mouseState.target.x += moveX;
-      mouseState.target.z += moveZ;
-
-      // Apply the new orientation
+      // Calculate the camera's right and forward vectors
+      // For camera-relative panning that respects rotation
+      const cameraDirection = new THREE.Vector3();
+      camera.getWorldDirection(cameraDirection);
+      cameraDirection.y = 0; // Keep movement in the horizontal plane
+      cameraDirection.normalize();
+      
+      // Camera right vector (perpendicular to direction)
+      const cameraRight = new THREE.Vector3(-cameraDirection.z, 0, cameraDirection.x);
+      
+      // Scale the movement based on camera height
+      const moveFactor = mouseState.panSensitivity * camera.position.y;
+      
+      // Calculate movement vectors (negative to create natural "grab world" feel)
+      const moveRight = cameraRight.multiplyScalar(-deltaX * moveFactor);
+      const moveForward = cameraDirection.multiplyScalar(deltaY * moveFactor);
+      
+      // Create combined movement vector
+      const movement = new THREE.Vector3().addVectors(moveRight, moveForward);
+      
+      // Apply movement to both camera and target
+      camera.position.add(movement);
+      mouseState.target.add(movement);
+      
+      // Update camera orientation
       camera.lookAt(mouseState.target);
-
+      
+      // Debug logging for significant movements
       if (Math.abs(deltaX) + Math.abs(deltaY) > 20) {
         logMouseControl("Panning camera", {
           deltaX,
@@ -437,6 +452,11 @@ try {
             y: camera.position.y.toFixed(1),
             z: camera.position.z.toFixed(1),
           },
+          moveVector: {
+            x: movement.x.toFixed(2),
+            y: movement.y.toFixed(2), 
+            z: movement.z.toFixed(2)
+          }
         });
       }
     }
