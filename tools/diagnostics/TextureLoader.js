@@ -1,32 +1,44 @@
-
 /**
  * TextureLoader.js
  * Diagnostic tool to verify texture loading
  */
 
-import { Logger } from '../../public/js/utils/Logger.js';
+import { Logger } from "../../public/js/utils/Logger.js";
 
 /**
  * Test the loading of BiomeTile textures
  */
 export async function testTextureLoading() {
-  Logger.info('TextureLoader', 'Starting texture loading test');
-  
+  Logger.info("TextureLoader", "Starting texture loading test");
+
   const biomeTypes = [
-    'plains', 'forest', 'mountains', 'desert', 'water',
-    'volcanic', 'storm', 'tundra', 'swamp', 'dark', 'sacred', 'battlefield'
+    "plains",
+    "forest",
+    "mountains",
+    "desert",
+    "water",
+    "volcanic",
+    "storm",
+    "tundra",
+    "swamp",
+    "dark",
+    "sacred",
+    "battlefield",
   ];
-  
+
   const results = {
     success: [],
     failed: [],
     dimensions: {},
-    totalSize: 0
+    totalSize: 0,
   };
-  
+
   // Log the start of the process with details
-  Logger.info('TextureLoader', `Starting texture loading test for ${biomeTypes.length} biome types`);
-  
+  Logger.info(
+    "TextureLoader",
+    `Starting texture loading test for ${biomeTypes.length} biome types`,
+  );
+
   for (const biome of biomeTypes) {
     try {
       // Create an Image to load and test the texture
@@ -36,7 +48,7 @@ export async function testTextureLoading() {
           results.success.push(biome);
           results.dimensions[biome] = {
             width: img.width,
-            height: img.height
+            height: img.height,
           };
           results.totalSize += img.width * img.height * 4; // Rough estimate of memory usage (RGBA)
           resolve();
@@ -46,48 +58,56 @@ export async function testTextureLoading() {
           reject(new Error(`Failed to load ${biome}.png`));
         };
       });
-      
+
       // Mapping from biome types to element texture files
       const biomeToElementMap = {
-        'plains': 'Earth',
-        'forest': 'Plant', // Changed from Nature to Plant
-        'mountains': 'Metal',
-        'desert': 'Light',
-        'water': 'Water',
-        'volcanic': 'Fire',
-        'storm': 'Electric',
-        'tundra': 'Wind',
-        'swamp': 'Corrosion',
-        'dark': 'Dark',
-        'sacred': 'Spirit',
-        'battlefield': 'Combat'
+        plains: "Earth",
+        forest: "Plant", // Changed from Nature to Plant
+        mountains: "Metal",
+        desert: "Light",
+        water: "Water",
+        volcanic: "Fire",
+        storm: "Electric",
+        tundra: "Wind",
+        swamp: "Corrosion",
+        dark: "Dark",
+        sacred: "Spirit",
+        battlefield: "Combat",
       };
-      
+
       // Use the element mapping instead of capitalization
       const elementName = biomeToElementMap[biome] || biome;
       img.src = `./public/assets/BiomeTiles/${elementName}.png`;
-      Logger.debug('TextureLoader', `Attempting to load ${img.src} (element for ${biome})`);
-      
+      Logger.debug(
+        "TextureLoader",
+        `Attempting to load ${img.src} (element for ${biome})`,
+      );
+
       // Wait with timeout
       await Promise.race([
         loadPromise,
-        new Promise((_, reject) => setTimeout(() => reject(new Error(`Timeout loading ${biome}.png`)), 5000))
+        new Promise((_, reject) =>
+          setTimeout(
+            () => reject(new Error(`Timeout loading ${biome}.png`)),
+            5000,
+          ),
+        ),
       ]);
-      
-      Logger.info('TextureLoader', `Successfully loaded ${biome}.png`);
+
+      Logger.info("TextureLoader", `Successfully loaded ${biome}.png`);
     } catch (err) {
-      Logger.error('TextureLoader', `Error loading ${biome}.png`, err);
+      Logger.error("TextureLoader", `Error loading ${biome}.png`, err);
     }
   }
-  
+
   // Log summary
-  Logger.info('TextureLoader', 'Texture loading test complete', {
+  Logger.info("TextureLoader", "Texture loading test complete", {
     total: biomeTypes.length,
     succeeded: results.success.length,
     failed: results.failed.length,
     dimensions: results.dimensions,
-    totalSizeKB: Math.round(results.totalSize / 1024)
+    totalSizeKB: Math.round(results.totalSize / 1024),
   });
-  
+
   return results;
 }
