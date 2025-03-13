@@ -12,7 +12,7 @@ const mouseState = {
   lastY: 0,
   panSensitivity: 0.003, // Sensitivity for panning
   rotateSensitivity: 0.005, // Sensitivity for rotation
-  zoomSensitivity: 0.1,
+  zoomSensitivity: 0.01,
   minZoom: 5,
   maxZoom: 50,
   target: new THREE.Vector3(0, 0, 0), // Camera look target
@@ -259,7 +259,7 @@ try {
     if (mouseState.leftDragging) {
       // Update camera position and target together to maintain orientation
       // The negative signs create the "grab world" effect (drag right, world moves right)
-      const moveX = deltaX * mouseState.panSensitivity * camera.position.y;
+      const moveX = -deltaX * mouseState.panSensitivity * camera.position.y;
       const moveZ = -deltaY * mouseState.panSensitivity * camera.position.y;
 
       camera.position.x += moveX;
