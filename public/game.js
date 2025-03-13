@@ -565,9 +565,11 @@ try {
   }
 
   // Add beast update to animation loop
-  const originalAnimate = animate;
+  let originalAnimate = animate;
+  
+  // Create enhanced animation function with beast updates
   function enhancedAnimate() {
-    // Call original animation function
+    // Call original animation function first
     originalAnimate();
 
     // Update beast if it exists
