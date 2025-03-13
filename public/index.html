@@ -1,81 +1,87 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Beast Tactics</title>
-  <style>
-    body { 
-      margin: 0; 
-      padding: 0;
-      overflow: hidden; 
-      background-color: #111; 
-      font-family: Arial, sans-serif;
-      color: #fff;
-    }
-    
-    canvas { 
-      width: 100%; 
-      height: 100%; 
-      display: block;
-    }
-    
-    #loading {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0,0,0,0.8);
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      z-index: 1000;
-      transition: opacity 0.5s ease-out;
-    }
-    
-    #loading.hidden {
-      opacity: 0;
-      pointer-events: none;
-    }
-    
-    .spinner {
-      width: 50px;
-      height: 50px;
-      border: 5px solid rgba(255,255,255,0.3);
-      border-radius: 50%;
-      border-top-color: #fff;
-      animation: spin 1s ease-in-out infinite;
-      margin-bottom: 20px;
-    }
-    
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Beast Tactics</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #000;
+        }
+        #loading {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            background-color: #000;
+            z-index: 1000;
+            transition: opacity 0.5s;
+        }
+        #loading.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+        #diagnostics-panel {
+            display: none;
+            position: fixed;
+            left: 10px;
+            bottom: 10px;
+            background-color: rgba(0,0,0,0.8);
+            color: white;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: monospace;
+            z-index: 1001;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+    </style>
 </head>
 <body>
-  <!-- Loading indicator -->
-  <div id="loading">
-    <div class="spinner"></div>
-    <div>Loading Beast Tactics...</div>
-  </div>
-  
-  <script>
-    // Log page load events for debugging
-    console.log("Page loading started");
-    document.addEventListener('DOMContentLoaded', () => {
-      console.log("DOM fully loaded");
-    });
-    
-    window.addEventListener('load', () => {
-      console.log("All resources loaded");
-    });
-  </script>
-  
-  <!-- Load game.js as a module -->
-  <script type="module" src="game.js"></script>
+    <div id="loading">
+        <h1>Loading Beast Tactics...</h1>
+        <p>Initializing game world</p>
+    </div>
+
+    <div id="diagnostics-panel"></div>
+
+    <script>
+        // DOM loaded logging
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM fully loaded');
+        });
+
+        // All resources loaded logging
+        window.addEventListener('load', function() {
+            console.log('All resources loaded');
+
+            // Check for diagnostics mode
+            if (window.location.search.includes('diagnostics=true')) {
+                // Load diagnostics tools when in diagnostics mode
+                const diagPanel = document.getElementById('diagnostics-panel');
+                diagPanel.style.display = 'block';
+                diagPanel.innerHTML = '<h3>Loading Diagnostics...</h3>';
+
+                // Load the diagnostics script
+                const script = document.createElement('script');
+                script.src = '/tools/diagnostics/BiomeDistributionTest.js';
+                script.onerror = () => {
+                    diagPanel.innerHTML += '<p>❌ Failed to load diagnostics</p>';
+                };
+                document.body.appendChild(script);
+            }
+        });
+    </script>
+
+    <script type="module" src="game.js"></script>
 </body>
 </html>

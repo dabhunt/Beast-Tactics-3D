@@ -117,27 +117,118 @@ try {
     6,
   );
 
-  // Define color palette for hexagons
-  const colorPalette = [
-    0xff5733, // Vibrant orange
-    0xc70039, // Crimson
-    0x900c3f, // Dark pink
-    0x581845, // Dark purple
-    0xffc300, // Bright yellow
-    0x2ecc71, // Green
-    0x3498db, // Blue
+  // Define all element types
+  const elementTypes = [
+    'Combat',
+    'Corrosion',
+    'Dark',
+    'Earth',
+    'Electric',
+    'Fire',
+    'Light',
+    'Metal',
+    'Plant',
+    'Spirit',
+    'Water',
+    'Wind'
   ];
-  debugLog("Color palette defined with", colorPalette.length, "colors");
-
-  // Create materials with different colors
-  const hexMaterials = colorPalette.map(
-    (color) =>
-      new THREE.MeshPhongMaterial({
-        color: color,
-        shininess: 30,
-        specular: 0x222222,
-      }),
-  );
+  
+  // Create URLs for local assets
+  const elemUrls = {};
+  elementTypes.forEach(element => {
+    elemUrls[element] = `/assets/BiomeTiles/${element}.png`;
+  });
+  
+  debugLog("Element types defined:", elementTypes);
+  debugLog("Element URLs mapped:", elemUrls);
+  
+  // Create texture loader with error handling
+  const textureLoader = new THREE.TextureLoader();
+  
+  // Create a loading tracker
+  const textureLoadingTracker = {
+    total: elementTypes.length,
+    loaded: 0,
+    failed: 0,
+    textures: {}
+  };
+  
+  // Default fallback material (used if textures fail to load)
+  const fallbackMaterials = [
+    new THREE.MeshPhongMaterial({ color: 0xff5733, shininess: 30, specular: 0x222222 }), // Combat
+    new THREE.MeshPhongMaterial({ color: 0x7cfc00, shininess: 30, specular: 0x222222 }), // Corrosion
+    new THREE.MeshPhongMaterial({ color: 0x581845, shininess: 30, specular: 0x222222 }), // Dark
+    new THREE.MeshPhongMaterial({ color: 0x964b00, shininess: 30, specular: 0x222222 }), // Earth
+    new THREE.MeshPhongMaterial({ color: 0xffff00, shininess: 30, specular: 0x222222 }), // Electric
+    new THREE.MeshPhongMaterial({ color: 0xff4500, shininess: 30, specular: 0x222222 }), // Fire
+    new THREE.MeshPhongMaterial({ color: 0xffffff, shininess: 30, specular: 0x222222 }), // Light
+    new THREE.MeshPhongMaterial({ color: 0xc0c0c0, shininess: 30, specular: 0x222222 }), // Metal
+    new THREE.MeshPhongMaterial({ color: 0x2ecc71, shininess: 30, specular: 0x222222 }), // Plant
+    new THREE.MeshPhongMaterial({ color: 0xd8bfd8, shininess: 30, specular: 0x222222 }), // Spirit
+    new THREE.MeshPhongMaterial({ color: 0x3498db, shininess: 30, specular: 0x222222 }), // Water
+    new THREE.MeshPhongMaterial({ color: 0xc6e2ff, shininess: 30, specular: 0x222222 })  // Wind
+  ];
+  
+  // Load all textures
+  const hexMaterials = {};
+  
+  function updateLoadingStatus() {
+    const total = textureLoadingTracker.total;
+    const loaded = textureLoadingTracker.loaded;
+    const failed = textureLoadingTracker.failed;
+    
+    debugLog(`Texture loading progress: ${loaded}/${total} loaded, ${failed} failed`);
+    
+    // Check if all textures are processed (either loaded or failed)
+    if (loaded + failed === total) {
+      debugLog("All textures processed. Ready to generate map.");
+      generateHexagonGrid();
+    }
+  }
+  
+  // Start loading all textures
+  elementTypes.forEach((element, index) => {
+    debugLog(`Loading texture for ${element} element...`);
+    
+    textureLoader.load(
+      // URL
+      elemUrls[element],
+      
+      // onLoad callback
+      (texture) => {
+        debugLog(`Successfully loaded ${element} texture`);
+        
+        // Create material with the loaded texture
+        const material = new THREE.MeshPhongMaterial({
+          map: texture,
+          shininess: 30,
+          specular: 0x333333
+        });
+        
+        // Store the material
+        hexMaterials[element] = material;
+        textureLoadingTracker.textures[element] = texture;
+        textureLoadingTracker.loaded++;
+        
+        updateLoadingStatus();
+      },
+      
+      // onProgress callback (not used)
+      undefined,
+      
+      // onError callback
+      (error) => {
+        console.error(`Failed to load texture for ${element}:`, error);
+        
+        // Use fallback material
+        debugLog(`Using fallback material for ${element}`);
+        hexMaterials[element] = fallbackMaterials[index];
+        textureLoadingTracker.failed++;
+        
+        updateLoadingStatus();
+      }
+    );
+  });
 
   // Add side material (edges of hexagons)
   const edgeMaterial = new THREE.MeshPhongMaterial({
@@ -147,9 +238,11 @@ try {
 
   // Function to create individual hexagons
   function createHex(q, r) {
-    // Pick a random material from our palette
-    const materialIndex = Math.floor(Math.random() * hexMaterials.length);
-    const hexMaterial = hexMaterials[materialIndex];
+    // Assign element type - for now, random selection
+    const randomElement = elementTypes[Math.floor(Math.random() * elementTypes.length)];
+    
+    // Get appropriate material based on element type
+    const hexMaterial = hexMaterials[randomElement] || fallbackMaterials[0];
 
     // Create multi-material for top/bottom and side
     const materials = [
@@ -160,6 +253,11 @@ try {
 
     // Create mesh with geometry and materials
     const hex = new THREE.Mesh(hexGeometry, materials);
+    
+    // Store element data for game logic
+    hex.userData.element = randomElement;
+    hex.userData.q = q;
+    hex.userData.r = r;
 
     // Position hexagon in grid
     const x = hexRadius * 1.75 * q;
@@ -167,7 +265,7 @@ try {
     hex.position.set(x, 0, z);
 
     // Debug rotation values for troubleshooting
-    debugLog(`Creating hex at (${q},${r}) with position (${x},0,${z})`);
+    debugLog(`Creating hex at (${q},${r}) with position (${x},0,${z}) - Element: ${randomElement}`);
 
     // In THREE.js, cylinders stand upright along Y axis by default
     // We need to rotate them 30 degrees (π/6 radians) around the Y axis
@@ -175,11 +273,6 @@ try {
     hex.rotation.x = 0;
     hex.rotation.y = Math.PI / 6; // 30 degrees rotation
     hex.rotation.z = 0;
-
-    // Log rotation for verification
-    debugLog(
-      `Hex rotation set to Y: ${hex.rotation.y} radians (${(hex.rotation.y * 180) / Math.PI} degrees)`,
-    );
 
     // Add to scene
     scene.add(hex);
@@ -191,28 +284,55 @@ try {
   const hexagons = [];
   let hexCount = 0;
 
-  // Generate grid (radius 7 - about 3x as many hexagons as radius 4)
-  const gridRadius = 7;
-  debugLog(`Generating hex grid with radius ${gridRadius}`);
+  // Function to generate the entire grid
+  function generateHexagonGrid() {
+    // Generate grid (radius 7 - about 3x as many hexagons as radius 4)
+    const gridRadius = 7;
+    debugLog(`Generating hex grid with radius ${gridRadius}`);
+    
+    // Track element distribution for debugging
+    const elementDistribution = {};
+    elementTypes.forEach(element => { elementDistribution[element] = 0; });
+    
+    // Clear any existing hexagons if we're regenerating
+    if (hexagons.length > 0) {
+      debugLog("Clearing existing hexagons before regeneration");
+      hexagons.forEach(hex => {
+        scene.remove(hex);
+      });
+      hexagons.length = 0;
+      hexCount = 0;
+    }
 
-  for (let q = -gridRadius; q <= gridRadius; q++) {
-    for (
-      let r = Math.max(-gridRadius, -q - gridRadius);
-      r <= Math.min(gridRadius, -q + gridRadius);
-      r++
-    ) {
-      const hex = createHex(q, r);
-      hexagons.push(hex);
-      hexCount++;
+    for (let q = -gridRadius; q <= gridRadius; q++) {
+      for (
+        let r = Math.max(-gridRadius, -q - gridRadius);
+        r <= Math.min(gridRadius, -q + gridRadius);
+        r++
+      ) {
+        const hex = createHex(q, r);
+        hexagons.push(hex);
+        hexCount++;
+        
+        // Track element distribution if hex has element data
+        if (hex.userData.element) {
+          elementDistribution[hex.userData.element]++;
+        }
 
-      // Log progress every 20 hexagons
-      if (hexCount % 20 === 0) {
-        debugLog(`Created ${hexCount} hexagons so far...`);
+        // Log progress every 20 hexagons
+        if (hexCount % 20 === 0) {
+          debugLog(`Created ${hexCount} hexagons so far...`);
+        }
       }
     }
-  }
 
-  debugLog(`Grid generation complete: ${hexagons.length} hexagons created`);
+    debugLog(`Grid generation complete: ${hexagons.length} hexagons created`);
+    debugLog("Element distribution:", elementDistribution);
+  }
+  
+  // Wait for texture loading to complete before generating the grid
+  // The grid will be generated from the updateLoadingStatus function
+  // when all textures are processed
 
   // Position camera more top-down with slight angle
   camera.position.set(0, 30, 10);
@@ -386,6 +506,7 @@ try {
   // Animation loop with performance tracking
   let frameCount = 0;
   let lastTime = performance.now();
+  let fpsUpdateTime = performance.now();
 
   debugLog("Starting animation loop...");
 
@@ -394,7 +515,15 @@ try {
       const currentTime = performance.now();
       frameCount++;
 
-      // Log FPS every 100 frames
+      // Update FPS counter every 30 frames (more frequent updates for UI)
+      if (frameCount % 30 === 0) {
+        const elapsed = currentTime - fpsUpdateTime;
+        currentFps = Math.round((30 * 1000) / elapsed);
+        fpsUpdateTime = currentTime;
+        updateDebugInfo(); // Update the debug overlay
+      }
+      
+      // Log FPS every 100 frames (to console)
       if (frameCount % 100 === 0) {
         const elapsed = currentTime - lastTime;
         const fps = Math.round((100 * 1000) / elapsed);
@@ -451,8 +580,39 @@ try {
   debugInfo.style.padding = "10px";
   debugInfo.style.fontFamily = "monospace";
   debugInfo.style.zIndex = "1000";
-  debugInfo.textContent = "Beast Tactics: Rendering active";
+  debugInfo.style.maxHeight = "80vh";
+  debugInfo.style.overflowY = "auto";
+  debugInfo.innerHTML = `
+    <h3>Beast Tactics</h3>
+    <div id="debug-fps">FPS: --</div>
+    <div id="debug-hex-count">Hexagons: --</div>
+    <div id="debug-camera">Camera: --</div>
+    <div id="debug-textures">Textures: Loading...</div>
+    <div id="debug-hovered">Hovered: None</div>
+  `;
   document.body.appendChild(debugInfo);
+  
+  // Function to update debug info
+  function updateDebugInfo() {
+    if (!DEBUG) return;
+    
+    const fpsElement = document.getElementById("debug-fps");
+    const hexCountElement = document.getElementById("debug-hex-count");
+    const cameraElement = document.getElementById("debug-camera");
+    const texturesElement = document.getElementById("debug-textures");
+    
+    if (fpsElement) fpsElement.textContent = `FPS: ${currentFps}`;
+    if (hexCountElement) hexCountElement.textContent = `Hexagons: ${hexagons.length}`;
+    if (cameraElement) {
+      cameraElement.textContent = `Camera: X:${camera.position.x.toFixed(1)} Y:${camera.position.y.toFixed(1)} Z:${camera.position.z.toFixed(1)}`;
+    }
+    if (texturesElement) {
+      texturesElement.textContent = `Textures: ${textureLoadingTracker.loaded}/${textureLoadingTracker.total} loaded, ${textureLoadingTracker.failed} failed`;
+    }
+  }
+  
+  // Add variable to store current FPS
+  let currentFps = 0;
 
   // Hide loading screen
   const loadingElement = document.getElementById("loading");
