@@ -163,14 +163,41 @@ export class GameSetupState {
     }
     
     try {
+      // Ensure the configuration exists and provide defaults if not
+      let mapConfig = this._gameManager._config?.map || {};
+      
+      // Default configuration if not provided
+      if (!mapConfig.size && mapConfig.size !== 0) {
+        mapConfig.size = 7; // Default map radius
+        Logger.debug('GameSetupState', 'Using default map size: 7');
+      }
+      
+      // Log the config we're using
+      Logger.debug('GameSetupState', 'Map generation config:', mapConfig);
+      
       // Generate the map
-      const config = this._gameManager._config.map;
-      await mapSystem.generateMap(config);
+      await mapSystem.generateMap(mapConfig);
+      
+      // Try to set the hex grid renderer reference if available
+      // This integration will need to be improved
+      try {
+        if (typeof window !== 'undefined' && window.hexGridRenderer) {
+          mapSystem.setHexGrid(window.hexGridRenderer);
+          Logger.debug('GameSetupState', 'Connected map system to hex grid renderer');
+        }
+      } catch (rendererError) {
+        Logger.warning('GameSetupState', 'Could not connect to hex grid renderer', rendererError);
+      }
       
       Logger.info('GameSetupState', 'Map initialized successfully');
       this.advanceSetup();
     } catch (error) {
       Logger.error('GameSetupState', 'Failed to initialize map', error);
+      console.error('Map initialization error details:', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack
+      });
       
       // Try to continue anyway
       this.advanceSetup();

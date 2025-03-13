@@ -472,12 +472,32 @@ try {
       
       init() {
         console.log('Game initialized');
+        
+        // Make grid renderer accessible to other systems
+        window.hexGridRenderer = this.gridRenderer;
       }
     }
 
     // Initialize the game
     const game = new Game();
     game.init();
+    
+    // Set up diagnostics tools - will be available via Ctrl+D 
+    if (gameManager) {
+      import('./tools/diagnostics/DiagnosticsUI.js')
+        .then(module => {
+          module.setupDiagnosticsShortcut(gameManager);
+          console.log('Diagnostics tools loaded - Press Ctrl+D to open');
+          
+          // Show diagnostics panel immediately in development
+          if (gameManager.debugMode) {
+            module.createDiagnosticsPanel(gameManager);
+          }
+        })
+        .catch(err => {
+          console.error('Failed to load diagnostics tools:', err);
+        });
+    }
     
     // Load diagnostic tools asynchronously
     import('../tools/diagnostics/SystemCheck.js')
