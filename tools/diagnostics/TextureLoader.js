@@ -1,3 +1,4 @@
+
 /**
  * TextureLoader.js
  * Diagnostic tool to verify texture loading
@@ -81,7 +82,7 @@ export async function testTextureLoading() {
 
       // Use the element mapping instead of capitalization
       const elementName = biomeToElementMap[biome] || biome;
-      img.src = `./public/assets/BiomeTiles/${elementName}.png`;
+      img.src = `/public/assets/BiomeTiles/${elementName}.png`;
       Logger.debug(
         "TextureLoader",
         `Attempting to load ${img.src} (element for ${biome})`,

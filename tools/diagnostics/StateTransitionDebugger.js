@@ -1,204 +1,408 @@
 
 /**
  * StateTransitionDebugger.js
- * A diagnostic tool to help track and debug state transitions
+ * Tools for debugging state transitions and fixing common issues
  */
 
 import { Logger } from "../../public/js/utils/Logger.js";
-import { GameStates } from "../../public/js/models/GameStates.js";
 
 /**
- * Diagnose state transition problems
- * @param {Object} stateManager - The StateManager instance
- * @param {Object} gameManager - The GameManager instance
+ * Diagnose state transition issues in state manager
+ * @param {StateManager} stateManager - The state manager to diagnose
+ * @param {GameManager} gameManager - Game manager instance
  * @returns {Object} Diagnostic results
  */
 export function diagnoseStateTransitions(stateManager, gameManager) {
-  Logger.info('StateTransitionDebugger', 'Running state transition diagnostics');
+  Logger.info("StateTransitionDebugger", "Diagnosing state transitions");
+  console.log("Running state transition diagnostics...");
   
   const results = {
-    currentState: stateManager.currentState,
-    previousState: stateManager.previousState,
-    validTransitions: {},
+    issues: [],
     availableStates: [],
-    stateInstances: {},
-    issues: []
+    currentState: null,
+    previousState: null,
+    transitionGraph: {}
   };
   
   try {
-    // Check which states are registered
-    if (stateManager._states) {
-      results.availableStates = Object.keys(stateManager._states);
-      
-      // Check each state instance
-      for (const [stateName, stateInstance] of Object.entries(stateManager._states)) {
-        results.stateInstances[stateName] = {
-          exists: !!stateInstance,
-          hasEnterState: typeof stateInstance?.enterState === 'function',
-          hasExitState: typeof stateInstance?.exitState === 'function',
-          hasUpdateState: typeof stateInstance?.updateState === 'function'
-        };
-        
-        if (!stateInstance) {
-          results.issues.push(`State ${stateName} is registered but instance is null or undefined`);
-        } else if (typeof stateInstance.enterState !== 'function') {
-          results.issues.push(`State ${stateName} is missing enterState method`);
-        } else if (typeof stateInstance.exitState !== 'function') {
-          results.issues.push(`State ${stateName} is missing exitState method`);
-        }
-      }
-    } else {
-      results.issues.push('State manager has no _states property');
+    // Validate state manager
+    if (!stateManager) {
+      results.issues.push("State manager is null or undefined");
+      return results;
     }
     
-    // Check valid transitions
-    if (stateManager._validTransitions) {
-      results.validTransitions = { ...stateManager._validTransitions };
-      
-      // Check if PLAYER_INPUT state exists in transitions
-      if (!results.validTransitions[GameStates.PLAYER_INPUT]) {
-        results.issues.push('PLAYER_INPUT state has no outgoing transitions defined');
+    // Get available states
+    results.availableStates = stateManager._states ? Object.keys(stateManager._states) : [];
+    results.currentState = stateManager.currentState;
+    results.previousState = stateManager.previousState;
+    
+    Logger.debug("StateTransitionDebugger", "Available states:", results.availableStates);
+    
+    // Check for required states
+    const requiredStates = ['GAME_SETUP', 'TURN_START', 'PLAYER_INPUT', 'TURN_END', 'GAME_OVER'];
+    
+    requiredStates.forEach(state => {
+      if (!results.availableStates.includes(state)) {
+        results.issues.push(`Required state missing: ${state}`);
       }
-      
-      // Check which states can transition to PLAYER_INPUT
-      const statesTransitioningToPlayerInput = [];
-      for (const [fromState, toStates] of Object.entries(results.validTransitions)) {
-        if (toStates.includes(GameStates.PLAYER_INPUT)) {
-          statesTransitioningToPlayerInput.push(fromState);
-        }
+    });
+    
+    // Check transition table
+    const transitions = stateManager._validTransitions || {};
+    results.transitionGraph = transitions;
+    
+    // Check for states with no outgoing transitions
+    results.availableStates.forEach(state => {
+      if (!transitions[state] || transitions[state].length === 0) {
+        results.issues.push(`State '${state}' has no outgoing transitions`);
       }
-      
-      if (statesTransitioningToPlayerInput.length === 0) {
-        results.issues.push('No states can transition to PLAYER_INPUT');
+    });
+    
+    // Check for states that can't be reached
+    const reachableStates = findReachableStates(transitions, 'GAME_SETUP');
+    
+    results.availableStates.forEach(state => {
+      if (!reachableStates.has(state) && state !== 'GAME_SETUP') {
+        results.issues.push(`State '${state}' cannot be reached from GAME_SETUP`);
       }
-      
-      results.statesTransitioningToPlayerInput = statesTransitioningToPlayerInput;
-    } else {
-      results.issues.push('State manager has no _validTransitions property');
+    });
+    
+    // Check for circular references that might cause infinite loops
+    const circularPaths = findCircularPaths(transitions);
+    if (circularPaths.length > 0) {
+      // It's normal to have some circular paths, but log them for reference
+      Logger.debug("StateTransitionDebugger", "Found circular paths:", circularPaths);
     }
     
-    // Check for TurnStartState to PLAYER_INPUT transition
-    if (stateManager._validTransitions && 
-        stateManager._validTransitions[GameStates.TURN_START] && 
-        stateManager._validTransitions[GameStates.TURN_START].includes(GameStates.PLAYER_INPUT)) {
+    // Check state implementation
+    results.availableStates.forEach(stateName => {
+      const state = stateManager._states[stateName];
       
-      Logger.debug('StateTransitionDebugger', 'Transition from TURN_START to PLAYER_INPUT is defined');
-      
-      // Try to simulate the transition with error trapping
-      try {
-        Logger.debug('StateTransitionDebugger', 'Simulating TurnStartState code that transitions to PLAYER_INPUT');
-        
-        // Check if the code in TurnStartState that transitions to PLAYER_INPUT has issues
-        const turnStartState = stateManager._states[GameStates.TURN_START];
-        const playerInputState = stateManager._states[GameStates.PLAYER_INPUT];
-        
-        if (!playerInputState) {
-          results.issues.push('PLAYER_INPUT state instance is missing');
-        } else {
-          Logger.debug('StateTransitionDebugger', 'PLAYER_INPUT state instance exists');
-        }
-        
-      } catch (error) {
-        Logger.error('StateTransitionDebugger', 'Error simulating transition', error);
-        results.issues.push(`Error simulating transition: ${error.message}`);
+      if (!state) {
+        results.issues.push(`State '${stateName}' is registered but implementation is missing`);
+        return;
       }
-    } else {
-      results.issues.push('Transition from TURN_START to PLAYER_INPUT is not defined');
-    }
+      
+      if (!state.onEnter || typeof state.onEnter !== 'function') {
+        results.issues.push(`State '${stateName}' missing onEnter method`);
+      }
+      
+      if (!state.onExit || typeof state.onExit !== 'function') {
+        results.issues.push(`State '${stateName}' missing onExit method`);
+      }
+      
+      if (!state.update || typeof state.update !== 'function') {
+        results.issues.push(`State '${stateName}' missing update method`);
+      }
+    });
     
-    Logger.info('StateTransitionDebugger', 'Diagnostics complete', {
+    Logger.info("StateTransitionDebugger", "State transition diagnosis complete", {
       issues: results.issues.length,
-      availableStates: results.availableStates.length
+      states: results.availableStates.length
     });
     
     return results;
   } catch (error) {
-    Logger.error('StateTransitionDebugger', 'Error during diagnostics', error);
-    return {
-      error: error.message,
-      stack: error.stack,
-      ...results
-    };
+    Logger.error("StateTransitionDebugger", "Error diagnosing state transitions", error);
+    console.error("Error diagnosing state transitions:", error);
+    
+    results.issues.push(`Diagnosis error: ${error.message}`);
+    return results;
   }
 }
 
 /**
- * Attempt to fix common state transition issues
- * @param {Object} stateManager - The StateManager instance
- * @param {Object} gameManager - The GameManager instance
- * @returns {Object} Results of fix attempts
+ * Fix common state issues
+ * @param {StateManager} stateManager - The state manager to fix
+ * @param {GameManager} gameManager - Game manager instance
+ * @returns {Object} Fix results
  */
 export function fixCommonStateIssues(stateManager, gameManager) {
-  Logger.info('StateTransitionDebugger', 'Attempting to fix common state transition issues');
+  Logger.info("StateTransitionDebugger", "Attempting to fix common state issues");
+  console.log("Attempting to fix state issues...");
   
   const results = {
-    fixesAttempted: [],
     fixesSucceeded: [],
+    fixesAttempted: [],
     remainingIssues: []
   };
   
   try {
-    // Check if PLAYER_INPUT state exists but might not be properly imported
-    if (!stateManager._states[GameStates.PLAYER_INPUT]) {
-      Logger.warning('StateTransitionDebugger', 'PLAYER_INPUT state missing, attempting to recreate it');
-      
-      try {
-        // Import PlayerInputState on-demand
-        import('../../public/js/states/PlayerInputState.js').then(module => {
-          const PlayerInputState = module.PlayerInputState;
-          stateManager._states[GameStates.PLAYER_INPUT] = new PlayerInputState(gameManager);
-          results.fixesAttempted.push('Recreated PLAYER_INPUT state');
-          results.fixesSucceeded.push('Recreated PLAYER_INPUT state');
-          Logger.info('StateTransitionDebugger', 'Successfully recreated PLAYER_INPUT state');
-        }).catch(err => {
-          Logger.error('StateTransitionDebugger', 'Failed to import PlayerInputState', err);
-          results.remainingIssues.push(`Failed to recreate PLAYER_INPUT state: ${err.message}`);
-        });
-      } catch (error) {
-        Logger.error('StateTransitionDebugger', 'Error recreating PLAYER_INPUT state', error);
-        results.remainingIssues.push(`Error recreating PLAYER_INPUT state: ${error.message}`);
-      }
-    }
+    // Run diagnostics first
+    const diagnostics = diagnoseStateTransitions(stateManager, gameManager);
     
-    // Ensure valid transitions are properly defined
-    if (stateManager._validTransitions) {
-      // Make sure TURN_START can transition to PLAYER_INPUT
-      if (!stateManager._validTransitions[GameStates.TURN_START]?.includes(GameStates.PLAYER_INPUT)) {
-        Logger.warning('StateTransitionDebugger', 'Adding PLAYER_INPUT as valid transition from TURN_START');
-        
-        if (!stateManager._validTransitions[GameStates.TURN_START]) {
-          stateManager._validTransitions[GameStates.TURN_START] = [];
+    // Track failed fixes
+    const fixFailures = [];
+    
+    // Try to fix each issue
+    for (const issue of diagnostics.issues) {
+      results.fixesAttempted.push(issue);
+      
+      // Missing state: GAME_SETUP
+      if (issue.includes("Required state missing: GAME_SETUP")) {
+        try {
+          const { GameSetupState } = createPlaceholderState('GameSetupState', 'GAME_SETUP');
+          stateManager.registerState('GAME_SETUP', new GameSetupState(gameManager));
+          results.fixesSucceeded.push(issue);
+        } catch (error) {
+          fixFailures.push({ issue, error });
         }
-        
-        stateManager._validTransitions[GameStates.TURN_START].push(GameStates.PLAYER_INPUT);
-        results.fixesAttempted.push('Added PLAYER_INPUT as valid transition from TURN_START');
-        results.fixesSucceeded.push('Added PLAYER_INPUT as valid transition from TURN_START');
       }
       
-      // Make sure PLAYER_INPUT can transition to some state
-      if (!stateManager._validTransitions[GameStates.PLAYER_INPUT]) {
-        Logger.warning('StateTransitionDebugger', 'PLAYER_INPUT has no outgoing transitions, adding defaults');
-        stateManager._validTransitions[GameStates.PLAYER_INPUT] = [GameStates.TURN_START, GameStates.GAME_OVER];
-        results.fixesAttempted.push('Added default outgoing transitions for PLAYER_INPUT');
-        results.fixesSucceeded.push('Added default outgoing transitions for PLAYER_INPUT');
+      // Missing state: TURN_START
+      else if (issue.includes("Required state missing: TURN_START")) {
+        try {
+          const { TurnStartState } = createPlaceholderState('TurnStartState', 'TURN_START');
+          stateManager.registerState('TURN_START', new TurnStartState(gameManager));
+          results.fixesSucceeded.push(issue);
+        } catch (error) {
+          fixFailures.push({ issue, error });
+        }
       }
-    } else {
-      results.remainingIssues.push('State manager has no _validTransitions property');
+      
+      // Missing state: PLAYER_INPUT
+      else if (issue.includes("Required state missing: PLAYER_INPUT")) {
+        try {
+          const { PlayerInputState } = createPlaceholderState('PlayerInputState', 'PLAYER_INPUT');
+          stateManager.registerState('PLAYER_INPUT', new PlayerInputState(gameManager));
+          results.fixesSucceeded.push(issue);
+        } catch (error) {
+          fixFailures.push({ issue, error });
+        }
+      }
+      
+      // Missing state: TURN_END
+      else if (issue.includes("Required state missing: TURN_END")) {
+        try {
+          const { TurnEndState } = createPlaceholderState('TurnEndState', 'TURN_END');
+          stateManager.registerState('TURN_END', new TurnEndState(gameManager));
+          results.fixesSucceeded.push(issue);
+        } catch (error) {
+          fixFailures.push({ issue, error });
+        }
+      }
+      
+      // Missing state: GAME_OVER
+      else if (issue.includes("Required state missing: GAME_OVER")) {
+        try {
+          const { GameOverState } = createPlaceholderState('GameOverState', 'GAME_OVER');
+          stateManager.registerState('GAME_OVER', new GameOverState(gameManager));
+          results.fixesSucceeded.push(issue);
+        } catch (error) {
+          fixFailures.push({ issue, error });
+        }
+      }
+      
+      // State with no outgoing transitions
+      else if (issue.includes("has no outgoing transitions")) {
+        try {
+          const stateName = issue.match(/State '(.+)' has no outgoing transitions/)[1];
+          
+          // Add sensible default transitions
+          if (stateName === 'GAME_SETUP') {
+            stateManager.addTransition('GAME_SETUP', 'TURN_START');
+            results.fixesSucceeded.push(issue);
+          }
+          else if (stateName === 'TURN_START') {
+            stateManager.addTransition('TURN_START', 'PLAYER_INPUT');
+            results.fixesSucceeded.push(issue);
+          }
+          else if (stateName === 'PLAYER_INPUT') {
+            stateManager.addTransition('PLAYER_INPUT', 'TURN_END');
+            results.fixesSucceeded.push(issue);
+          }
+          else if (stateName === 'TURN_END') {
+            stateManager.addTransition('TURN_END', 'TURN_START');
+            stateManager.addTransition('TURN_END', 'GAME_OVER');
+            results.fixesSucceeded.push(issue);
+          }
+          else {
+            // For other states, add a default transition to TURN_START
+            stateManager.addTransition(stateName, 'TURN_START');
+            results.fixesSucceeded.push(issue);
+          }
+        } catch (error) {
+          fixFailures.push({ issue, error });
+        }
+      }
+      
+      // State cannot be reached
+      else if (issue.includes("cannot be reached from GAME_SETUP")) {
+        try {
+          const stateName = issue.match(/State '(.+)' cannot be reached/)[1];
+          
+          // Add sensible incoming transitions
+          if (stateName === 'PLAYER_INPUT') {
+            stateManager.addTransition('TURN_START', 'PLAYER_INPUT');
+            results.fixesSucceeded.push(issue);
+          }
+          else if (stateName === 'TURN_END') {
+            stateManager.addTransition('PLAYER_INPUT', 'TURN_END');
+            results.fixesSucceeded.push(issue);
+          }
+          else if (stateName === 'GAME_OVER') {
+            stateManager.addTransition('TURN_END', 'GAME_OVER');
+            results.fixesSucceeded.push(issue);
+          }
+          else {
+            // For other states, add a default transition from GAME_SETUP
+            stateManager.addTransition('GAME_SETUP', stateName);
+            results.fixesSucceeded.push(issue);
+          }
+        } catch (error) {
+          fixFailures.push({ issue, error });
+        }
+      }
+      
+      // Missing method
+      else if (issue.includes("missing") && issue.includes("method")) {
+        // These usually need custom implementation, so just log them
+        fixFailures.push({ issue, error: new Error("Custom method implementation required") });
+      }
+      
+      // Other issues
+      else {
+        fixFailures.push({ issue, error: new Error("Unknown issue type") });
+      }
     }
     
-    Logger.info('StateTransitionDebugger', 'Fix attempts complete', {
-      attempted: results.fixesAttempted.length,
+    // Collect remaining issues
+    results.remainingIssues = fixFailures.map(failure => {
+      Logger.warning("StateTransitionDebugger", `Failed to fix issue: ${failure.issue}`, failure.error);
+      return `${failure.issue} (Fix failed: ${failure.error.message})`;
+    });
+    
+    Logger.info("StateTransitionDebugger", "Fix attempts complete", {
       succeeded: results.fixesSucceeded.length,
+      attempted: results.fixesAttempted.length,
       remaining: results.remainingIssues.length
     });
     
     return results;
   } catch (error) {
-    Logger.error('StateTransitionDebugger', 'Error fixing state issues', error);
-    return {
-      error: error.message,
-      stack: error.stack,
-      ...results
-    };
+    Logger.error("StateTransitionDebugger", "Error fixing state issues", error);
+    console.error("Error fixing state issues:", error);
+    
+    results.remainingIssues.push(`Fix error: ${error.message}`);
+    return results;
   }
+}
+
+/**
+ * Find all states reachable from a given starting state
+ * @param {Object} transitions - Transition graph
+ * @param {String} startState - Starting state
+ * @returns {Set} Set of reachable states
+ * @private
+ */
+function findReachableStates(transitions, startState) {
+  const reachable = new Set();
+  const queue = [startState];
+  
+  while (queue.length > 0) {
+    const current = queue.shift();
+    reachable.add(current);
+    
+    if (transitions[current]) {
+      transitions[current].forEach(target => {
+        if (!reachable.has(target)) {
+          queue.push(target);
+        }
+      });
+    }
+  }
+  
+  return reachable;
+}
+
+/**
+ * Find potential circular paths in transition graph
+ * @param {Object} transitions - Transition graph
+ * @returns {Array} Array of circular paths
+ * @private
+ */
+function findCircularPaths(transitions) {
+  const circularPaths = [];
+  const visited = new Set();
+  const path = [];
+  
+  function dfs(state) {
+    if (path.includes(state)) {
+      // Found a cycle
+      const cycleStart = path.indexOf(state);
+      const cycle = path.slice(cycleStart).concat(state);
+      circularPaths.push(cycle);
+      return;
+    }
+    
+    if (visited.has(state) || !transitions[state]) {
+      return;
+    }
+    
+    visited.add(state);
+    path.push(state);
+    
+    transitions[state].forEach(target => {
+      dfs(target);
+    });
+    
+    path.pop();
+  }
+  
+  // Check from each state
+  Object.keys(transitions).forEach(state => {
+    path.length = 0;
+    dfs(state);
+  });
+  
+  return circularPaths;
+}
+
+/**
+ * Create a basic placeholder state for testing/fixing
+ * @param {String} className - Name of the state class
+ * @param {String} stateName - State identifier
+ * @returns {Object} Object with the created state class
+ * @private
+ */
+function createPlaceholderState(className, stateName) {
+  Logger.debug("StateTransitionDebugger", `Creating placeholder state: ${className}`);
+  
+  // Create a dynamic class
+  const StateClass = class {
+    constructor(gameManager) {
+      this.gameManager = gameManager;
+      this.name = stateName;
+      
+      Logger.debug(className, "Instance created");
+    }
+    
+    async onEnter() {
+      Logger.info(className, `Entering ${this.name} state (placeholder)`);
+      return true;
+    }
+    
+    async onExit() {
+      Logger.info(className, `Exiting ${this.name} state (placeholder)`);
+      return true;
+    }
+    
+    update(deltaTime) {
+      // Placeholder update method
+      return true;
+    }
+    
+    handleInput(input) {
+      Logger.debug(className, `Handling input in ${this.name} state (placeholder)`, input);
+      return true;
+    }
+  };
+  
+  // Set the name of the class (for better debugging)
+  Object.defineProperty(StateClass, 'name', {value: className});
+  
+  // Return an object with the created class
+  return {
+    [className]: StateClass
+  };
 }

@@ -1,10 +1,14 @@
+
 /**
  * Logger.js
- * Centralized logging utility with different levels and formatting
+ * Centralized logging system with different levels and component tagging
  */
 
-// Internal log levels
-const LogLevel = {
+/**
+ * Log levels enum
+ * @enum {Number}
+ */
+export const LogLevel = {
   DEBUG: 0,
   INFO: 1,
   WARNING: 2,
@@ -12,147 +16,233 @@ const LogLevel = {
   NONE: 4
 };
 
-// Default to DEBUG level in development
-let currentLogLevel = LogLevel.DEBUG;
-
-// Whether to include timestamps in logs
-let includeTimestamp = true;
-
 /**
- * Get a formatted timestamp for logging
- * @returns {String} Formatted timestamp
+ * Logger class for consistent logging throughout the application
  */
-function getTimestamp() {
-  if (!includeTimestamp) return '';
-
-  const now = new Date();
-  return `[${now.toISOString()}] `;
-}
-
-/**
- * Centralized logger to manage all game logging
- */
-export const Logger = {
-  // Log level constants for external use
-  LEVELS: {
-    DEBUG: LogLevel.DEBUG,
-    INFO: LogLevel.INFO,
-    WARNING: LogLevel.WARNING,
-    ERROR: LogLevel.ERROR,
-    NONE: LogLevel.NONE
-  },
-
-  /**
-   * Set the current log level
-   * @param {String|Number} level - Log level to set (debug, info, warning, error, none) or numeric level
-   */
-  setLogLevel(level) {
-    // Handle string level names
-    if (typeof level === 'string') {
-      const levelMap = {
-        'debug': LogLevel.DEBUG,
-        'info': LogLevel.INFO,
-        'warning': LogLevel.WARNING,
-        'error': LogLevel.ERROR,
-        'none': LogLevel.NONE
-      };
-
-      if (levelMap[level.toLowerCase()] !== undefined) {
-        currentLogLevel = levelMap[level.toLowerCase()];
-        console.log(`Logger: Log level set to ${level.toUpperCase()}`);
-      } else {
-        console.warn(`Logger: Invalid log level: ${level}`);
-      }
-    }
-    // Handle numeric levels directly
-    else if (typeof level === 'number' && level >= 0 && level <= 4) {
-      currentLogLevel = level;
-      console.log(`Logger: Log level set to ${this.getCurrentLevel()}`);
-    }
-  },
-
-  /**
-   * Enable or disable timestamps in logs
-   * @param {Boolean} enabled - Whether to include timestamps
-   */
-  enableTimestamps(enabled) {
-    includeTimestamp = !!enabled;
-  },
-
+export class Logger {
+  static _currentLevel = LogLevel.DEBUG;
+  static _logHistory = [];
+  static _maxHistorySize = 1000;
+  static _logToConsole = true;
+  
   /**
    * Log a debug message
-   * @param {String} source - Source component of the log
-   * @param {String} message - Log message
-   * @param {Object} data - Optional data to include
+   * @param {String} component - Component/module name
+   * @param {String} message - Message to log
+   * @param {Object} [data] - Optional data to include
    */
-  debug(source, message, data) {
-    if (currentLogLevel <= LogLevel.DEBUG) {
-      const timestamp = getTimestamp();
-      if (data) {
-        console.debug(`${timestamp}[DEBUG] [${source}] ${message}`, data);
-      } else {
-        console.debug(`${timestamp}[DEBUG] [${source}] ${message}`);
-      }
-    }
-  },
-
+  static debug(component, message, data = undefined) {
+    Logger._log(LogLevel.DEBUG, component, message, data);
+  }
+  
   /**
    * Log an info message
-   * @param {String} source - Source component of the log
-   * @param {String} message - Log message
-   * @param {Object} data - Optional data to include
+   * @param {String} component - Component/module name
+   * @param {String} message - Message to log
+   * @param {Object} [data] - Optional data to include
    */
-  info(source, message, data) {
-    if (currentLogLevel <= LogLevel.INFO) {
-      const timestamp = getTimestamp();
-      if (data) {
-        console.info(`${timestamp}[INFO] [${source}] ${message}`, data);
-      } else {
-        console.info(`${timestamp}[INFO] [${source}] ${message}`);
-      }
-    }
-  },
-
+  static info(component, message, data = undefined) {
+    Logger._log(LogLevel.INFO, component, message, data);
+  }
+  
   /**
    * Log a warning message
-   * @param {String} source - Source component of the log
-   * @param {String} message - Log message
-   * @param {Object} data - Optional data to include
+   * @param {String} component - Component/module name
+   * @param {String} message - Message to log
+   * @param {Object} [data] - Optional data to include
    */
-  warn(source, message, data) {
-    if (currentLogLevel <= LogLevel.WARNING) {
-      const timestamp = getTimestamp();
-      if (data) {
-        console.warn(`${timestamp}[WARNING] [${source}] ${message}`, data);
-      } else {
-        console.warn(`${timestamp}[WARNING] [${source}] ${message}`);
-      }
-    }
-  },
-
+  static warning(component, message, data = undefined) {
+    Logger._log(LogLevel.WARNING, component, message, data);
+  }
+  
   /**
    * Log an error message
-   * @param {String} source - Source component of the log
-   * @param {String} message - Log message
-   * @param {Object} data - Optional data to include
+   * @param {String} component - Component/module name
+   * @param {String} message - Message to log
+   * @param {Error|Object} [error] - Error object or data
    */
-  error(source, message, data) {
-    if (currentLogLevel <= LogLevel.ERROR) {
-      const timestamp = getTimestamp();
-      if (data) {
-        console.error(`${timestamp}[ERROR] [${source}] ${message}`, data);
+  static error(component, message, error = undefined) {
+    Logger._log(LogLevel.ERROR, component, message, error);
+  }
+  
+  /**
+   * Internal logging method
+   * @param {LogLevel} level - Log level
+   * @param {String} component - Component/module name
+   * @param {String} message - Message to log
+   * @param {*} [data] - Optional data to include
+   * @private
+   */
+  static _log(level, component, message, data) {
+    // Skip if below current log level
+    if (level < Logger._currentLevel) {
+      return;
+    }
+    
+    const timestamp = new Date().toISOString();
+    const entry = {
+      timestamp,
+      level: Logger._getLevelName(level),
+      component,
+      message,
+      data
+    };
+    
+    // Add to history (with limit)
+    Logger._logHistory.unshift(entry);
+    if (Logger._logHistory.length > Logger._maxHistorySize) {
+      Logger._logHistory.pop();
+    }
+    
+    // Output to console if enabled
+    if (Logger._logToConsole) {
+      const consoleMethod = Logger._getConsoleMethod(level);
+      const formattedMessage = `[${timestamp}] [${entry.level}] [${component}] ${message}`;
+      
+      if (data !== undefined) {
+        consoleMethod(formattedMessage, data);
       } else {
-        console.error(`${timestamp}[ERROR] [${source}] ${message}`);
+        consoleMethod(formattedMessage);
       }
     }
-  },
-
-  /**
-   * Get the current log level name
-   * @returns {String} Current log level name
-   */
-  getCurrentLevel() {
-    const levelNames = ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'NONE'];
-    return levelNames[currentLogLevel];
   }
-};
+  
+  /**
+   * Get the console method based on log level
+   * @param {LogLevel} level - Log level
+   * @returns {Function} Console method
+   * @private
+   */
+  static _getConsoleMethod(level) {
+    switch (level) {
+      case LogLevel.DEBUG:
+        return console.debug;
+      case LogLevel.INFO:
+        return console.log;
+      case LogLevel.WARNING:
+        return console.warn;
+      case LogLevel.ERROR:
+        return console.error;
+      default:
+        return console.log;
+    }
+  }
+  
+  /**
+   * Get the string name of a log level
+   * @param {LogLevel} level - Log level
+   * @returns {String} Level name
+   * @private
+   */
+  static _getLevelName(level) {
+    switch (level) {
+      case LogLevel.DEBUG:
+        return 'DEBUG';
+      case LogLevel.INFO:
+        return 'INFO';
+      case LogLevel.WARNING:
+        return 'WARNING';
+      case LogLevel.ERROR:
+        return 'ERROR';
+      default:
+        return 'UNKNOWN';
+    }
+  }
+  
+  /**
+   * Set the minimum log level to display
+   * @param {LogLevel} level - Minimum log level
+   */
+  static setLevel(level) {
+    Logger._currentLevel = level;
+    
+    // Log this change at the new level if possible
+    if (level <= LogLevel.INFO) {
+      Logger.info('Logger', `Log level set to ${Logger._getLevelName(level)}`);
+    }
+  }
+  
+  /**
+   * Enable or disable console logging
+   * @param {Boolean} enabled - Whether to log to console
+   */
+  static enableConsoleOutput(enabled) {
+    Logger._logToConsole = enabled;
+    
+    // Log this change if enabling
+    if (enabled) {
+      Logger.info('Logger', 'Console logging enabled');
+    }
+  }
+  
+  /**
+   * Get recent log history
+   * @param {Number} [count=100] - Number of entries to retrieve
+   * @param {LogLevel} [minLevel=DEBUG] - Minimum log level to include
+   * @returns {Array} Array of log entries
+   */
+  static getHistory(count = 100, minLevel = LogLevel.DEBUG) {
+    return Logger._logHistory
+      .filter(entry => Logger._getLevelValue(entry.level) >= minLevel)
+      .slice(0, count);
+  }
+  
+  /**
+   * Clear the log history
+   */
+  static clearHistory() {
+    Logger._logHistory = [];
+    Logger.info('Logger', 'Log history cleared');
+  }
+  
+  /**
+   * Get the numeric value of a level name
+   * @param {String} levelName - Level name
+   * @returns {LogLevel} Level value
+   * @private
+   */
+  static _getLevelValue(levelName) {
+    switch (levelName) {
+      case 'DEBUG':
+        return LogLevel.DEBUG;
+      case 'INFO':
+        return LogLevel.INFO;
+      case 'WARNING':
+        return LogLevel.WARNING;
+      case 'ERROR':
+        return LogLevel.ERROR;
+      default:
+        return LogLevel.DEBUG;
+    }
+  }
+  
+  /**
+   * Save the log to a file (browser only)
+   * @returns {Boolean} Success status
+   */
+  static exportLogs() {
+    try {
+      const logText = Logger._logHistory.map(entry => {
+        let line = `[${entry.timestamp}] [${entry.level}] [${entry.component}] ${entry.message}`;
+        if (entry.data) {
+          line += '\n' + JSON.stringify(entry.data, null, 2);
+        }
+        return line;
+      }).join('\n');
+      
+      const blob = new Blob([logText], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `game-logs-${new Date().toISOString().slice(0, 19).replace('T', '-')}.txt`;
+      a.click();
+      
+      URL.revokeObjectURL(url);
+      return true;
+    } catch (error) {
+      console.error('Failed to export logs:', error);
+      return false;
+    }
+  }
+}

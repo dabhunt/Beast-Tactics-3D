@@ -1,153 +1,192 @@
 
 /**
  * StateDebugger.js
- * Diagnostic tool to help debug state transitions and validation
+ * Debugging tools for game state validation and testing
  */
 
-import { Logger } from '../../public/js/utils/Logger.js';
+import { Logger } from "../../public/js/utils/Logger.js";
 
 /**
- * Analyze state manager and game states for potential issues
- * @param {Object} stateManager - The state manager to analyze
- * @param {Object} gameManager - The game manager instance
- * @returns {Object} Analysis results
- */
-export async function analyzeStates(stateManager, gameManager) {
-  Logger.info('StateDebugger', 'Starting state transition analysis');
-  
-  const results = {
-    registeredStates: [],
-    validTransitions: {},
-    invalidStates: [],
-    missingDependencies: []
-  };
-  
-  try {
-    // Check which states are registered
-    if (stateManager._states) {
-      results.registeredStates = Object.keys(stateManager._states);
-      Logger.debug('StateDebugger', `Found ${results.registeredStates.length} registered states`, results.registeredStates);
-    } else {
-      Logger.warning('StateDebugger', 'Could not access states in state manager');
-      results.missingDependencies.push('stateManager._states');
-    }
-    
-    // Check transition rules
-    if (stateManager._validTransitions) {
-      results.validTransitions = {...stateManager._validTransitions};
-      Logger.debug('StateDebugger', 'Found transition rules', results.validTransitions);
-      
-      // Check for PLAYER_INPUT state specifically
-      if (!results.registeredStates.includes('PLAYER_INPUT') && 
-          Object.values(results.validTransitions).some(arr => arr.includes('PLAYER_INPUT'))) {
-        results.invalidStates.push('PLAYER_INPUT');
-        Logger.error('StateDebugger', 'PLAYER_INPUT state is referenced in transitions but not registered');
-      }
-    } else {
-      Logger.warning('StateDebugger', 'Could not access transition rules');
-      results.missingDependencies.push('stateManager._validTransitions');
-    }
-    
-    // Check game states module
-    try {
-      const gameStates = await import('../../public/js/models/GameStates.js');
-      const definedStates = Object.values(gameStates.GameStates || {});
-      Logger.debug('StateDebugger', 'GameStates definition contains:', definedStates);
-      
-      // Find states that are defined but not registered
-      const unregisteredStates = definedStates.filter(state => !results.registeredStates.includes(state));
-      if (unregisteredStates.length > 0) {
-        Logger.warning('StateDebugger', 'States defined but not registered:', unregisteredStates);
-        results.invalidStates.push(...unregisteredStates);
-      }
-    } catch (err) {
-      Logger.error('StateDebugger', 'Could not analyze GameStates module', err);
-      results.missingDependencies.push('GameStates module');
-    }
-    
-    Logger.info('StateDebugger', 'State analysis complete', {
-      registeredStates: results.registeredStates.length,
-      invalidStates: results.invalidStates.length,
-      missingDependencies: results.missingDependencies.length
-    });
-    
-    return results;
-  } catch (err) {
-    Logger.error('StateDebugger', 'Error during state analysis', err);
-    console.error('Detailed error:', err);
-    return {
-      error: err.message,
-      stack: err.stack,
-      ...results
-    };
-  }
-}
-
-/**
- * Validate PlayerInputState setup
- * @param {Object} stateManager - The state manager to check
+ * Validate the PlayerInputState and its transitions
+ * @param {StateManager} stateManager - The state manager to validate
  * @returns {Object} Validation results
  */
 export function validatePlayerInputState(stateManager) {
-  Logger.info('StateDebugger', 'Validating PlayerInputState setup');
+  Logger.info("StateDebugger", "Validating PlayerInputState");
+  console.log("Validating PlayerInputState...");
   
   const results = {
     stateExists: false,
     inTransitions: false,
+    outTransitions: false,
     transitionSources: [],
     transitionTargets: [],
     issues: []
   };
   
   try {
-    // Check if state exists
-    results.stateExists = stateManager._states && 'PLAYER_INPUT' in stateManager._states;
-    
-    if (!results.stateExists) {
-      results.issues.push('PLAYER_INPUT state is not registered in state manager');
-      Logger.error('StateDebugger', 'PLAYER_INPUT state is not registered');
+    // Check if state manager is available
+    if (!stateManager) {
+      results.issues.push("State manager is null or undefined");
+      return results;
     }
     
-    // Check transitions
-    if (stateManager._validTransitions) {
-      // Check if any states can transition to PLAYER_INPUT
-      for (const [fromState, toStates] of Object.entries(stateManager._validTransitions)) {
-        if (Array.isArray(toStates) && toStates.includes('PLAYER_INPUT')) {
-          results.inTransitions = true;
-          results.transitionSources.push(fromState);
-        }
+    // Check if PlayerInputState exists
+    const playerInputState = stateManager._states ? stateManager._states['PLAYER_INPUT'] : null;
+    results.stateExists = !!playerInputState;
+    
+    if (!playerInputState) {
+      results.issues.push("PlayerInputState not found in state registry");
+      return results;
+    }
+    
+    Logger.debug("StateDebugger", "PlayerInputState exists in registry");
+    
+    // Check incoming transitions (Can we reach this state?)
+    const transitions = stateManager._validTransitions || {};
+    let hasIncomingTransitions = false;
+    
+    Object.entries(transitions).forEach(([sourceState, targetStates]) => {
+      if (targetStates.includes('PLAYER_INPUT')) {
+        hasIncomingTransitions = true;
+        results.transitionSources.push(sourceState);
+      }
+    });
+    
+    results.inTransitions = hasIncomingTransitions;
+    
+    if (!hasIncomingTransitions) {
+      results.issues.push("PlayerInputState has no incoming transitions");
+    }
+    
+    // Check outgoing transitions (Can we exit this state?)
+    const outgoingTransitions = transitions['PLAYER_INPUT'] || [];
+    results.outTransitions = outgoingTransitions.length > 0;
+    results.transitionTargets = outgoingTransitions;
+    
+    if (!results.outTransitions) {
+      results.issues.push("PlayerInputState has no outgoing transitions");
+    }
+    
+    // Validate methods implementation
+    if (playerInputState) {
+      if (!playerInputState.onEnter || typeof playerInputState.onEnter !== 'function') {
+        results.issues.push("PlayerInputState is missing onEnter method");
       }
       
-      // Check if PLAYER_INPUT can transition to other states
-      if (stateManager._validTransitions['PLAYER_INPUT']) {
-        results.transitionTargets = [...stateManager._validTransitions['PLAYER_INPUT']];
+      if (!playerInputState.onExit || typeof playerInputState.onExit !== 'function') {
+        results.issues.push("PlayerInputState is missing onExit method");
+      }
+      
+      if (!playerInputState.update || typeof playerInputState.update !== 'function') {
+        results.issues.push("PlayerInputState is missing update method");
+      }
+      
+      if (!playerInputState.handleInput || typeof playerInputState.handleInput !== 'function') {
+        results.issues.push("PlayerInputState is missing handleInput method");
       }
     }
     
-    if (!results.inTransitions) {
-      results.issues.push('No valid transitions to PLAYER_INPUT state are defined');
-      Logger.warning('StateDebugger', 'No valid transitions to PLAYER_INPUT state');
+    // Log results
+    Logger.info("StateDebugger", "PlayerInputState validation complete", {
+      exists: results.stateExists,
+      hasIncomingTransitions: results.inTransitions,
+      hasOutgoingTransitions: results.outTransitions,
+      issueCount: results.issues.length
+    });
+    
+    if (results.issues.length > 0) {
+      Logger.warning("StateDebugger", "Found issues with PlayerInputState", 
+        results.issues);
     }
     
-    if (results.transitionTargets.length === 0) {
-      results.issues.push('No valid transitions from PLAYER_INPUT state are defined');
-      Logger.warning('StateDebugger', 'PLAYER_INPUT has no outgoing transitions');
+    return results;
+  } catch (error) {
+    Logger.error("StateDebugger", "Error validating PlayerInputState", error);
+    
+    results.issues.push(`Validation error: ${error.message}`);
+    return results;
+  }
+}
+
+/**
+ * Test the response of a specific game state
+ * @param {String} stateName - Name of state to test
+ * @param {StateManager} stateManager - State manager instance
+ * @returns {Object} Test results
+ */
+export async function testStateResponse(stateName, stateManager) {
+  Logger.info("StateDebugger", `Testing state response for: ${stateName}`);
+  
+  const results = {
+    success: false,
+    state: stateName,
+    entrySuccess: false,
+    exitSuccess: false,
+    updateSuccess: false,
+    issues: []
+  };
+  
+  try {
+    // Check if state manager is available
+    if (!stateManager) {
+      results.issues.push("State manager is null or undefined");
+      return results;
     }
     
-    Logger.info('StateDebugger', 'PlayerInputState validation complete', {
-      stateExists: results.stateExists,
-      inTransitions: results.inTransitions,
+    // Check if state exists
+    const state = stateManager._states ? stateManager._states[stateName] : null;
+    
+    if (!state) {
+      results.issues.push(`State '${stateName}' not found in state registry`);
+      return results;
+    }
+    
+    // Remember previous state
+    const previousState = stateManager.currentState;
+    
+    // Test onEnter function
+    try {
+      await state.onEnter();
+      results.entrySuccess = true;
+    } catch (error) {
+      results.issues.push(`Error in ${stateName}.onEnter(): ${error.message}`);
+    }
+    
+    // Test update function
+    try {
+      await state.update(0.016); // Simulate one frame at 60fps
+      results.updateSuccess = true;
+    } catch (error) {
+      results.issues.push(`Error in ${stateName}.update(): ${error.message}`);
+    }
+    
+    // Test onExit function
+    try {
+      await state.onExit();
+      results.exitSuccess = true;
+    } catch (error) {
+      results.issues.push(`Error in ${stateName}.onExit(): ${error.message}`);
+    }
+    
+    // Overall success
+    results.success = results.entrySuccess && results.updateSuccess && results.exitSuccess;
+    
+    // Restore previous state if needed
+    if (stateManager.currentState !== previousState) {
+      stateManager.changeState(previousState);
+    }
+    
+    Logger.info("StateDebugger", `State test complete for ${stateName}`, {
+      success: results.success,
       issues: results.issues.length
     });
     
     return results;
-  } catch (err) {
-    Logger.error('StateDebugger', 'Error validating PlayerInputState', err);
-    console.error('Detailed validation error:', err);
-    return {
-      error: err.message,
-      stack: err.stack,
-      ...results
-    };
+  } catch (error) {
+    Logger.error("StateDebugger", `Error testing state ${stateName}`, error);
+    
+    results.issues.push(`Test error: ${error.message}`);
+    return results;
   }
 }

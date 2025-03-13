@@ -1,84 +1,199 @@
-
 /**
  * BiomeDistributionTest.js
- * Diagnostic tool to verify the distribution of biomes in the generated map
+ * Tools for analyzing biome distribution in the game map
  */
 
-import { Logger } from '../../public/js/utils/Logger.js';
+import { Logger } from "../../public/js/utils/Logger.js";
 
 /**
- * Test and visualize the distribution of biomes in the map
+ * Analyze the biome distribution on the generated map
+ * @returns {Object} Analysis results
  */
-export class BiomeDistributionTest {
-  constructor() {
-    this.biomeCount = {};
-    this.totalHexes = 0;
-  }
-  
-  /**
-   * Analyze the biome distribution from the generated hexes
-   * @param {Array} hexes - Array of hex objects from the renderer
-   */
-  analyzeDistribution(hexes) {
-    Logger.info('BiomeDistributionTest', 'Analyzing biome distribution...');
-    
-    // Reset counts
-    this.biomeCount = {};
-    this.totalHexes = hexes.length;
-    
-    // Initialize expected biome types with zero counts
-    const expectedBiomes = [
-      'plains', 'forest', 'mountains', 'desert', 'water', 
-      'volcanic', 'storm', 'tundra', 'swamp', 'dark', 
-      'sacred', 'battlefield'
-    ];
-    
-    expectedBiomes.forEach(biome => {
-      this.biomeCount[biome] = 0;
-    });
-    
-    // Count biomes
+export async function analyzeMapGeneration() {
+  Logger.info("BiomeDistributionTest", "Starting map generation analysis");
+  console.log("Analyzing biome distribution...");
+
+  try {
+    // Attempt to get access to the game manager and map system
+    const gameManager = window.gameManager;
+
+    if (!gameManager) {
+      Logger.error("BiomeDistributionTest", "Game manager not available");
+      return {
+        error: "Game manager not available, cannot analyze biome distribution",
+        biomeCounts: {},
+        totalHexes: 0
+      };
+    }
+
+    const mapSystem = gameManager.getSubsystem('mapSystem');
+
+    if (!mapSystem) {
+      Logger.error("BiomeDistributionTest", "Map system not available");
+      return {
+        error: "Map system not available, cannot analyze biome distribution",
+        biomeCounts: {},
+        totalHexes: 0
+      };
+    }
+
+    // Get map tiles
+    const hexes = mapSystem.getAllTiles();
+
+    if (!hexes || hexes.length === 0) {
+      Logger.warning("BiomeDistributionTest", "No hex tiles found in map system");
+      return {
+        error: "No hex tiles found in the current map",
+        biomeCounts: {},
+        totalHexes: 0
+      };
+    }
+
+    Logger.info("BiomeDistributionTest", `Found ${hexes.length} hex tiles for analysis`);
+
+    // Count biome types
+    const biomeCounts = {};
+    let totalHexes = hexes.length;
+
     hexes.forEach(hex => {
       const biomeType = hex.userData?.biomeType || hex.biomeType;
+
       if (biomeType) {
-        this.biomeCount[biomeType]++;
+        biomeCounts[biomeType] = (biomeCounts[biomeType] || 0) + 1;
       } else {
-        Logger.warn('BiomeDistributionTest', 'Hex without biome type found', hex);
+        Logger.warning("BiomeDistributionTest", "Found hex without biome type", hex);
       }
     });
-    
-    // Log results
-    Logger.info('BiomeDistributionTest', 'Biome distribution analysis:', {
-      totalHexes: this.totalHexes,
-      distribution: this.biomeCount
-    });
-    
+
     // Calculate percentages
-    const percentages = {};
-    Object.keys(this.biomeCount).forEach(biome => {
-      percentages[biome] = (this.biomeCount[biome] / this.totalHexes * 100).toFixed(2) + '%';
+    const biomePercentages = {};
+    Object.entries(biomeCounts).forEach(([biome, count]) => {
+      biomePercentages[biome] = (count / totalHexes * 100).toFixed(2) + '%';
     });
-    
-    Logger.info('BiomeDistributionTest', 'Biome distribution percentages:', percentages);
-    
+
+    // Calculate expected distribution
+    const expectedDistribution = {};
+    const biomeTypes = Object.keys(biomeCounts);
+    const equalShare = 1 / biomeTypes.length;
+
+    biomeTypes.forEach(biome => {
+      expectedDistribution[biome] = equalShare;
+    });
+
+    // Calculate deviation from equal distribution
+    const deviations = {};
+    let totalDeviation = 0;
+
+    biomeTypes.forEach(biome => {
+      const actual = biomeCounts[biome] / totalHexes;
+      const expected = expectedDistribution[biome];
+      deviations[biome] = Math.abs(actual - expected);
+      totalDeviation += deviations[biome];
+    });
+
+    const averageDeviation = totalDeviation / biomeTypes.length;
+
+    // Log results
+    Logger.info("BiomeDistributionTest", "Biome distribution analysis complete", {
+      totalHexes,
+      biomeCounts,
+      biomePercentages,
+      averageDeviation
+    });
+
     return {
-      counts: this.biomeCount,
-      percentages: percentages,
-      total: this.totalHexes
+      totalHexes,
+      biomeCounts,
+      biomePercentages, 
+      averageDeviation,
+      equalityScore: (100 * (1 - averageDeviation * biomeTypes.length)).toFixed(2)
+    };
+  } catch (error) {
+    Logger.error("BiomeDistributionTest", "Error analyzing map generation", error);
+    console.error("Error analyzing map generation:", error);
+
+    return {
+      error: `Analysis error: ${error.message}`,
+      biomeCounts: {},
+      totalHexes: 0
     };
   }
-  
-  /**
-   * Generate HTML report of biome distribution
-   * @return {String} HTML content for report
-   */
-  generateHTMLReport() {
+}
+
+/**
+ * Calculate metrics about the distribution equality
+ * @param {Object} biomeCounts - Counts of each biome
+ * @param {Number} totalHexes - Total number of hexes
+ * @returns {Object} Equality metrics
+ */
+function calculateDistributionEquality(biomeCounts, totalHexes) {
+  // Get the number of biome types
+  const biomeTypes = Object.keys(biomeCounts);
+  const typeCount = biomeTypes.length;
+
+  // Perfect equal distribution would have this many hexes per biome
+  const perfectCount = totalHexes / typeCount;
+
+  // Calculate variance
+  let totalVariance = 0;
+
+  biomeTypes.forEach(biomeType => {
+    const count = biomeCounts[biomeType];
+    const difference = Math.abs(count - perfectCount);
+    totalVariance += (difference * difference);
+  });
+
+  const variance = totalVariance / typeCount;
+  const stdDeviation = Math.sqrt(variance);
+
+  // Calculate coefficient of variation (normalized measure of dispersion)
+  const coefficientOfVariation = stdDeviation / perfectCount;
+
+  // Convert to a 0-100 equality score (0 = completely unequal, 100 = perfectly equal)
+  const equalityScore = (100 * (1 - Math.min(1, coefficientOfVariation))).toFixed(2);
+
+  // Generate a message based on the score
+  let message = "";
+
+  if (equalityScore > 90) {
+    message = "The distribution is very even, with excellent biome variety.";
+  } else if (equalityScore > 80) {
+    message = "The distribution is mostly even, with good biome variety.";
+  } else if (equalityScore > 70) {
+    message = "The distribution is somewhat uneven, but still has reasonable biome variety.";
+  } else if (equalityScore > 50) {
+    message = "The distribution is uneven, with some biomes significantly more common than others.";
+  } else {
+    message = "The distribution is very uneven, with poor biome variety.";
+  }
+
+  return {
+    equalityScore,
+    perfectCount,
+    variance,
+    stdDeviation,
+    coefficientOfVariation,
+    message
+  };
+}
+
+/**
+ * Generate HTML report of biome distribution
+ * @param {Object} analysisResult - Result from analyzeMapGeneration
+ * @return {String} HTML content for report
+ */
+async function generateHTMLReport(analysisResult) {
     let html = '<h2>Biome Distribution Analysis</h2>';
     
-    html += `<p>Total hexes analyzed: ${this.totalHexes}</p>`;
+    if (analysisResult.error) {
+        html += `<p style="color: red;">Error: ${analysisResult.error}</p>`;
+        return html;
+    }
+
+    html += `<p>Total hexes analyzed: ${analysisResult.totalHexes}</p>`;
     
     // Add distribution equality metrics
-    const equalityMetrics = this.calculateDistributionEquality();
+    const equalityMetrics = calculateDistributionEquality(analysisResult.biomeCounts, analysisResult.totalHexes);
     
     html += `
     <div style="margin: 10px 0; padding: 10px; background-color: rgba(255,255,255,0.1); border-radius: 5px;">
@@ -113,18 +228,18 @@ export class BiomeDistributionTest {
     };
     
     // Sort biomes by count descending
-    const sortedBiomes = Object.keys(this.biomeCount).sort(
-      (a, b) => this.biomeCount[b] - this.biomeCount[a]
+    const sortedBiomes = Object.keys(analysisResult.biomeCounts).sort(
+      (a, b) => analysisResult.biomeCounts[b] - analysisResult.biomeCounts[a]
     );
     
     // Add rows for each biome
     sortedBiomes.forEach(biome => {
-      const percentage = (this.biomeCount[biome] / this.totalHexes * 100).toFixed(2) + '%';
+      const percentage = analysisResult.biomePercentages[biome] || "0%";
       const color = biomeColors[biome] || '#cccccc';
       
       html += `<tr>
         <td>${biome}</td>
-        <td>${this.biomeCount[biome]}</td>
+        <td>${analysisResult.biomeCounts[biome] || 0}</td>
         <td>${percentage}</td>
         <td style="background-color: ${color}; width: 30px;"></td>
       </tr>`;
@@ -134,7 +249,7 @@ export class BiomeDistributionTest {
     
     // Add missing biomes section
     const allBiomes = Object.keys(biomeColors);
-    const missingBiomes = allBiomes.filter(biome => !this.biomeCount[biome]);
+    const missingBiomes = allBiomes.filter(biome => !analysisResult.biomeCounts[biome]);
     
     if (missingBiomes.length > 0) {
       html += '<h3>Missing Biomes</h3>';
@@ -148,16 +263,13 @@ export class BiomeDistributionTest {
     
     return html;
   }
-}
+
 
 /**
  * Create a simple diagnostic UI for biome distribution
  * @param {Object} hexGridRenderer - The renderer instance with hex data
  */
-export function createBiomeDistributionUI(hexGridRenderer) {
-  // Create test instance
-  const biomeTest = new BiomeDistributionTest();
-  
+export async function createBiomeDistributionUI(hexGridRenderer) {
   // Create UI container
   const container = document.createElement('div');
   container.style.position = 'absolute';
@@ -190,84 +302,15 @@ export function createBiomeDistributionUI(hexGridRenderer) {
   container.appendChild(resultsContainer);
   
   // Add analyze event
-  analyzeButton.addEventListener('click', () => {
-    const hexes = hexGridRenderer.getHexes();
-    const results = biomeTest.analyzeDistribution(hexes);
+  analyzeButton.addEventListener('click', async () => {
+    const results = await analyzeMapGeneration();
     
     // Display results
-    resultsContainer.innerHTML = biomeTest.generateHTMLReport();
+    resultsContainer.innerHTML = await generateHTMLReport(results);
   });
   
   // Add to document
   document.body.appendChild(container);
   
-  return biomeTest;
+  return {}; // Returning an empty object since no longer tracking a BiomeDistributionTest instance.
 }
-
-
-  /**
-   * Calculate how evenly distributed the biomes are
-   * @returns {Object} Object containing distribution metrics
-   */
-  calculateDistributionEquality() {
-    if (this.totalHexes === 0) {
-      return { 
-        equalityScore: 0, 
-        message: "No hexes analyzed" 
-      };
-    }
-    
-    // Calculate the ideal number of each biome for perfect equality
-    const biomeTypes = Object.keys(this.biomeCount);
-    const idealCount = this.totalHexes / biomeTypes.length;
-    
-    Logger.debug('BiomeDistributionTest', `Ideal count per biome: ${idealCount.toFixed(2)}`);
-    
-    // Calculate the variance from ideal
-    let totalVariance = 0;
-    let missingBiomes = 0;
-    let maxVariancePercent = 0;
-    
-    biomeTypes.forEach(biome => {
-      const count = this.biomeCount[biome] || 0;
-      const variance = Math.abs(count - idealCount);
-      const variancePercent = (variance / idealCount) * 100;
-      
-      totalVariance += variance;
-      maxVariancePercent = Math.max(maxVariancePercent, variancePercent);
-      
-      if (count === 0) {
-        missingBiomes++;
-      }
-    });
-    
-    // Calculate an overall equality score (100 = perfect equality, 0 = worst)
-    const averageVariancePercent = totalVariance / biomeTypes.length / idealCount * 100;
-    const equalityScore = Math.max(0, 100 - averageVariancePercent);
-    
-    // Generate message about equality
-    let message = "";
-    if (equalityScore > 95) {
-      message = "Excellent distribution! All biomes are nearly equally represented.";
-    } else if (equalityScore > 85) {
-      message = "Good distribution with minor variations.";
-    } else if (equalityScore > 70) {
-      message = "Fair distribution with noticeable variations.";
-    } else if (equalityScore > 50) {
-      message = "Poor distribution with significant imbalance.";
-    } else {
-      message = "Very uneven distribution.";
-    }
-    
-    if (missingBiomes > 0) {
-      message += ` ${missingBiomes} biome types are missing entirely.`;
-    }
-    
-    return {
-      equalityScore: equalityScore.toFixed(2),
-      averageVariance: (totalVariance / biomeTypes.length).toFixed(2),
-      maxVariancePercent: maxVariancePercent.toFixed(2),
-      missingBiomes,
-      message
-    };
-  }

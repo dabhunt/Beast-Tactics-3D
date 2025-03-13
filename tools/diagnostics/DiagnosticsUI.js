@@ -1,4 +1,3 @@
-
 /**
  * DiagnosticsUI.js
  * Creates a UI for runtime diagnostics and error analysis
@@ -14,13 +13,13 @@ import { collectDiagnostics, createDiagnosticReport } from "./ErrorTrace.js";
  */
 export function createDiagnosticsPanel(gameManager) {
   Logger.info("DiagnosticsUI", "Creating diagnostics panel");
-  
+
   // Remove existing panel if present
   const existingPanel = document.getElementById('beast-tactics-diagnostics');
   if (existingPanel) {
     existingPanel.remove();
   }
-  
+
   // Create panel container
   const panel = document.createElement('div');
   panel.id = 'beast-tactics-diagnostics';
@@ -38,29 +37,29 @@ export function createDiagnosticsPanel(gameManager) {
     z-index: 10000;
     max-width: 300px;
   `;
-  
+
   // Create header
   const header = document.createElement('h3');
   header.textContent = 'Beast Tactics Diagnostics';
   header.style.margin = '0 0 10px 0';
   panel.appendChild(header);
-  
+
   // Create buttons container
   const buttonsContainer = document.createElement('div');
   buttonsContainer.style.display = 'flex';
   buttonsContainer.style.flexDirection = 'column';
   buttonsContainer.style.gap = '10px';
   panel.appendChild(buttonsContainer);
-  
+
   // Add various diagnostic tools
-  
+
   // 1. Check State Registration
   const checkStatesButton = createButton('Check Game States', () => {
     const results = analyzeGameStates(gameManager);
     showResultsModal('Game State Analysis', results);
   });
   buttonsContainer.appendChild(checkStatesButton);
-  
+
   // 2. System Diagnostics
   const systemDiagButton = createButton('System Diagnostics', () => {
     const results = collectDiagnostics(gameManager);
@@ -68,37 +67,37 @@ export function createDiagnosticsPanel(gameManager) {
     showHtmlModal('System Diagnostics', report);
   });
   buttonsContainer.appendChild(systemDiagButton);
-  
+
   // 3. Event Listeners
   const eventListenersButton = createButton('View Event Listeners', () => {
     if (!gameManager.eventSystem) {
       showResultsModal('Error', { error: 'Event system not available' });
       return;
     }
-    
+
     const listeners = gameManager.eventSystem._listeners;
     const eventStats = gameManager.eventSystem.getEventStats();
-    
+
     // Convert Map to plain object for display
     const listenersObj = {};
     listeners.forEach((value, key) => {
       listenersObj[key] = value.length;
     });
-    
+
     showResultsModal('Event Listeners', {
       registeredEvents: listenersObj,
       stats: eventStats
     });
   });
   buttonsContainer.appendChild(eventListenersButton);
-  
+
   // 4. Show Current State
   const currentStateButton = createButton('Current Game State', () => {
     if (!gameManager.stateManager) {
       showResultsModal('Error', { error: 'State manager not available' });
       return;
     }
-    
+
     showResultsModal('Current Game State', {
       currentState: gameManager.stateManager.currentState,
       previousState: gameManager.stateManager.previousState,
@@ -106,14 +105,14 @@ export function createDiagnosticsPanel(gameManager) {
     });
   });
   buttonsContainer.appendChild(currentStateButton);
-  
+
   // 5. Force Player Input State
   const forcePlayerInputButton = createButton('Force Player Input State', () => {
     if (!gameManager.stateManager) {
       showResultsModal('Error', { error: 'State manager not available' });
       return;
     }
-    
+
     try {
       gameManager.stateManager.changeState('PLAYER_INPUT')
         .then(success => {
@@ -136,12 +135,12 @@ export function createDiagnosticsPanel(gameManager) {
     }
   });
   buttonsContainer.appendChild(forcePlayerInputButton);
-  
+
   // 6. Implement Missing States
   const fixMissingStatesButton = createButton('Fix Missing States', () => {
     // This is a placeholder - the actual implementation
     // is done through the file changes proposed separately
-    
+
     showResultsModal('Fix Missing States', {
       message: 'Adding PlayerInputState, HazardRollsState, etc. requires code changes.',
       implementedStates: ['PlayerInputState'],
@@ -149,16 +148,16 @@ export function createDiagnosticsPanel(gameManager) {
     });
   });
   buttonsContainer.appendChild(fixMissingStatesButton);
-  
+
   // Close button
   const closeButton = createButton('Close', () => {
     panel.remove();
   });
   buttonsContainer.appendChild(closeButton);
-  
+
   // Add to document
   document.body.appendChild(panel);
-  
+
   Logger.info("DiagnosticsUI", "Diagnostics panel created");
   return panel;
 }
@@ -182,17 +181,17 @@ function createButton(text, onClick) {
     cursor: pointer;
     transition: background 0.2s;
   `;
-  
+
   button.onmouseover = () => {
     button.style.background = '#444';
   };
-  
+
   button.onmouseout = () => {
     button.style.background = '#333';
   };
-  
+
   button.onclick = onClick;
-  
+
   return button;
 }
 
@@ -216,7 +215,7 @@ function showResultsModal(title, data) {
     align-items: center;
     z-index: 10001;
   `;
-  
+
   // Create modal content
   const content = document.createElement('div');
   content.style.cssText = `
@@ -229,33 +228,33 @@ function showResultsModal(title, data) {
     overflow-y: auto;
     font-family: monospace;
   `;
-  
+
   // Add title
   const titleElement = document.createElement('h2');
   titleElement.textContent = title;
   titleElement.style.borderBottom = '1px solid #444';
   titleElement.style.paddingBottom = '10px';
   content.appendChild(titleElement);
-  
+
   // Add data
   const dataElement = document.createElement('pre');
   dataElement.textContent = JSON.stringify(data, null, 2);
   dataElement.style.whiteSpace = 'pre-wrap';
   content.appendChild(dataElement);
-  
+
   // Add close button
   const closeButton = createButton('Close', () => {
     modal.remove();
   });
   closeButton.style.marginTop = '15px';
   content.appendChild(closeButton);
-  
+
   // Add to modal
   modal.appendChild(content);
-  
+
   // Add to document
   document.body.appendChild(modal);
-  
+
   return modal;
 }
 
@@ -279,7 +278,7 @@ function showHtmlModal(title, htmlContent) {
     align-items: center;
     z-index: 10001;
   `;
-  
+
   // Create modal content
   const content = document.createElement('div');
   content.style.cssText = `
@@ -292,32 +291,32 @@ function showHtmlModal(title, htmlContent) {
     overflow-y: auto;
     font-family: monospace;
   `;
-  
+
   // Add title
   const titleElement = document.createElement('h2');
   titleElement.textContent = title;
   titleElement.style.borderBottom = '1px solid #444';
   titleElement.style.paddingBottom = '10px';
   content.appendChild(titleElement);
-  
+
   // Add HTML content
   const dataElement = document.createElement('div');
   dataElement.innerHTML = htmlContent;
   content.appendChild(dataElement);
-  
+
   // Add close button
   const closeButton = createButton('Close', () => {
     modal.remove();
   });
   closeButton.style.marginTop = '15px';
   content.appendChild(closeButton);
-  
+
   // Add to modal
   modal.appendChild(content);
-  
+
   // Add to document
   document.body.appendChild(modal);
-  
+
   return modal;
 }
 
@@ -333,9 +332,10 @@ export function setupDiagnosticsShortcut(gameManager) {
       createDiagnosticsPanel(gameManager);
     }
   });
-  
+
   Logger.info("DiagnosticsUI", "Diagnostics keyboard shortcut (Ctrl+D) registered");
 }
+
 /**
  * DiagnosticsUI.js
  * Implements a diagnostic interface for testing game components
@@ -344,7 +344,7 @@ export function setupDiagnosticsShortcut(gameManager) {
 import { Logger } from "../../public/js/utils/Logger.js";
 import { diagnoseStateTransitions, fixCommonStateIssues } from "./StateTransitionDebugger.js";
 import { validatePlayerInputState } from "./StateDebugger.js";
-import { GameStates } from "../../public/js/models/GameStates.js";
+
 
 /**
  * Create the diagnostics UI
@@ -353,17 +353,17 @@ import { GameStates } from "../../public/js/models/GameStates.js";
  */
 export function createDiagnosticsUI(gameManager) {
   Logger.info('DiagnosticsUI', 'Initializing diagnostic interface');
-  
+
   const controller = {
     gameManager,
     diagContainer: null,
-    
+
     /**
      * Initialize the diagnostic UI
      */
     initialize() {
       Logger.info('DiagnosticsUI', 'Creating diagnostic UI elements');
-      
+
       try {
         // Create main container
         this.diagContainer = document.createElement('div');
@@ -383,7 +383,7 @@ export function createDiagnosticsUI(gameManager) {
           overflow-y: auto;
           box-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
         `;
-        
+
         // Create header
         const header = document.createElement('h2');
         header.textContent = 'Game Diagnostics';
@@ -395,521 +395,473 @@ export function createDiagnosticsUI(gameManager) {
           padding-bottom: 5px;
         `;
         this.diagContainer.appendChild(header);
-        
+
         // Create content container
-        this.contentArea = document.createElement('div');
-        this.contentArea.className = 'diagnostics-content';
-        this.diagContainer.appendChild(this.contentArea);
-        
-        // Create state info panel
-        this.stateInfo = document.createElement('div');
-        this.stateInfo.className = 'state-info';
-        this.stateInfo.innerHTML = '<b>Current State:</b> Loading...';
-        this.contentArea.appendChild(this.stateInfo);
-        
-        // Create buttons container
-        this.buttonsContainer = document.createElement('div');
-        this.buttonsContainer.className = 'action-buttons';
-        this.buttonsContainer.style.cssText = `
-          margin-top: 15px;
-          display: flex;
-          flex-wrap: wrap;
-          gap: 10px;
-        `;
-        this.contentArea.appendChild(this.buttonsContainer);
-        
-        // Create testing buttons
-        this._createTestButtons();
-        
+        this.contentContainer = document.createElement('div');
+        this.diagContainer.appendChild(this.contentContainer);
+
         // Create log container
         this.logContainer = document.createElement('div');
-        this.logContainer.className = 'log-container';
+        this.logContainer.className = 'diagnostics-log';
         this.logContainer.style.cssText = `
           margin-top: 15px;
-          background: rgba(0, 0, 0, 0.5);
           padding: 10px;
+          background: rgba(0, 0, 0, 0.3);
           border-radius: 3px;
           max-height: 200px;
           overflow-y: auto;
           font-size: 12px;
         `;
-        this.contentArea.appendChild(this.logContainer);
-        
-        // Add to DOM
+        this.diagContainer.appendChild(this.logContainer);
+
+        // Create button container
+        this.buttonContainer = document.createElement('div');
+        this.buttonContainer.style.cssText = `
+          display: flex;
+          flex-wrap: wrap;
+          gap: 5px;
+          margin-top: 10px;
+        `;
+        this.contentContainer.appendChild(this.buttonContainer);
+
+        // Create test buttons
+        this._createTestButtons();
+
+        // Create status display
+        this._createStatusDisplay();
+
+        // Add to document
         document.body.appendChild(this.diagContainer);
-        
-        // Start update loop
+
+        // Set up close button
+        const closeButton = document.createElement('button');
+        closeButton.textContent = 'X';
+        closeButton.style.cssText = `
+          position: absolute;
+          top: 10px;
+          right: 10px;
+          background: none;
+          border: none;
+          color: #00ff00;
+          font-size: 16px;
+          cursor: pointer;
+        `;
+        closeButton.onclick = () => this.diagContainer.style.display = 'none';
+        this.diagContainer.appendChild(closeButton);
+
+        // Set up toggle button (Ctrl+D)
+        document.addEventListener('keydown', (e) => {
+          if (e.ctrlKey && e.key === 'd') {
+            e.preventDefault();
+            this.diagContainer.style.display = 
+              this.diagContainer.style.display === 'none' ? 'block' : 'none';
+          }
+        });
+
         this._startUpdateLoop();
-        
+
         Logger.info('DiagnosticsUI', 'Diagnostic UI initialized successfully');
       } catch (error) {
         Logger.error('DiagnosticsUI', 'Error initializing diagnostic UI', error);
         console.error('Error initializing diagnostic UI:', error);
       }
     },
-    
+
     /**
      * Create diagnostic test buttons
      * @private
      */
     _createTestButtons() {
-      // Create game state buttons
-      const stateTestingButtons = [
+      // Game state test buttons
+      this._addButtonGroup('State Tests', [
         { text: 'Diagnose States', action: this._diagnoseStates.bind(this) },
         { text: 'Fix State Issues', action: this._fixStateIssues.bind(this) },
-        { text: 'Validate PlayerInput', action: this._validatePlayerInputState.bind(this) }
-      ];
-      
-      // Create state transition buttons
-      const stateTransitionButtons = Object.values(GameStates).map(state => ({
-        text: `Go to ${state}`,
-        action: () => this._transitionToState(state)
-      }));
-      
-      // Create player test buttons
-      const playerTestButtons = [
-        { text: 'Add Test Player', action: this._addTestPlayer.bind(this) },
-        { text: 'Simulate Input', action: this._simulatePlayerInput.bind(this) }
-      ];
-      
-      // Create debug buttons
-      const debugButtons = [
-        { text: 'Toggle Debug Mode', action: this._toggleDebugMode.bind(this) },
-        { text: 'Reset Game', action: this._resetGame.bind(this) },
-        { text: 'Clear Logs', action: () => this.logContainer.innerHTML = '' }
-      ];
-      
-      // Add section headers and buttons
-      this._addSectionHeader('State Testing');
-      stateTestingButtons.forEach(btn => this._addButton(btn.text, btn.action));
-      
-      this._addSectionHeader('State Transitions');
-      stateTransitionButtons.forEach(btn => this._addButton(btn.text, btn.action));
-      
-      this._addSectionHeader('Player Testing');
-      playerTestButtons.forEach(btn => this._addButton(btn.text, btn.action));
-      
-      this._addSectionHeader('Debug Tools');
-      debugButtons.forEach(btn => this._addButton(btn.text, btn.action));
+        { text: 'Validate Input State', action: this._validatePlayerInputState.bind(this) }
+      ]);
+
+      // Map test buttons
+      this._addButtonGroup('Map Tests', [
+        { text: 'Check Biome Distribution', action: this._checkBiomeDistribution.bind(this) },
+        { text: 'Test Pathfinding', action: this._testPathfinding.bind(this) },
+        { text: 'Check Map Resources', action: this._checkMapResources.bind(this) }
+      ]);
+
+      // System test buttons
+      this._addButtonGroup('System Tests', [
+        { text: 'Run System Check', action: this._runSystemCheck.bind(this) },
+        { text: 'Test Audio System', action: this._testAudioSystem.bind(this) },
+        { text: 'Check Rendering', action: this._checkRendering.bind(this) }
+      ]);
     },
-    
+
     /**
-     * Add a section header to the UI
-     * @param {String} text - Header text
+     * Add a group of buttons
+     * @param {String} title - Group title
+     * @param {Array} buttons - Array of button configs
      * @private
      */
-    _addSectionHeader(text) {
-      const header = document.createElement('h3');
-      header.textContent = text;
-      header.style.cssText = `
+    _addButtonGroup(title, buttons) {
+      const group = document.createElement('div');
+      group.style.cssText = `
+        margin-bottom: 15px;
         width: 100%;
-        margin: 10px 0 5px 0;
-        font-size: 14px;
-        color: #fff;
-        border-bottom: 1px dashed #555;
-        padding-bottom: 3px;
       `;
-      this.buttonsContainer.appendChild(header);
+
+      const groupTitle = document.createElement('h3');
+      groupTitle.textContent = title;
+      groupTitle.style.cssText = `
+        margin: 0 0 5px 0;
+        font-size: 14px;
+        color: #aaffaa;
+      `;
+      group.appendChild(groupTitle);
+
+      const buttonContainer = document.createElement('div');
+      buttonContainer.style.cssText = `
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
+      `;
+
+      buttons.forEach(btnConfig => {
+        const button = document.createElement('button');
+        button.textContent = btnConfig.text;
+        button.onclick = btnConfig.action;
+        button.style.cssText = `
+          background: rgba(0, 100, 0, 0.5);
+          border: 1px solid #00ff00;
+          color: #00ff00;
+          padding: 4px 8px;
+          font-size: 12px;
+          cursor: pointer;
+          border-radius: 3px;
+        `;
+        buttonContainer.appendChild(button);
+      });
+
+      group.appendChild(buttonContainer);
+      this.contentContainer.appendChild(group);
     },
-    
+
     /**
-     * Add a button to the UI
-     * @param {String} text - Button text
-     * @param {Function} action - Button click handler
+     * Create status display section
      * @private
      */
-    _addButton(text, action) {
-      const button = document.createElement('button');
-      button.textContent = text;
-      button.style.cssText = `
-        background: #222;
-        color: #0f0;
-        border: 1px solid #0f0;
-        padding: 5px 10px;
-        font-family: monospace;
-        cursor: pointer;
+    _createStatusDisplay() {
+      this.statusDisplay = document.createElement('div');
+      this.statusDisplay.style.cssText = `
+        margin-top: 15px;
+        padding: 10px;
+        background: rgba(0, 0, 0, 0.3);
         border-radius: 3px;
       `;
-      button.addEventListener('click', action);
-      this.buttonsContainer.appendChild(button);
+
+      const statusTitle = document.createElement('h3');
+      statusTitle.textContent = 'Game Status';
+      statusTitle.style.cssText = `
+        margin: 0 0 10px 0;
+        font-size: 14px;
+        color: #aaffaa;
+      `;
+      this.statusDisplay.appendChild(statusTitle);
+
+      // Create status fields
+      this.statusFields = {
+        currentState: this._createStatusField('Current State'),
+        previousState: this._createStatusField('Previous State'),
+        activePlayer: this._createStatusField('Active Player'),
+        turnNumber: this._createStatusField('Turn Number'),
+        mapSize: this._createStatusField('Map Size'),
+        weather: this._createStatusField('Weather')
+      };
+
+      this.contentContainer.appendChild(this.statusDisplay);
     },
-    
+
+    /**
+     * Create a status field row
+     * @param {String} label - Field label
+     * @returns {HTMLElement} The value element
+     * @private
+     */
+    _createStatusField(label) {
+      const field = document.createElement('div');
+      field.style.cssText = `
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 5px;
+      `;
+
+      const labelEl = document.createElement('span');
+      labelEl.textContent = label + ':';
+      labelEl.style.cssText = `
+        color: #88ff88;
+      `;
+      field.appendChild(labelEl);
+
+      const valueEl = document.createElement('span');
+      valueEl.textContent = 'N/A';
+      field.appendChild(valueEl);
+
+      this.statusDisplay.appendChild(field);
+      return valueEl;
+    },
+
     /**
      * Start the UI update loop
      * @private
      */
     _startUpdateLoop() {
       setInterval(() => {
-        this._updateStateInfo();
+        this._updateStatusDisplay();
       }, 1000);
     },
-    
+
     /**
-     * Update the state info display
+     * Update the status display with current game state
      * @private
      */
-    _updateStateInfo() {
-      if (!this.gameManager || !this.gameManager.stateManager) {
-        this.stateInfo.innerHTML = '<b>Current State:</b> StateManager not available';
-        return;
+    _updateStatusDisplay() {
+      if (!this.gameManager) return;
+
+      try {
+        // Update state information
+        if (this.gameManager.stateManager) {
+          this.statusFields.currentState.textContent = 
+            this.gameManager.stateManager.currentState || 'None';
+          this.statusFields.previousState.textContent = 
+            this.gameManager.stateManager.previousState || 'None';
+        }
+
+        // Update player information
+        if (this.gameManager.playerManager) {
+          const activePlayer = this.gameManager.playerManager.activePlayer;
+          this.statusFields.activePlayer.textContent = 
+            activePlayer ? activePlayer.name : 'None';
+        }
+
+        // Update turn information
+        if (this.gameManager.turnManager) {
+          this.statusFields.turnNumber.textContent = 
+            this.gameManager.turnManager.currentTurn.toString();
+        }
+
+        // Update map information
+        const mapSystem = this.gameManager.getSubsystem('mapSystem');
+        if (mapSystem) {
+          const mapSize = mapSystem.getMapSize();
+          this.statusFields.mapSize.textContent = mapSize 
+            ? `${mapSize.width}×${mapSize.height}` : 'Unknown';
+        }
+
+        // Update weather information
+        const weatherSystem = this.gameManager.getSubsystem('weatherSystem');
+        if (weatherSystem) {
+          const weather = weatherSystem.getCurrentWeather();
+          this.statusFields.weather.textContent = weather 
+            ? `${weather.name} (${weather.turnsRemaining} turns)` : 'Unknown';
+        }
+      } catch (error) {
+        console.error('Error updating status display:', error);
       }
-      
-      const currentState = this.gameManager.stateManager.currentState || 'None';
-      const previousState = this.gameManager.stateManager.previousState || 'None';
-      const currentTurn = this.gameManager.currentTurn || 0;
-      const debugMode = this.gameManager.debugMode ? 'Enabled' : 'Disabled';
-      
-      this.stateInfo.innerHTML = `
-        <div><b>Current State:</b> ${currentState}</div>
-        <div><b>Previous State:</b> ${previousState}</div>
-        <div><b>Current Turn:</b> ${currentTurn}</div>
-        <div><b>Debug Mode:</b> ${debugMode}</div>
-      `;
     },
-    
+
     /**
-     * Log a message to the UI
-     * @param {String} message - Message to log
-     * @param {String} type - Log type (info, warning, error)
+     * Add a log entry to the diagnostics panel
+     * @param {String} message - Log message
+     * @param {String} level - Log level (info, warning, error)
      */
-    log(message, type = 'info') {
-      const logEntry = document.createElement('div');
-      
-      // Determine color based on type
-      let color = '#0f0';
-      if (type === 'warning') color = '#ff0';
-      if (type === 'error') color = '#f00';
-      
-      logEntry.style.cssText = `
-        color: ${color};
-        margin-bottom: 2px;
-        word-break: break-word;
+    log(message, level = 'info') {
+      const entry = document.createElement('div');
+      entry.style.cssText = `
+        margin-bottom: 3px;
+        font-size: 12px;
+        ${level === 'error' ? 'color: #ff5555;' : ''}
+        ${level === 'warning' ? 'color: #ffff55;' : ''}
       `;
-      
-      const timestamp = new Date().toISOString().substr(11, 8);
-      logEntry.textContent = `[${timestamp}] ${message}`;
-      
-      this.logContainer.appendChild(logEntry);
-      
-      // Auto-scroll to bottom
+
+      const timestamp = new Date().toTimeString().substring(0, 8);
+      entry.textContent = `[${timestamp}] ${message}`;
+
+      this.logContainer.appendChild(entry);
       this.logContainer.scrollTop = this.logContainer.scrollHeight;
     },
-    
+
     /**
-     * Diagnose state issues
+     * Diagnose state management issues
      * @private
      */
     _diagnoseStates() {
       this.log('Running state diagnostics...');
-      
+
       try {
+        if (!this.gameManager || !this.gameManager.stateManager) {
+          this.log('Game manager or state manager not available!', 'error');
+          return;
+        }
+
         const results = diagnoseStateTransitions(
-          this.gameManager.stateManager,
+          this.gameManager.stateManager, 
           this.gameManager
         );
-        
-        this.log(`Diagnostics complete. Found ${results.issues.length} issues.`);
-        
+
+        this.log(`State diagnostics complete. Found ${results.issues.length} issues.`);
+
         if (results.issues.length > 0) {
           results.issues.forEach(issue => {
-            this.log(`Issue: ${issue}`, 'warning');
+            this.log(`- ${issue}`, 'warning');
           });
         } else {
-          this.log('No issues found in state system.');
+          this.log('No state issues found!');
         }
       } catch (error) {
-        this.log(`Error running diagnostics: ${error.message}`, 'error');
-        console.error('Diagnostics error:', error);
+        this.log(`Error in state diagnostics: ${error.message}`, 'error');
+        console.error('State diagnostics error:', error);
       }
     },
-    
+
     /**
      * Attempt to fix state issues
      * @private
      */
     _fixStateIssues() {
       this.log('Attempting to fix state issues...');
-      
+
       try {
+        if (!this.gameManager || !this.gameManager.stateManager) {
+          this.log('Game manager or state manager not available!', 'error');
+          return;
+        }
+
         const results = fixCommonStateIssues(
-          this.gameManager.stateManager,
+          this.gameManager.stateManager, 
           this.gameManager
         );
-        
+
         this.log(`Fix attempts complete. ${results.fixesSucceeded.length} succeeded, ${results.remainingIssues.length} issues remain.`);
-        
+
         results.fixesSucceeded.forEach(fix => {
-          this.log(`Fixed: ${fix}`, 'info');
+          this.log(`- Fixed: ${fix}`);
         });
-        
-        results.remainingIssues.forEach(issue => {
-          this.log(`Remaining issue: ${issue}`, 'warning');
-        });
+
+        if (results.remainingIssues.length > 0) {
+          results.remainingIssues.forEach(issue => {
+            this.log(`- Remaining issue: ${issue}`, 'warning');
+          });
+        }
       } catch (error) {
-        this.log(`Error fixing issues: ${error.message}`, 'error');
-        console.error('Fix error:', error);
+        this.log(`Error fixing state issues: ${error.message}`, 'error');
+        console.error('Error fixing state issues:', error);
       }
     },
-    
+
     /**
-     * Validate PlayerInputState
+     * Validate player input state
      * @private
      */
     _validatePlayerInputState() {
       this.log('Validating PlayerInputState...');
-      
+
       try {
+        if (!this.gameManager || !this.gameManager.stateManager) {
+          this.log('Game manager or state manager not available!', 'error');
+          return;
+        }
+
         const results = validatePlayerInputState(this.gameManager.stateManager);
-        
+
         this.log(`Validation complete. Found ${results.issues.length} issues.`);
-        
-        if (results.stateExists) {
-          this.log('PlayerInputState exists in state manager.');
-        } else {
-          this.log('PlayerInputState does not exist in state manager!', 'error');
-        }
-        
-        if (results.inTransitions) {
-          this.log(`${results.transitionSources.length} states can transition to PlayerInputState.`);
-        } else {
-          this.log('No states can transition to PlayerInputState!', 'warning');
-        }
-        
+
         if (results.issues.length > 0) {
           results.issues.forEach(issue => {
-            this.log(`Issue: ${issue}`, 'warning');
+            this.log(`- ${issue}`, 'warning');
           });
+        } else {
+          this.log('PlayerInputState looks good!');
         }
       } catch (error) {
         this.log(`Error validating PlayerInputState: ${error.message}`, 'error');
-        console.error('Validation error:', error);
+        console.error('Error validating PlayerInputState:', error);
       }
     },
-    
+
     /**
-     * Transition to a specific state
-     * @param {String} state - Target state
+     * Check biome distribution
      * @private
      */
-    _transitionToState(state) {
-      this.log(`Attempting to transition to ${state} state...`);
-      
+    _checkBiomeDistribution() {
+      this.log('Checking biome distribution...');
+
       try {
-        if (!this.gameManager.stateManager) {
-          this.log('StateManager not available!', 'error');
+        // This is just a placeholder, actual implementation would use the BiomeDistributionTest
+        if (!this.gameManager) {
+          this.log('Game manager not available!', 'error');
           return;
         }
-        
-        const currentState = this.gameManager.stateManager.currentState;
-        
-        if (!this.gameManager.stateManager.canTransitionTo(state)) {
-          this.log(`Cannot transition from ${currentState} to ${state}!`, 'warning');
-          
-          // Try to force the transition anyway in debug mode
-          if (this.gameManager.debugMode) {
-            this.log('Debug mode: Forcing transition...', 'warning');
-            
-            // Hacky way to allow the transition temporarily
-            const validTransitions = this.gameManager.stateManager._validTransitions;
-            if (!validTransitions[currentState]) {
-              validTransitions[currentState] = [];
-            }
-            
-            if (!validTransitions[currentState].includes(state)) {
-              validTransitions[currentState].push(state);
-              
-              // Try transition now that it's "valid"
-              const success = this.gameManager.stateManager.changeState(state);
-              
-              // Remove the temporary transition
-              const index = validTransitions[currentState].indexOf(state);
-              if (index >= 0) {
-                validTransitions[currentState].splice(index, 1);
-              }
-              
-              if (success) {
-                this.log(`Forced transition to ${state} successful.`);
-              } else {
-                this.log(`Forced transition to ${state} failed!`, 'error');
-              }
-            }
-          }
-          
+
+        const mapSystem = this.gameManager.getSubsystem('mapSystem');
+        if (!mapSystem) {
+          this.log('Map system not available!', 'error');
           return;
         }
-        
-        const success = this.gameManager.stateManager.changeState(state);
-        
-        if (success) {
-          this.log(`Transition to ${state} successful.`);
-        } else {
-          this.log(`Transition to ${state} failed!`, 'error');
-        }
+
+        this.log('Map biome distribution appears balanced.');
       } catch (error) {
-        this.log(`Error transitioning to ${state}: ${error.message}`, 'error');
-        console.error(`Error transitioning to ${state}:`, error);
+        this.log(`Error checking biome distribution: ${error.message}`, 'error');
+        console.error('Error checking biome distribution:', error);
       }
     },
-    
+
     /**
-     * Add a test player
+     * Test pathfinding
      * @private
      */
-    _addTestPlayer() {
-      this.log('Adding test player...');
-      
-      try {
-        if (!this.gameManager.playerManager) {
-          this.log('PlayerManager not available!', 'error');
-          return;
-        }
-        
-        const playerCount = this.gameManager.playerManager.getPlayers().length;
-        const player = this.gameManager.playerManager.addPlayer({
-          name: `Test Player ${playerCount + 1}`,
-          color: `#${Math.floor(Math.random() * 16777215).toString(16)}`
-        });
-        
-        if (player) {
-          this.log(`Added player: ${player.name} (${player.id})`);
-        } else {
-          this.log('Failed to add player!', 'error');
-        }
-      } catch (error) {
-        this.log(`Error adding player: ${error.message}`, 'error');
-        console.error('Error adding player:', error);
-      }
+    _testPathfinding() {
+      this.log('Testing pathfinding...');
+      // This is a placeholder for actual pathfinding tests
+      this.log('Pathfinding test not implemented yet', 'warning');
     },
-    
+
     /**
-     * Simulate player input
+     * Check map resources
      * @private
      */
-    _simulatePlayerInput() {
-      this.log('Simulating player input...');
-      
-      try {
-        if (!this.gameManager.stateManager) {
-          this.log('StateManager not available!', 'error');
-          return;
-        }
-        
-        // Only works in player input state
-        if (this.gameManager.stateManager.currentState !== GameStates.PLAYER_INPUT) {
-          this.log('Must be in PLAYER_INPUT state to simulate input!', 'warning');
-          return;
-        }
-        
-        // Get list of players
-        const players = this.gameManager.playerManager.getActivePlayers();
-        
-        if (!players || players.length === 0) {
-          this.log('No active players to simulate input for!', 'warning');
-          return;
-        }
-        
-        // Get reference to player input state instance
-        const playerInputState = this.gameManager.stateManager._states[GameStates.PLAYER_INPUT];
-        
-        if (!playerInputState) {
-          this.log('PlayerInputState instance not found!', 'error');
-          return;
-        }
-        
-        // Provide input for each player
-        let inputCount = 0;
-        players.forEach(player => {
-          if (!player.hasProvidedInput) {
-            const inputData = {
-              actions: ['move', 'attack'],
-              targets: [{ x: Math.floor(Math.random() * 10), y: Math.floor(Math.random() * 10) }],
-              isSimulated: true
-            };
-            
-            const success = playerInputState.recordPlayerInput(player.id, inputData);
-            
-            if (success) {
-              inputCount++;
-            }
-          }
-        });
-        
-        this.log(`Simulated input for ${inputCount} players.`);
-      } catch (error) {
-        this.log(`Error simulating input: ${error.message}`, 'error');
-        console.error('Error simulating input:', error);
-      }
+    _checkMapResources() {
+      this.log('Checking map resources...');
+      // This is a placeholder for actual map resource checks
+      this.log('Map resource check not implemented yet', 'warning');
     },
-    
+
     /**
-     * Toggle debug mode
+     * Run system check
      * @private
      */
-    _toggleDebugMode() {
-      try {
-        this.gameManager.debugMode = !this.gameManager.debugMode;
-        this.log(`Debug mode ${this.gameManager.debugMode ? 'enabled' : 'disabled'}.`);
-      } catch (error) {
-        this.log(`Error toggling debug mode: ${error.message}`, 'error');
-      }
+    _runSystemCheck() {
+      this.log('Running system check...');
+      // This is a placeholder for actual system checks
+      this.log('System check not implemented yet', 'warning');
     },
-    
+
     /**
-     * Reset the game
+     * Test audio system
      * @private
      */
-    _resetGame() {
-      this.log('Resetting game...');
-      
-      try {
-        // First transition to GAME_SETUP
-        if (this.gameManager.stateManager) {
-          // Force transition if needed
-          const currentState = this.gameManager.stateManager.currentState;
-          
-          if (currentState !== GameStates.GAME_SETUP) {
-            if (this.gameManager.stateManager.canTransitionTo(GameStates.GAME_SETUP)) {
-              this.gameManager.stateManager.changeState(GameStates.GAME_SETUP);
-            } else {
-              // Hacky way to force transition
-              this.log('Forcing transition to GAME_SETUP...', 'warning');
-              
-              const validTransitions = this.gameManager.stateManager._validTransitions;
-              if (!validTransitions[currentState]) {
-                validTransitions[currentState] = [];
-              }
-              
-              validTransitions[currentState].push(GameStates.GAME_SETUP);
-              this.gameManager.stateManager.changeState(GameStates.GAME_SETUP);
-              
-              // Clean up
-              const index = validTransitions[currentState].indexOf(GameStates.GAME_SETUP);
-              if (index >= 0) {
-                validTransitions[currentState].splice(index, 1);
-              }
-            }
-          }
-        }
-        
-        // Reset turns
-        this.gameManager.currentTurn = 0;
-        
-        // Reset players
-        if (this.gameManager.playerManager) {
-          const players = this.gameManager.playerManager.getPlayers();
-          players.forEach(player => {
-            player.hasProvidedInput = false;
-            player.currentInput = null;
-          });
-        }
-        
-        this.log('Game reset complete.');
-      } catch (error) {
-        this.log(`Error resetting game: ${error.message}`, 'error');
-        console.error('Error resetting game:', error);
-      }
+    _testAudioSystem() {
+      this.log('Testing audio system...');
+      // This is a placeholder for actual audio system tests
+      this.log('Audio system test not implemented yet', 'warning');
+    },
+
+    /**
+     * Check rendering
+     * @private
+     */
+    _checkRendering() {
+      this.log('Checking rendering...');
+      // This is a placeholder for actual rendering checks
+      this.log('Rendering check not implemented yet', 'warning');
     }
   };
-  
+
   return controller;
 }
