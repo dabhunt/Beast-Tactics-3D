@@ -1,0 +1,91 @@
+Set Up a Basic File Structure:
+Replit starts with index.js, but you’ll need a client-server split for a Discord Activity:
+/BeastTactics
+├── /public         # Client-side files (HTML, JS, assets)
+│   ├── index.html  # Main game entry point
+│   ├── game.js     # Three.js game logic
+│   └── /assets     # Sprites, 3D models, etc.
+├── server.js       # Backend server with Express
+└── package.json
+Configure Hosting:
+Replit auto-hosts web projects. Add a basic Express server in server.js to serve your game:
+javascript
+const express = require('express');
+const app = express();
+const port = 3000;
+
+app.use(express.static('public'));
+
+app.listen(port, () => {
+  console.log(`Server running at http://localhost:${port}`);
+});
+Replit will provide a URL (e.g., https://BeastTactics.yourusername.repl.co) once you run it.
+Step 3: Initialize Three.js for the Hexagonal Grid
+Your game’s core is a circular hexagonal grid (radius 4, centered at {q=0, r=0}). Here’s how to set up Three.js in Replit:
+Create the HTML Entry Point (public/index.html):
+html
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Beast Tactics</title>
+  <style>
+    body { margin: 0; overflow: hidden; }
+    canvas { width: 100%; height: 100%; }
+  </style>
+</head>
+<body>
+  <script type="module" src="game.js"></script>
+</body>
+</html>
+Set Up Three.js Basics (public/game.js):
+javascript
+import * as THREE from 'three';
+
+// Scene setup
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+const renderer = new THREE.WebGLRenderer();
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
+
+// Hexagonal grid (simplified)
+const hexRadius = 1;
+const hexGeometry = new THREE.CylinderGeometry(hexRadius, hexRadius, 0.2, 6);
+const hexMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+
+function createHex(q, r) {
+  const hex = new THREE.Mesh(hexGeometry, hexMaterial);
+  const x = hexRadius * 1.5 * q;
+  const z = hexRadius * Math.sqrt(3) * (r + q / 2);
+  hex.position.set(x, 0, z);
+  scene.add(hex);
+}
+
+// Generate grid (radius 4)
+for (let q = -4; q <= 4; q++) {
+  for (let r = Math.max(-4, -q - 4); r <= Math.min(4, -q + 4); r++) {
+    createHex(q, r);
+  }
+}
+
+camera.position.set(0, 10, 10);
+camera.lookAt(0, 0, 0);
+
+// Animation loop
+function animate() {
+  requestAnimationFrame(animate);
+  renderer.render(scene, camera);
+}
+animate();
+
+// Resize handler
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+This creates a flat 3D hex grid with axial coordinates. You can later add biome textures or elevation.
+Run It:
+Click “Run” in Replit. The green “Open in New Tab” button will show your 3D grid at the provided URL.
+
