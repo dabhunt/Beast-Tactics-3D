@@ -63,6 +63,9 @@
     <div>Loading Beast Tactics...</div>
   </div>
   
+  <!-- Import Three.js from CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.min.js"></script>
+  
   <script>
     // Log page load events for debugging
     console.log("Page loading started");
@@ -72,15 +75,9 @@
     
     window.addEventListener('load', () => {
       console.log("All resources loaded");
-      
-      // Hide loading indicator after a slight delay
-      setTimeout(() => {
-        const loading = document.getElementById('loading');
-        if (loading) loading.classList.add('hidden');
-      }, 1000);
     });
   </script>
   
-  <script type="module" src="game.js"></script>
+  <script src="game.js"></script>
 </body>
 </html>
