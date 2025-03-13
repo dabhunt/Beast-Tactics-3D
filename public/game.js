@@ -1,59 +1,8 @@
 // Import Three.js from CDN
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js";
 
-// Import game architecture
-import { GameManager } from "./js/core/GameManager.js";
-import { Logger } from "./js/utils/Logger.js";
-
-// Import biome distribution test tool
-import { createBiomeDistributionUI } from '../tools/diagnostics/BiomeDistributionTest.js';
-
 // Logging setup
 console.log("Beast Tactics script loaded and starting...");
-
-// Game manager instance
-let gameManager = null;
-
-// Initialize core game architecture
-async function initializeGameArchitecture() {
-  try {
-    console.log("Initializing Beast Tactics core architecture...");
-
-    // Create game manager
-    gameManager = new GameManager({
-      version: '1.0.0',
-      debugMode: true
-    });
-
-    // Initialize the game
-    await gameManager.initialize({
-      players: [
-        { name: 'Player 1', color: 'Red' }
-      ]
-    });
-
-    console.log("Core architecture initialized successfully");
-    return gameManager;
-  } catch (error) {
-    console.error("Failed to initialize game architecture:", error);
-    console.debug("Error details:", {
-      name: error.name,
-      message: error.message,
-      stack: error.stack
-    });
-    throw error;
-  }
-}
-
-// Initialize game architecture in the background
-initializeGameArchitecture().then(manager => {
-  console.log("Game architecture ready, manager:", manager);
-}).catch(error => {
-  console.error("Game architecture initialization failed:", error);
-});
-
-// Import our HexGridRenderer
-import { HexGridRenderer, BiomeTypes } from "./js/rendering/HexGridRenderer.js";
 
 // Track mouse state for camera controls
 const mouseState = {
@@ -72,7 +21,7 @@ const mouseState = {
 // Debug function to log mouse control events
 function logMouseControl(action, data) {
   if (!DEBUG) return;
-  //console.log(`[MOUSE] ${action}`, data);
+  console.log(`[MOUSE] ${action}`, data);
 }
 
 // Global error handler for debugging
@@ -105,16 +54,11 @@ function debugLog(message, data = null) {
 
 debugLog("Setting up THREE.js scene...");
 
-// Track loading state
-let texturesLoaded = false;
-let hexGridRenderer = null;
-let hexagons = [];
-
 try {
-  // Scene setup with improved background
+  // Scene setup
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x333344); // Slightly bluish dark color for better contrast
-  debugLog("Scene created with improved background color");
+  scene.background = new THREE.Color(0x222222);
+  debugLog("Scene created with dark background");
 
   // Camera setup with logging of parameters
   const cameraParams = {
@@ -151,82 +95,130 @@ try {
   document.body.appendChild(renderer.domElement);
   debugLog("Renderer canvas added to document");
 
-  // Add improved lighting to scene
-  // Increase ambient light intensity for better base illumination
-  const ambientLight = new THREE.AmbientLight(0xffffff, 0.7); // Increased from 0.5 to 0.7
+  // Add lights to scene
+  debugLog("Setting up lighting...");
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
   scene.add(ambientLight);
-  console.log("Enhanced ambient lighting added with intensity 0.7");
 
-  // Add primary directional light (sun-like)
-  const primaryLight = new THREE.DirectionalLight(0xffffee, 1.0); // Slightly warm white, increased intensity
-  primaryLight.position.set(5, 15, 10); // Higher position for better top-down lighting
-  primaryLight.castShadow = true; // Enable shadows for depth
-  scene.add(primaryLight);
-  console.log("Primary directional light added with position:", primaryLight.position);
+  const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+  dirLight.position.set(5, 10, 5);
+  scene.add(dirLight);
+  debugLog("Lighting setup complete: ambient and directional lights added");
 
-  // Add secondary fill light to reduce harsh shadows
-  const secondaryLight = new THREE.DirectionalLight(0xaaccff, 0.4); // Slightly blue for contrast
-  secondaryLight.position.set(-10, 10, -5); // Coming from opposite direction
-  scene.add(secondaryLight);
-  console.log("Secondary directional light added for fill lighting");
+  // Hexagonal grid setup
+  const hexRadius = 1;
+  const hexHeight = 0.2;
+  debugLog("Creating hexagonal grid with radius:", hexRadius);
 
-  // Add subtle hemisphere light for realistic environmental lighting
-  const hemisphereLight = new THREE.HemisphereLight(0xffffbb, 0x080820, 0.5); // Sky/ground colors
-  scene.add(hemisphereLight);
-  console.log("Hemisphere light added for environmental lighting");
+  const hexGeometry = new THREE.CylinderGeometry(
+    hexRadius,
+    hexRadius,
+    hexHeight,
+    6,
+  );
 
-  // Set up hex grid renderer with all biome types for equal distribution
-  hexGridRenderer = new HexGridRenderer({
-    gridRadius: 7,
-    hexRadius: 1,
-    hexHeight: 0.2,
-    scene: scene,
-    biomeDistribution: {
-      plains: 1,     // Earth
-      forest: 1,     // Plant
-      mountains: 1,  // Earth (was Metal)
-      desert: 1,     // Light
-      water: 1,      // Water
-      volcanic: 1,   // Fire
-      storm: 1,      // Electric
-      tundra: 1,     // Wind
-      swamp: 1,      // Corrosion 
-      dark: 1,       // Dark
-      sacred: 1,     // Spirit
-      battlefield: 1 // Combat
-    }
+  // Define color palette for hexagons
+  const colorPalette = [
+    0xff5733, // Vibrant orange
+    0xc70039, // Crimson
+    0x900c3f, // Dark pink
+    0x581845, // Dark purple
+    0xffc300, // Bright yellow
+    0x2ecc71, // Green
+    0x3498db, // Blue
+  ];
+  debugLog("Color palette defined with", colorPalette.length, "colors");
+
+  // Create materials with different colors
+  const hexMaterials = colorPalette.map(
+    (color) =>
+      new THREE.MeshPhongMaterial({
+        color: color,
+        shininess: 30,
+        specular: 0x222222,
+      }),
+  );
+
+  // Add side material (edges of hexagons)
+  const edgeMaterial = new THREE.MeshPhongMaterial({
+    color: 0x333333,
+    shininess: 10,
   });
 
-  // Load textures and create grid when textures are ready
-  debugLog("Loading biome textures...");
-  hexGridRenderer.loadTextures().then(success => {
-    if (success) {
-      debugLog("Textures loaded successfully, generating grid...");
-      hexGridRenderer.createGrid();
-      hexagons = hexGridRenderer.getHexagons();
-      texturesLoaded = true;
+  // Function to create individual hexagons
+  function createHex(q, r) {
+    // Pick a random material from our palette
+    const materialIndex = Math.floor(Math.random() * hexMaterials.length);
+    const hexMaterial = hexMaterials[materialIndex];
 
-      // Hide loading screen once the grid is ready
-      const loadingElement = document.getElementById("loading");
-      if (loadingElement) {
-        loadingElement.classList.add("hidden");
-        debugLog("Loading screen hidden");
+    // Create multi-material for top/bottom and side
+    const materials = [
+      edgeMaterial, // Side
+      hexMaterial, // Top
+      hexMaterial, // Bottom
+    ];
+
+    // Create mesh with geometry and materials
+    const hex = new THREE.Mesh(hexGeometry, materials);
+
+    // Position hexagon in grid
+    const x = hexRadius * 1.75 * q;
+    const z = hexRadius * Math.sqrt(3) * (r + q / 2);
+    hex.position.set(x, 0, z);
+
+    // Debug rotation values for troubleshooting
+    debugLog(`Creating hex at (${q},${r}) with position (${x},0,${z})`);
+
+    // In THREE.js, cylinders stand upright along Y axis by default
+    // We need to rotate them 30 degrees (π/6 radians) around the Y axis
+    // for the hexagons to align properly in the grid
+    hex.rotation.x = 0;
+    hex.rotation.y = Math.PI / 6; // 30 degrees rotation
+    hex.rotation.z = 0;
+
+    // Log rotation for verification
+    debugLog(
+      `Hex rotation set to Y: ${hex.rotation.y} radians (${(hex.rotation.y * 180) / Math.PI} degrees)`,
+    );
+
+    // Add to scene
+    scene.add(hex);
+
+    return hex;
+  }
+
+  debugLog("Starting to generate hexagon grid...");
+  const hexagons = [];
+  let hexCount = 0;
+
+  // Generate grid (radius 7 - about 3x as many hexagons as radius 4)
+  const gridRadius = 7;
+  debugLog(`Generating hex grid with radius ${gridRadius}`);
+
+  for (let q = -gridRadius; q <= gridRadius; q++) {
+    for (
+      let r = Math.max(-gridRadius, -q - gridRadius);
+      r <= Math.min(gridRadius, -q + gridRadius);
+      r++
+    ) {
+      const hex = createHex(q, r);
+      hexagons.push(hex);
+      hexCount++;
+
+      // Log progress every 20 hexagons
+      if (hexCount % 20 === 0) {
+        debugLog(`Created ${hexCount} hexagons so far...`);
       }
-
-      // Additional debug info
-      debugLog(`Grid generation complete: ${hexagons.length} hexagons created with biome textures`);
-    } else {
-      console.error("Failed to load all textures, grid may not render correctly");
     }
-  }).catch(error => {
-    console.error("Error during texture loading:", error);
-  });
+  }
+
+  debugLog(`Grid generation complete: ${hexagons.length} hexagons created`);
 
   // Position camera more top-down with slight angle
   camera.position.set(0, 30, 10);
   mouseState.target.set(0, 0, 0);
   camera.lookAt(mouseState.target);
-  //debugLog("Camera positioned at:", camera.position);
+  debugLog("Camera positioned at:", camera.position);
 
   // Set up camera controls for mouse interaction
 
@@ -237,7 +229,7 @@ try {
       mouseState.leftDragging = true;
       mouseState.lastX = event.clientX;
       mouseState.lastY = event.clientY;
-      //logMouseControl("Pan started", { x: event.clientX, y: event.clientY });
+      logMouseControl("Pan started", { x: event.clientX, y: event.clientY });
       event.preventDefault(); // Prevent default browser behavior
     } else if (event.button === 2) {
       // Right mouse button for rotation
@@ -410,10 +402,13 @@ try {
         lastTime = currentTime;
       }
 
-      // Update hexagon animations if grid is loaded
-      if (texturesLoaded && hexGridRenderer) {
-        hexGridRenderer.update(currentTime);
-      }
+      // Add some movement to make it clear rendering is working
+      hexagons.forEach((hex, index) => {
+        // Make hexagons gently bob up and down
+        if (index % 3 === 0) {
+          hex.position.y = Math.sin(currentTime * 0.001 + index * 0.1) * 0.2;
+        }
+      });
 
       // Render the scene
       renderer.render(scene, camera);
@@ -458,80 +453,6 @@ try {
   debugInfo.style.zIndex = "1000";
   debugInfo.textContent = "Beast Tactics: Rendering active";
   document.body.appendChild(debugInfo);
-
-  // Initialize the game when the page is loaded
-  document.addEventListener('DOMContentLoaded', function() {
-    console.log('Initializing Beast Tactics...');
-
-    // Create a simple Game class for testing if not already defined
-    class Game {
-      constructor() {
-        console.log('Game instance created');
-        this.gridRenderer = hexGridRenderer; // Use existing hex grid renderer
-      }
-      
-      init() {
-        console.log('Game initialized');
-      }
-    }
-
-    // Initialize the game
-    const game = new Game();
-    game.init();
-    
-    // Load diagnostic tools asynchronously
-    import('../tools/diagnostics/SystemCheck.js')
-      .then(module => {
-        window.createSystemCheckUI = module.createSystemCheckUI;
-        console.log('System check diagnostic loaded');
-      })
-      .catch(err => {
-        console.error('Failed to load system check diagnostic:', err);
-      });
-    
-    // Add debug keyboard shortcuts
-    document.addEventListener('keydown', (e) => {
-      // Press 'B' to toggle biome distribution panel
-      if (e.key === 'b' && e.ctrlKey) {
-        console.log('Toggling biome distribution debug panel');
-
-        // Check if panel exists
-        let panel = document.getElementById('biome-debug-panel');
-
-        if (panel) {
-          // Remove existing panel
-          panel.remove();
-        } else {
-          // Create new panel if game is initialized
-          if (game.gridRenderer) {
-            createBiomeDistributionUI(game.gridRenderer);
-          } else {
-            console.error('Grid renderer not initialized yet');
-          }
-        }
-      }
-      
-      // Press 'S' to toggle system check panel
-      if (e.key === 's' && e.ctrlKey) {
-        console.log('Toggling system check panel');
-        
-        // Check if panel exists
-        let panel = document.getElementById('system-check-panel');
-        
-        if (panel) {
-          // Remove existing panel
-          panel.remove();
-        } else {
-          // Create new panel
-          if (gameManager) {
-            createSystemCheckUI(gameManager);
-          } else {
-            console.error('Game manager not initialized yet');
-          }
-        }
-      }
-    });
-  });
 
   // Hide loading screen
   const loadingElement = document.getElementById("loading");
