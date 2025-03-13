@@ -467,7 +467,10 @@ try {
     const game = new Game(); //This line needs to be adapted to your actual game initialization
     game.init();
 
-    // Add debug keyboard shortcut for biome distribution
+    // Import system check diagnostic
+    import { createSystemCheckUI } from '../tools/diagnostics/SystemCheck.js';
+    
+    // Add debug keyboard shortcuts
     document.addEventListener('keydown', (e) => {
       // Press 'B' to toggle biome distribution panel
       if (e.key === 'b' && e.ctrlKey) {
@@ -485,6 +488,26 @@ try {
             createBiomeDistributionUI(game.gridRenderer);
           } else {
             console.error('Grid renderer not initialized yet');
+          }
+        }
+      }
+      
+      // Press 'S' to toggle system check panel
+      if (e.key === 's' && e.ctrlKey) {
+        console.log('Toggling system check panel');
+        
+        // Check if panel exists
+        let panel = document.getElementById('system-check-panel');
+        
+        if (panel) {
+          // Remove existing panel
+          panel.remove();
+        } else {
+          // Create new panel
+          if (gameManager) {
+            createSystemCheckUI(gameManager);
+          } else {
+            console.error('Game manager not initialized yet');
           }
         }
       }

@@ -19,7 +19,10 @@ export const BiomeTypes = {
   SWAMP: 'swamp',
   DARK: 'dark',
   SACRED: 'sacred',
-  BATTLEFIELD: 'battlefield'
+  BATTLEFIELD: 'battlefield',
+  ELECTRICFOREST: 'electricForest',
+  CAVE: 'cave',
+  TEMP: 'temp'
 };
 
 export class HexGridRenderer {
@@ -61,7 +64,7 @@ export class HexGridRenderer {
       sacred: 0.06,      // Spirit
       battlefield: 0.04  // Combat
     };
-    
+
     // Log the full biome distribution to verify all types are present
     Logger.debug('HexGridRenderer', 'Biome distribution:', this._biomeDistribution);
 
@@ -78,17 +81,21 @@ export class HexGridRenderer {
     // Mapping from biome types to element texture files
     const biomeToElementMap = {
       'plains': 'Earth',
-      'forest': 'Plant',     // Changed from Nature to Plant
-      'mountains': 'Metal',
+      'forest': 'Plant',
+      'mountains': 'Earth', // Changed from Metal to Earth
       'desert': 'Light',
       'water': 'Water',
       'volcanic': 'Fire',
-      'storm': 'Electric',   // Changed from Wind to Electric
-      'tundra': 'Wind',      // Changed from Ice to Wind
-      'swamp': 'Corrosion',  // Changed from Plant to Corrosion
-      'dark': 'Dark',
-      'sacred': 'Spirit',
-      'battlefield': 'Combat'
+      'storm': 'Electric',
+      'tundra': 'Wind',
+      'swamp': 'Corrosion',
+      'dark': 'Dark', // Should be Cave = Dark
+      'sacred': 'Spirit', // Should be Temp = Spirit
+      'battlefield': 'Combat',
+      'electricForest': 'Electric', // Added specifically for Electric
+      'cave': 'Dark', // Added for Cave = Dark
+      'temp': 'Spirit', // Added for Temp = Spirit
+      'volcano': 'Fire' // Added for Volcano = Fire
     };
 
     Logger.debug('HexGridRenderer', 'Using biome to element mapping:', biomeToElementMap);
@@ -143,7 +150,7 @@ export class HexGridRenderer {
   getHexes() {
     return this._hexes;
   }
-  
+
   /**
    * Determine biome type for a hex based on coordinates and configured distribution
    * @param {Number} q - Q coordinate
@@ -258,7 +265,11 @@ export class HexGridRenderer {
         swamp: 0x808000,
         dark: 0x000000,
         sacred: 0xffd700,
-        battlefield: 0x8b0000
+        battlefield: 0x8b0000,
+        electricForest: 0x4682b4, // Added color for electricForest
+        cave: 0x000000, // Added color for cave
+        temp: 0xffd700, // Added color for temp
+        volcano: 0xff6347 // Added color for volcano
       };
       topMaterial.color.setHex(biomeColors[biomeType] || 0xffffff);
     }
@@ -329,7 +340,7 @@ export class HexGridRenderer {
    * @returns {THREE.Mesh|null} Hexagon at coordinates or null if not found
    */
   getHexAt(q, r) {
-    return this._hexagons.find(hex => 
+    return this._hexagons.find(hex =>
       hex.userData.q === q && hex.userData.r === r
     ) || null;
   }

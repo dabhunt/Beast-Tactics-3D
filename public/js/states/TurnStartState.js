@@ -77,21 +77,46 @@ export class TurnStartState {
   async _processWeatherChanges() {
     Logger.info('TurnStartState', 'Processing weather changes');
     
-    // Get weather system if available
-    const weatherSystem = this._gameManager.getSubsystem('weatherSystem');
-    
-    if (!weatherSystem) {
-      Logger.warning('TurnStartState', 'Weather system not available, skipping weather changes');
-      return;
-    }
-    
     try {
+      // Get weather system if available - with detailed logging
+      Logger.debug('TurnStartState', 'Attempting to access weather system');
+      const weatherSystem = this._gameManager.getSubsystem ? 
+        this._gameManager.getSubsystem('weatherSystem') : null;
+      
+      // Log details about the game manager
+      Logger.debug('TurnStartState', 'GameManager state:', {
+        hasGetSubsystem: typeof this._gameManager.getSubsystem === 'function',
+        currentTurn: this._gameManager.currentTurn,
+        managerInitialized: this._gameManager.initialized
+      });
+      
+      if (!weatherSystem) {
+        Logger.warning('TurnStartState', 'Weather system not available, skipping weather changes');
+        return;
+      }
+      
+      // Validate that the weatherSystem has the expected method
+      if (typeof weatherSystem.updateWeather !== 'function') {
+        Logger.warning('TurnStartState', 'Weather system exists but updateWeather method is missing, skipping');
+        return;
+      }
+      
       // Update weather
+      Logger.debug('TurnStartState', 'Calling weatherSystem.updateWeather()');
       await weatherSystem.updateWeather(this._gameManager.currentTurn);
       
       Logger.debug('TurnStartState', 'Weather processing complete');
     } catch (error) {
       Logger.error('TurnStartState', 'Error processing weather changes', error);
+      // Log detailed error info
+      console.error('Weather system error details:', {
+        errorName: error.name,
+        errorMessage: error.message,
+        errorStack: error.stack
+      });
+      
+      // Prevent this error from halting the turn process
+      Logger.info('TurnStartState', 'Continuing despite weather processing error');
     }
   }
   

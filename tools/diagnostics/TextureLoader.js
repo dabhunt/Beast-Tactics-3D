@@ -62,17 +62,21 @@ export async function testTextureLoading() {
       // Mapping from biome types to element texture files
       const biomeToElementMap = {
         plains: "Earth",
-        forest: "Plant", // Changed from Nature to Plant
-        mountains: "Metal",
+        forest: "Plant",
+        mountains: "Earth", // Changed from Metal to Earth
         desert: "Light",
         water: "Water",
         volcanic: "Fire",
         storm: "Electric",
         tundra: "Wind",
         swamp: "Corrosion",
-        dark: "Dark",
-        sacred: "Spirit",
+        dark: "Dark", // Should be Cave = Dark
+        sacred: "Spirit", // Should be Temp = Spirit
         battlefield: "Combat",
+        electricForest: "Electric", // Added specifically for Electric
+        cave: "Dark", // Added for Cave = Dark
+        temp: "Spirit", // Added for Temp = Spirit
+        volcano: "Fire" // Added for Volcano = Fire
       };
 
       // Use the element mapping instead of capitalization
