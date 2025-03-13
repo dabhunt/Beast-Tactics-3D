@@ -59,15 +59,27 @@ export class HexGridRenderer {
   async loadTextures() {
     Logger.info('HexGridRenderer', 'Loading biome textures...');
     
+    // Mapping from biome types to element texture files
+    const biomeToElementMap = {
+      'plains': 'Earth',
+      'forest': 'Nature',
+      'mountains': 'Metal',
+      'desert': 'Light',
+      'water': 'Water'
+    };
+    
+    Logger.debug('HexGridRenderer', 'Using biome to element mapping:', biomeToElementMap);
+    
     const texturePromises = Object.values(BiomeTypes).map(biomeType => {
       return new Promise((resolve, reject) => {
         console.log(`Loading texture for biome: ${biomeType}`);
-        // Capitalize first letter to match filename convention
-        const capitalizedBiomeType = biomeType.charAt(0).toUpperCase() + biomeType.slice(1);
-        const texturePath = `./assets/BiomeTiles/${capitalizedBiomeType}.png`;
+        
+        // Get the corresponding element name from the mapping
+        const elementName = biomeToElementMap[biomeType] || biomeType;
+        const texturePath = `./assets/BiomeTiles/${elementName}.png`;
         
         // Log the actual path being requested for debugging
-        console.log(`Requesting texture from path: ${texturePath}`);
+        console.log(`Requesting texture from path: ${texturePath} (element for ${biomeType})`);
         
         this._textureLoader.load(
           texturePath,

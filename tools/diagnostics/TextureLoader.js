@@ -40,10 +40,19 @@ export async function testTextureLoading() {
         };
       });
       
-      // Start loading with proper capitalization
-      const capitalizedBiome = biome.charAt(0).toUpperCase() + biome.slice(1);
-      img.src = `./public/assets/BiomeTiles/${capitalizedBiome}.png`;
-      Logger.debug('TextureLoader', `Attempting to load ${img.src}`);
+      // Mapping from biome types to element texture files
+      const biomeToElementMap = {
+        'plains': 'Earth',
+        'forest': 'Nature',
+        'mountains': 'Metal',
+        'desert': 'Light',
+        'water': 'Water'
+      };
+      
+      // Use the element mapping instead of capitalization
+      const elementName = biomeToElementMap[biome] || biome;
+      img.src = `./public/assets/BiomeTiles/${elementName}.png`;
+      Logger.debug('TextureLoader', `Attempting to load ${img.src} (element for ${biome})`);
       
       // Wait with timeout
       await Promise.race([

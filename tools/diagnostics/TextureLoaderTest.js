@@ -44,13 +44,24 @@ export class TextureLoaderTest {
       failure: []
     };
     
+    // Mapping from biome types to element texture files
+    const biomeToElementMap = {
+      'plains': 'Earth',
+      'forest': 'Nature',
+      'mountains': 'Metal',
+      'desert': 'Light',
+      'water': 'Water'
+    };
+    
+    Logger.debug('TextureLoaderTest', 'Using biome to element mapping:', biomeToElementMap);
+    
     for (const biome of biomeTypes) {
       try {
         Logger.debug('TextureLoaderTest', `Loading texture for ${biome}...`);
-        // Capitalize first letter to match filename convention
-        const capitalizedBiome = biome.charAt(0).toUpperCase() + biome.slice(1);
-        const texturePath = `/assets/BiomeTiles/${capitalizedBiome}.png`;
-        Logger.debug('TextureLoaderTest', `Requesting texture from path: ${texturePath}`);
+        // Get the corresponding element name from the mapping
+        const elementName = biomeToElementMap[biome] || biome;
+        const texturePath = `/assets/BiomeTiles/${elementName}.png`;
+        Logger.debug('TextureLoaderTest', `Requesting texture from path: ${texturePath} (element for ${biome})`);
         
         // Test if file exists with fetch
         const response = await fetch(texturePath);
