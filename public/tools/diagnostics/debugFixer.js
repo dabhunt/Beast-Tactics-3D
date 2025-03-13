@@ -12,6 +12,19 @@
 console.log("[DEBUG-FIXER] Initializing diagnostic tool");
 
 /**
+ * Run all diagnostics to identify issues
+ */
+function runDiagnostics() {
+  console.log("[DEBUG-FIXER] Running comprehensive diagnostics");
+  
+  // Run all checks
+  checkDuplicateDeclarations();
+  checkGIFAnimation();
+  
+  console.log("[DEBUG-FIXER] Diagnostics complete. Check console for issues.");
+}
+
+/**
  * Check for duplicate class declarations that could cause conflicts
  */
 function checkDuplicateDeclarations() {
@@ -48,6 +61,20 @@ function checkDuplicateDeclarations() {
 /**
  * Check GIF animation functionality
  */
+function checkGIFAnimation() {
+  console.log("[DEBUG-FIXER] Checking GIF animation functionality");
+  
+  // Check if the AnimatedGIFLoader is properly loaded
+  if (window.gifLoader) {
+    console.log("[DEBUG-FIXER] GIF Loader is available globally");
+  } else {
+    console.log("[DEBUG-FIXER] GIF Loader not found in global scope");
+  }
+  
+  // Look for any animated GIFs in the page
+  const images = document.querySelectorAll('img[src$=".gif"]');
+  console.log(`[DEBUG-FIXER] Found ${images.length} GIF images in the DOM`);
+}
 function checkGIFAnimation() {
   console.log("[DEBUG-FIXER] Checking GIF animation functionality");
   

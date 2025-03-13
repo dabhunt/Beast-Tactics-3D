@@ -1,23 +1,16 @@
 
 /**
- * AnimatedGIFLoader.js - Utility for loading and animating GIF textures in THREE.js
- * 
- * This module handles extracting frames from GIFs and updating textures to animate them
- * in THREE.js materials, which doesn't natively support GIF animation.
+ * AnimatedGIFLoader.js - Handles loading and animation of GIF files in THREE.js
  */
 
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js";
 
-// Debug flag
-const DEBUG = true;
-
 /**
- * Log debugging information
- * @param {string} message - Log message
- * @param {Object} data - Optional data to log
+ * Debug logging function for AnimatedGIFLoader
+ * @param {string} message - Message to log
+ * @param {Object} data - Optional data to include in log
  */
 function debugLog(message, data = null) {
-  if (!DEBUG) return;
   if (data) {
     console.log(`[GIF-LOADER] ${message}`, data);
   } else {
@@ -26,7 +19,7 @@ function debugLog(message, data = null) {
 }
 
 /**
- * Animated GIF loader class to handle loading and animating GIFs in THREE.js
+ * Class for loading and animating GIF textures in THREE.js
  */
 class AnimatedGIFLoader {
   constructor() {
@@ -235,5 +228,8 @@ class AnimatedGIFLoader {
   }
 }
 
-// Create a singleton instance of the loader
+// Create a singleton instance
 export const gifLoader = new AnimatedGIFLoader();
+
+// Export the class for those who need to create multiple instances
+export { AnimatedGIFLoader };

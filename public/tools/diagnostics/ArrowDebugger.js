@@ -1,32 +1,14 @@
+
 /**
- * ArrowDebugger.js - Debugging tool for directional arrows in beasts
+ * ArrowDebugger.js - Utility for debugging directional arrows on beasts
  * 
- * This module provides a debugging interface for adjusting and testing
- * the directional arrows used by Beast entities.
+ * This module provides tools for adjusting and fine-tuning the directional
+ * arrows used for beast movement in the game.
  */
 
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js";
 
-// Debug flag
-const DEBUG = true;
-
-/**
- * Log debugging information
- * @param {string} message - Log message
- * @param {Object} data - Optional data to log
- */
-function debugLog(message, data = null) {
-  if (!DEBUG) return;
-  if (data) {
-    console.log(`[ARROW-DEBUG] ${message}`, data);
-  } else {
-    console.log(`[ARROW-DEBUG] ${message}`);
-  }
-}
-
-/**
- * Class for debugging and adjusting beast directional arrows
- */
+// Single export of the ArrowDebugger class
 export class ArrowDebugger {
   /**
    * Create a new arrow debugger
@@ -472,5 +454,3 @@ const arrowHeight = ${this.settings.height.toFixed(2)};
     console.log("[ARROW-DEBUG] Beast reference updated", beast);
   }
 }
-
-export { ArrowDebugger };
