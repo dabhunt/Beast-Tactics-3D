@@ -201,3 +201,84 @@ if (document.readyState === 'complete') {
 } else {
   window.addEventListener('load', initHexGridTester);
 }
+/**
+ * HexGridSpacingTester.js - Tool for testing hexagonal grid spacing
+ */
+
+console.log("[DIAGNOSTICS] HexGridSpacingTester loaded");
+
+// Only run diagnostic when in diagnostic mode
+if (window.location.search.includes('diagnostics=true')) {
+  document.addEventListener('DOMContentLoaded', () => {
+    console.log("[DIAGNOSTICS] Initializing hex grid spacing tester");
+    
+    const diagPanel = document.getElementById('diagnostics-panel');
+    if (!diagPanel) {
+      console.error("[DIAGNOSTICS] Diagnostics panel not found");
+      return;
+    }
+    
+    diagPanel.innerHTML = `
+      <h3>Hex Grid Spacing Tester</h3>
+      <div>
+        <label>Horizontal Spacing: <span id="h-spacing-val">1.5</span></label>
+        <input type="range" id="h-spacing" min="1.0" max="2.0" step="0.05" value="1.5">
+      </div>
+      <div>
+        <label>Vertical Factor: <span id="v-factor-val">1.0</span></label>
+        <input type="range" id="v-factor" min="0.8" max="1.2" step="0.05" value="1.0">
+      </div>
+      <button id="apply-spacing">Apply Spacing</button>
+      <div id="diagnostics-log" style="margin-top: 10px; max-height: 200px; overflow-y: auto;"></div>
+    `;
+    
+    // Log function for diagnostics
+    function logDiagnostic(message) {
+      const logElement = document.getElementById('diagnostics-log');
+      if (logElement) {
+        const time = new Date().toLocaleTimeString();
+        logElement.innerHTML += `<div>[${time}] ${message}</div>`;
+        logElement.scrollTop = logElement.scrollHeight;
+      }
+      console.log(`[DIAGNOSTICS] ${message}`);
+    }
+    
+    logDiagnostic("Spacing tester initialized");
+    
+    // Setup event listeners
+    const hSpacing = document.getElementById('h-spacing');
+    const vFactor = document.getElementById('v-factor');
+    const hSpacingVal = document.getElementById('h-spacing-val');
+    const vFactorVal = document.getElementById('v-factor-val');
+    const applyButton = document.getElementById('apply-spacing');
+    
+    if (hSpacing && vFactor && hSpacingVal && vFactorVal && applyButton) {
+      hSpacing.addEventListener('input', () => {
+        hSpacingVal.textContent = hSpacing.value;
+      });
+      
+      vFactor.addEventListener('input', () => {
+        vFactorVal.textContent = vFactor.value;
+      });
+      
+      applyButton.addEventListener('click', () => {
+        const horizontalSpacing = parseFloat(hSpacing.value);
+        const verticalFactor = parseFloat(vFactor.value);
+        
+        logDiagnostic(`Applying new spacing: h=${horizontalSpacing}, v=${verticalFactor}`);
+        
+        // Look for the generateHexagonGrid function in the global scope
+        if (typeof window.generateHexagonGrid === 'function') {
+          window.generateHexagonGrid(horizontalSpacing, verticalFactor);
+          logDiagnostic("Grid regenerated successfully");
+        } else {
+          logDiagnostic("ERROR: generateHexagonGrid function not found");
+        }
+      });
+      
+      logDiagnostic("Controls setup complete");
+    } else {
+      logDiagnostic("ERROR: Failed to find control elements");
+    }
+  });
+}

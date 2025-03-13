@@ -368,24 +368,32 @@ try {
   // The grid will be generated from the updateLoadingStatus function
   // when all textures are processed
 
+  // Make generateHexagonGrid available globally for diagnostics tools
+  window.generateHexagonGrid = generateHexagonGrid;
+
   // Initialize the debug menu after all components are created
   debugLog("Initializing debug menu...");
-  const debugMenu = new DebugMenu(
-    scene,
-    camera,
-    renderer, 
-    hexagons,
-    lights,
-    textureLoadingTracker.textures
-  );
-  
-  // Connect camera manager to debug menu
-  debugMenu.setCameraManager(cameraManager);
-  
-  // Connect grid generator to debug menu
-  debugMenu.setGridGenerator(generateHexagonGrid);
-  
-  debugLog("Debug menu initialized and connected to game components");
+  try {
+    const debugMenu = new DebugMenu(
+      scene,
+      camera,
+      renderer, 
+      hexagons,
+      lights,
+      textureLoadingTracker.textures
+    );
+    
+    // Connect camera manager to debug menu
+    debugMenu.setCameraManager(cameraManager);
+    
+    // Connect grid generator to debug menu
+    debugMenu.setGridGenerator(generateHexagonGrid);
+    
+    debugLog("Debug menu initialized and connected to game components");
+  } catch (error) {
+    console.error("Failed to initialize debug menu:", error);
+    debugLog("Debug menu initialization failed, continuing without it");
+  }
 
   // Animation loop with performance tracking
   let frameCount = 0;
