@@ -1,0 +1,321 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Beast Tactics Diagnostics</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background-color: #f0f0f0;
+    }
+    header {
+      text-align: center;
+      padding: 10px;
+      margin-bottom: 20px;
+      background-color: #222;
+      color: white;
+      border-radius: 5px;
+    }
+    .control-panel {
+      margin-bottom: 20px;
+      padding: 15px;
+      background-color: white;
+      border-radius: 5px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    button {
+      padding: 10px 15px;
+      margin: 5px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    button:hover {
+      background-color: #3e8e41;
+    }
+    button.warning {
+      background-color: #ff9800;
+    }
+    button.danger {
+      background-color: #f44336;
+    }
+    #results-container {
+      padding: 15px;
+      background-color: white;
+      border-radius: 5px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      min-height: 300px;
+    }
+    .result-block {
+      margin-bottom: 15px;
+      padding: 10px;
+      border-radius: 4px;
+    }
+    .success {
+      background-color: #e8f5e9;
+      border-left: 5px solid #4CAF50;
+    }
+    .error {
+      background-color: #ffebee;
+      border-left: 5px solid #f44336;
+    }
+    pre {
+      white-space: pre-wrap;
+      background-color: #f5f5f5;
+      padding: 10px;
+      border-radius: 4px;
+      overflow-x: auto;
+    }
+    .nav-link {
+      display: inline-block;
+      margin-top: 20px;
+      color: #2196F3;
+      text-decoration: none;
+    }
+    .nav-link:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Beast Tactics Diagnostics Tool</h1>
+    <p>Test and verify the core game architecture</p>
+  </header>
+  
+  <div class="control-panel">
+    <h2>Test Controls</h2>
+    <button id="run-diagnostics">Run Architecture Tests</button>
+    <button id="test-state-machine" class="warning">Test State Machine</button>
+    <button id="test-events" class="warning">Test Event System</button>
+    <button id="test-game-flow" class="warning">Test Game Flow</button>
+    <button id="reset-game" class="danger">Reset Game State</button>
+  </div>
+  
+  <div id="results-container">
+    <h2>Test Results</h2>
+    <p>Click "Run Architecture Tests" to begin testing the core architecture.</p>
+  </div>
+  
+  <a href="index.html" class="nav-link">← Back to Game</a>
+  
+  <script type="module">
+    import { runDiagnostics, getDiagnosticsTool } from './js/tools/diagnostics/TestRunner.js';
+    import { GameManager } from './js/core/GameManager.js';
+    
+    // DOM Elements
+    const runDiagnosticsBtn = document.getElementById('run-diagnostics');
+    const testStateMachineBtn = document.getElementById('test-state-machine');
+    const testEventsBtn = document.getElementById('test-events');
+    const testGameFlowBtn = document.getElementById('test-game-flow');
+    const resetGameBtn = document.getElementById('reset-game');
+    const resultsContainer = document.getElementById('results-container');
+    
+    // Game manager instance
+    let gameManager = null;
+    
+    // Display results in the container
+    function displayResult(title, content, isError = false) {
+      const resultBlock = document.createElement('div');
+      resultBlock.className = `result-block ${isError ? 'error' : 'success'}`;
+      
+      const titleElement = document.createElement('h3');
+      titleElement.textContent = title;
+      
+      const contentElement = document.createElement('div');
+      
+      if (typeof content === 'object') {
+        const pre = document.createElement('pre');
+        pre.textContent = JSON.stringify(content, null, 2);
+        contentElement.appendChild(pre);
+      } else {
+        contentElement.textContent = content;
+      }
+      
+      resultBlock.appendChild(titleElement);
+      resultBlock.appendChild(contentElement);
+      
+      resultsContainer.appendChild(resultBlock);
+    }
+    
+    // Clear results container
+    function clearResults() {
+      resultsContainer.innerHTML = '<h2>Test Results</h2>';
+    }
+    
+    // Initialize the game manager
+    async function initializeGameManager() {
+      try {
+        gameManager = new GameManager({
+          version: '1.0.0',
+          debugMode: true,
+          testing: true
+        });
+        
+        await gameManager.initialize();
+        return true;
+      } catch (error) {
+        console.error('Failed to initialize game manager:', error);
+        displayResult('Initialization Error', error.message, true);
+        return false;
+      }
+    }
+    
+    // Run diagnostics button
+    runDiagnosticsBtn.addEventListener('click', async () => {
+      clearResults();
+      displayResult('Starting Diagnostics', 'Running core architecture tests...');
+      
+      try {
+        const results = await runDiagnostics(false);
+        const tool = getDiagnosticsTool();
+        
+        if (results.error) {
+          displayResult('Diagnostics Failed', results.error.message, true);
+        } else {
+          displayResult('Diagnostics Complete', `
+            Total Tests: ${results.summary.total}
+            Passed: ${results.summary.passed}
+            Failed: ${results.summary.failed}
+          `);
+          
+          // Insert HTML report
+          const reportContainer = document.createElement('div');
+          reportContainer.innerHTML = tool.generateHTMLReport();
+          resultsContainer.appendChild(reportContainer);
+        }
+      } catch (error) {
+        displayResult('Diagnostics Error', error.message, true);
+      }
+    });
+    
+    // Test state machine button
+    testStateMachineBtn.addEventListener('click', async () => {
+      clearResults();
+      displayResult('State Machine Test', 'Testing state transitions...');
+      
+      if (!gameManager && !(await initializeGameManager())) {
+        return;
+      }
+      
+      try {
+        const stateManager = gameManager.stateManager;
+        const initialState = stateManager.currentState;
+        
+        displayResult('Current State', `Initial state: ${initialState}`);
+        
+        // Try a few transitions
+        const transitions = [];
+        
+        if (stateManager.canTransitionTo('GameSetup')) {
+          const result = await stateManager.changeState('GameSetup');
+          transitions.push({ to: 'GameSetup', success: result });
+        }
+        
+        displayResult('State Transitions', transitions);
+      } catch (error) {
+        displayResult('State Machine Test Error', error.message, true);
+      }
+    });
+    
+    // Test events button
+    testEventsBtn.addEventListener('click', async () => {
+      clearResults();
+      displayResult('Event System Test', 'Testing event registration and triggering...');
+      
+      if (!gameManager && !(await initializeGameManager())) {
+        return;
+      }
+      
+      try {
+        const eventSystem = gameManager.eventSystem;
+        const events = [];
+        
+        // Register test event
+        const testEventName = 'test_event_' + Date.now();
+        let eventReceived = false;
+        let eventData = null;
+        
+        eventSystem.registerListener(testEventName, (data) => {
+          eventReceived = true;
+          eventData = data;
+        });
+        
+        // Trigger event
+        const testPayload = { test: true, time: Date.now() };
+        eventSystem.triggerEvent(testEventName, testPayload);
+        
+        // Check result
+        events.push({
+          name: testEventName,
+          triggered: true,
+          received: eventReceived,
+          dataMatch: JSON.stringify(eventData) === JSON.stringify(testPayload)
+        });
+        
+        displayResult('Event Test Results', events);
+      } catch (error) {
+        displayResult('Event System Test Error', error.message, true);
+      }
+    });
+    
+    // Test game flow button
+    testGameFlowBtn.addEventListener('click', async () => {
+      clearResults();
+      displayResult('Game Flow Test', 'Testing game initialization and flow...');
+      
+      try {
+        // Create fresh game manager for this test
+        const testGame = new GameManager({
+          version: '1.0.0',
+          debugMode: true,
+          testing: true
+        });
+        
+        await testGame.initialize();
+        
+        const flowResults = {
+          initialized: testGame._isInitialized,
+          gameInProgress: testGame.isGameInProgress,
+          currentState: testGame.stateManager.currentState,
+        };
+        
+        // Try to start game
+        const startResult = testGame.startGame();
+        flowResults.gameStarted = startResult;
+        flowResults.stateAfterStart = testGame.stateManager.currentState;
+        flowResults.gameInProgressAfterStart = testGame.isGameInProgress;
+        
+        displayResult('Game Flow Results', flowResults);
+      } catch (error) {
+        displayResult('Game Flow Test Error', error.message, true);
+      }
+    });
+    
+    // Reset game button
+    resetGameBtn.addEventListener('click', async () => {
+      clearResults();
+      displayResult('Game Reset', 'Resetting game state...');
+      
+      // Clear any existing game manager
+      gameManager = null;
+      
+      try {
+        // Re-initialize
+        if (await initializeGameManager()) {
+          displayResult('Reset Complete', 'Game state has been reset');
+        }
+      } catch (error) {
+        displayResult('Reset Error', error.message, true);
+      }
+    });
+  </script>
+</body>
+</html>

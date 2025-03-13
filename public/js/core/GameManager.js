@@ -51,6 +51,9 @@ export class GameManager {
     try {
       Logger.info('GameManager', 'Beginning initialization', options);
       
+      // Set initialization flag early to prevent race conditions
+      this._isInitialized = true;
+      
       // Register all subsystems with the service locator
       this._serviceLocator.registerService('stateManager', this._stateManager);
       this._serviceLocator.registerService('turnManager', this._turnManager);
@@ -65,8 +68,6 @@ export class GameManager {
       
       // Set initial game state
       this._stateManager.changeState(GameStates.GAME_SETUP);
-      
-      this._isInitialized = true;
       
       // Trigger initialization complete event
       this._eventSystem.triggerEvent('onGameInitialized', { 
