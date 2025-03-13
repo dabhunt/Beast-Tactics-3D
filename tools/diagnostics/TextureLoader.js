@@ -40,8 +40,10 @@ export async function testTextureLoading() {
         };
       });
       
-      // Start loading
-      img.src = `./public/assets/BiomeTiles/${biome}.png`;
+      // Start loading with proper capitalization
+      const capitalizedBiome = biome.charAt(0).toUpperCase() + biome.slice(1);
+      img.src = `./public/assets/BiomeTiles/${capitalizedBiome}.png`;
+      Logger.debug('TextureLoader', `Attempting to load ${img.src}`);
       
       // Wait with timeout
       await Promise.race([

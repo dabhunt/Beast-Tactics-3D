@@ -63,7 +63,7 @@ export const Logger = {
       } else {
         console.warn(`Logger: Invalid log level: ${level}`);
       }
-    } 
+    }
     // Handle numeric levels directly
     else if (typeof level === 'number' && level >= 0 && level <= 4) {
       currentLogLevel = level;

@@ -62,7 +62,12 @@ export class HexGridRenderer {
     const texturePromises = Object.values(BiomeTypes).map(biomeType => {
       return new Promise((resolve, reject) => {
         console.log(`Loading texture for biome: ${biomeType}`);
-        const texturePath = `./assets/BiomeTiles/${biomeType}.png`;
+        // Capitalize first letter to match filename convention
+        const capitalizedBiomeType = biomeType.charAt(0).toUpperCase() + biomeType.slice(1);
+        const texturePath = `./assets/BiomeTiles/${capitalizedBiomeType}.png`;
+        
+        // Log the actual path being requested for debugging
+        console.log(`Requesting texture from path: ${texturePath}`);
         
         this._textureLoader.load(
           texturePath,

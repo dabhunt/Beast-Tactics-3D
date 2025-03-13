@@ -47,7 +47,10 @@ export class TextureLoaderTest {
     for (const biome of biomeTypes) {
       try {
         Logger.debug('TextureLoaderTest', `Loading texture for ${biome}...`);
-        const texturePath = `/assets/BiomeTiles/${biome}.png`;
+        // Capitalize first letter to match filename convention
+        const capitalizedBiome = biome.charAt(0).toUpperCase() + biome.slice(1);
+        const texturePath = `/assets/BiomeTiles/${capitalizedBiome}.png`;
+        Logger.debug('TextureLoaderTest', `Requesting texture from path: ${texturePath}`);
         
         // Test if file exists with fetch
         const response = await fetch(texturePath);
