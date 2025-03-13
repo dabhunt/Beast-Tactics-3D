@@ -57,8 +57,8 @@ debugLog("Setting up THREE.js scene...");
 try {
   // Scene setup
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x222222);
-  debugLog("Scene created with dark background");
+  scene.background = new THREE.Color(0x111926); // Slightly blue-tinted dark background for better contrast
+  debugLog("Scene created with dark blue-tinted background for better contrast");
 
   // Camera setup with logging of parameters
   const cameraParams = {
@@ -95,15 +95,30 @@ try {
   document.body.appendChild(renderer.domElement);
   debugLog("Renderer canvas added to document");
 
-  // Add lights to scene
-  debugLog("Setting up lighting...");
-  const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+  // Add enhanced lighting setup for better visibility
+  debugLog("Setting up enhanced lighting...");
+  
+  // Brighter ambient light for better base illumination
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
   scene.add(ambientLight);
 
-  const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
-  dirLight.position.set(5, 10, 5);
+  // Primary directional light (sun-like)
+  const dirLight = new THREE.DirectionalLight(0xffffcc, 1.0);
+  dirLight.position.set(5, 15, 5);
+  dirLight.castShadow = true;
   scene.add(dirLight);
-  debugLog("Lighting setup complete: ambient and directional lights added");
+  
+  // Secondary fill light from opposite side
+  const fillLight = new THREE.DirectionalLight(0xccddff, 0.4);
+  fillLight.position.set(-5, 8, -5);
+  scene.add(fillLight);
+  
+  // Small overhead point light for specular highlights
+  const pointLight = new THREE.PointLight(0xffffff, 0.5, 50);
+  pointLight.position.set(0, 15, 0);
+  scene.add(pointLight);
+  
+  debugLog("Enhanced lighting setup complete with main, fill, and point lights");
 
   // Hexagonal grid setup
   const hexRadius = 1;
@@ -153,20 +168,27 @@ try {
     textures: {}
   };
   
+  // Texture offset configuration to handle transparent margins
+  const textureConfig = {
+    // 17px transparent margins at top and bottom of png tiles
+    verticalMarginRatio: 0.17, // Approximation - adjust based on actual image dimensions
+    debug: true // Set to true to see debugging logs about texture adjustments
+  };
+  
   // Default fallback material (used if textures fail to load)
   const fallbackMaterials = [
-    new THREE.MeshPhongMaterial({ color: 0xff5733, shininess: 30, specular: 0x222222 }), // Combat
-    new THREE.MeshPhongMaterial({ color: 0x7cfc00, shininess: 30, specular: 0x222222 }), // Corrosion
-    new THREE.MeshPhongMaterial({ color: 0x581845, shininess: 30, specular: 0x222222 }), // Dark
-    new THREE.MeshPhongMaterial({ color: 0x964b00, shininess: 30, specular: 0x222222 }), // Earth
-    new THREE.MeshPhongMaterial({ color: 0xffff00, shininess: 30, specular: 0x222222 }), // Electric
-    new THREE.MeshPhongMaterial({ color: 0xff4500, shininess: 30, specular: 0x222222 }), // Fire
-    new THREE.MeshPhongMaterial({ color: 0xffffff, shininess: 30, specular: 0x222222 }), // Light
-    new THREE.MeshPhongMaterial({ color: 0xc0c0c0, shininess: 30, specular: 0x222222 }), // Metal
-    new THREE.MeshPhongMaterial({ color: 0x2ecc71, shininess: 30, specular: 0x222222 }), // Plant
-    new THREE.MeshPhongMaterial({ color: 0xd8bfd8, shininess: 30, specular: 0x222222 }), // Spirit
-    new THREE.MeshPhongMaterial({ color: 0x3498db, shininess: 30, specular: 0x222222 }), // Water
-    new THREE.MeshPhongMaterial({ color: 0xc6e2ff, shininess: 30, specular: 0x222222 })  // Wind
+    new THREE.MeshPhongMaterial({ color: 0xff5733, shininess: 50, specular: 0x555555 }), // Combat
+    new THREE.MeshPhongMaterial({ color: 0x7cfc00, shininess: 50, specular: 0x555555 }), // Corrosion
+    new THREE.MeshPhongMaterial({ color: 0x581845, shininess: 50, specular: 0x555555 }), // Dark
+    new THREE.MeshPhongMaterial({ color: 0x964b00, shininess: 50, specular: 0x555555 }), // Earth
+    new THREE.MeshPhongMaterial({ color: 0xffff00, shininess: 50, specular: 0x555555 }), // Electric
+    new THREE.MeshPhongMaterial({ color: 0xff4500, shininess: 50, specular: 0x555555 }), // Fire
+    new THREE.MeshPhongMaterial({ color: 0xffffff, shininess: 50, specular: 0x555555 }), // Light
+    new THREE.MeshPhongMaterial({ color: 0xc0c0c0, shininess: 50, specular: 0x555555 }), // Metal
+    new THREE.MeshPhongMaterial({ color: 0x2ecc71, shininess: 50, specular: 0x555555 }), // Plant
+    new THREE.MeshPhongMaterial({ color: 0xd8bfd8, shininess: 50, specular: 0x555555 }), // Spirit
+    new THREE.MeshPhongMaterial({ color: 0x3498db, shininess: 50, specular: 0x555555 }), // Water
+    new THREE.MeshPhongMaterial({ color: 0xc6e2ff, shininess: 50, specular: 0x555555 })  // Wind
   ];
   
   // Load all textures
@@ -198,11 +220,27 @@ try {
       (texture) => {
         debugLog(`Successfully loaded ${element} texture`);
         
-        // Create material with the loaded texture
+        // Apply texture offset to account for transparent margins
+        texture.repeat.set(1, 1 - (textureConfig.verticalMarginRatio * 2));
+        texture.offset.set(0, textureConfig.verticalMarginRatio);
+        
+        if (textureConfig.debug) {
+          console.log(`[TEXTURE] Applied texture offset for ${element}:`, {
+            verticalMargin: textureConfig.verticalMarginRatio,
+            repeat: texture.repeat.toArray(),
+            offset: texture.offset.toArray()
+          });
+        }
+        
+        // Create material with the loaded texture and improved lighting properties
         const material = new THREE.MeshPhongMaterial({
           map: texture,
-          shininess: 30,
-          specular: 0x333333
+          shininess: 60, // Increased shininess
+          specular: 0x555555, // Increased specular highlight
+          emissive: 0x222222, // Add slight emissive to enhance colors
+          emissiveIntensity: 0.2,
+          transparent: true,
+          side: THREE.DoubleSide // Ensure both sides render properly
         });
         
         // Store the material
