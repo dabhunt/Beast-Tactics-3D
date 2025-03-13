@@ -48,19 +48,22 @@ export class HexGridRenderer {
 
     // Store biome distribution for the map
     this._biomeDistribution = config.biomeDistribution || {
-      plains: 0.3,
-      forest: 0.25,
-      mountains: 0.2,
-      desert: 0.15,
-      water: 0.1,
-      volcanic: 0.05,
-      storm: 0.05,
-      tundra: 0.05,
-      swamp: 0.05,
-      dark: 0.025,
-      sacred: 0.025,
-      battlefield: 0.05
+      plains: 0.12,      // Earth
+      forest: 0.12,      // Plant
+      mountains: 0.12,   // Metal
+      desert: 0.08,      // Light
+      water: 0.08,       // Water
+      volcanic: 0.08,    // Fire
+      storm: 0.08,       // Electric
+      tundra: 0.08,      // Wind
+      swamp: 0.08,       // Corrosion
+      dark: 0.06,        // Dark
+      sacred: 0.06,      // Spirit
+      battlefield: 0.04  // Combat
     };
+    
+    // Log the full biome distribution to verify all types are present
+    Logger.debug('HexGridRenderer', 'Biome distribution:', this._biomeDistribution);
 
     Logger.debug('HexGridRenderer', 'Created instance');
   }
@@ -75,14 +78,14 @@ export class HexGridRenderer {
     // Mapping from biome types to element texture files
     const biomeToElementMap = {
       'plains': 'Earth',
-      'forest': 'Nature',
+      'forest': 'Plant',     // Changed from Nature to Plant
       'mountains': 'Metal',
       'desert': 'Light',
       'water': 'Water',
       'volcanic': 'Fire',
-      'storm': 'Wind',
-      'tundra': 'Ice',
-      'swamp': 'Plant',
+      'storm': 'Electric',   // Changed from Wind to Electric
+      'tundra': 'Wind',      // Changed from Ice to Wind
+      'swamp': 'Corrosion',  // Changed from Plant to Corrosion
       'dark': 'Dark',
       'sacred': 'Spirit',
       'battlefield': 'Combat'
@@ -133,6 +136,14 @@ export class HexGridRenderer {
     }
   }
 
+  /**
+   * Get all generated hexes for analysis
+   * @returns {Array} Array of hex objects
+   */
+  getHexes() {
+    return this._hexes;
+  }
+  
   /**
    * Determine biome type for a hex based on coordinates and configured distribution
    * @param {Number} q - Q coordinate

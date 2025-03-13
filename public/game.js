@@ -5,6 +5,9 @@ import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.m
 import { GameManager } from "./js/core/GameManager.js";
 import { Logger } from "./js/utils/Logger.js";
 
+// Import biome distribution test tool
+import { createBiomeDistributionUI } from '../tools/diagnostics/BiomeDistributionTest.js';
+
 // Logging setup
 console.log("Beast Tactics script loaded and starting...");
 
@@ -15,20 +18,20 @@ let gameManager = null;
 async function initializeGameArchitecture() {
   try {
     console.log("Initializing Beast Tactics core architecture...");
-    
+
     // Create game manager
     gameManager = new GameManager({
       version: '1.0.0',
       debugMode: true
     });
-    
+
     // Initialize the game
     await gameManager.initialize({
       players: [
         { name: 'Player 1', color: 'Red' }
       ]
     });
-    
+
     console.log("Core architecture initialized successfully");
     return gameManager;
   } catch (error) {
@@ -160,13 +163,13 @@ try {
   primaryLight.castShadow = true; // Enable shadows for depth
   scene.add(primaryLight);
   console.log("Primary directional light added with position:", primaryLight.position);
-  
+
   // Add secondary fill light to reduce harsh shadows
   const secondaryLight = new THREE.DirectionalLight(0xaaccff, 0.4); // Slightly blue for contrast
   secondaryLight.position.set(-10, 10, -5); // Coming from opposite direction
   scene.add(secondaryLight);
   console.log("Secondary directional light added for fill lighting");
-  
+
   // Add subtle hemisphere light for realistic environmental lighting
   const hemisphereLight = new THREE.HemisphereLight(0xffffbb, 0x080820, 0.5); // Sky/ground colors
   scene.add(hemisphereLight);
@@ -179,14 +182,21 @@ try {
     hexHeight: 0.2,
     scene: scene,
     biomeDistribution: {
-      plains: 0.3,
-      forest: 0.25,
-      mountains: 0.2,
-      desert: 0.15,
-      water: 0.1
+      plains: 0.1,
+      forest: 0.1,
+      mountains: 0.1,
+      desert: 0.1,
+      water: 0.1,
+      fire: 0.05,
+      earth: 0.05,
+      air: 0.05,
+      light: 0.05,
+      shadow: 0.05,
+      metal: 0.05,
+      spirit: 0.05
     }
   });
-  
+
   // Load textures and create grid when textures are ready
   debugLog("Loading biome textures...");
   hexGridRenderer.loadTextures().then(success => {
@@ -195,14 +205,14 @@ try {
       hexGridRenderer.createGrid();
       hexagons = hexGridRenderer.getHexagons();
       texturesLoaded = true;
-      
+
       // Hide loading screen once the grid is ready
       const loadingElement = document.getElementById("loading");
       if (loadingElement) {
         loadingElement.classList.add("hidden");
         debugLog("Loading screen hidden");
       }
-      
+
       // Additional debug info
       debugLog(`Grid generation complete: ${hexagons.length} hexagons created with biome textures`);
     } else {
@@ -448,6 +458,38 @@ try {
   debugInfo.style.zIndex = "1000";
   debugInfo.textContent = "Beast Tactics: Rendering active";
   document.body.appendChild(debugInfo);
+
+  // Initialize the game when the page is loaded
+  document.addEventListener('DOMContentLoaded', function() {
+    console.log('Initializing Beast Tactics...');
+
+    // Start the game (assuming 'Game' is defined elsewhere)
+    const game = new Game(); //This line needs to be adapted to your actual game initialization
+    game.init();
+
+    // Add debug keyboard shortcut for biome distribution
+    document.addEventListener('keydown', (e) => {
+      // Press 'B' to toggle biome distribution panel
+      if (e.key === 'b' && e.ctrlKey) {
+        console.log('Toggling biome distribution debug panel');
+
+        // Check if panel exists
+        let panel = document.getElementById('biome-debug-panel');
+
+        if (panel) {
+          // Remove existing panel
+          panel.remove();
+        } else {
+          // Create new panel if game is initialized
+          if (game.gridRenderer) {
+            createBiomeDistributionUI(game.gridRenderer);
+          } else {
+            console.error('Grid renderer not initialized yet');
+          }
+        }
+      }
+    });
+  });
 
   // Hide loading screen
   const loadingElement = document.getElementById("loading");

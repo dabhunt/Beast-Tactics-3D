@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -89,7 +88,7 @@
     <h1>Beast Tactics Diagnostics Tool</h1>
     <p>Test and verify the core game architecture</p>
   </header>
-  
+
   <div class="control-panel">
     <h2>Test Controls</h2>
     <button id="run-diagnostics">Run Architecture Tests</button>
@@ -98,18 +97,18 @@
     <button id="test-game-flow" class="warning">Test Game Flow</button>
     <button id="reset-game" class="danger">Reset Game State</button>
   </div>
-  
+
   <div id="results-container">
     <h2>Test Results</h2>
     <p>Click "Run Architecture Tests" to begin testing the core architecture.</p>
   </div>
-  
+
   <a href="index.html" class="nav-link">← Back to Game</a>
-  
+
   <script type="module">
     import { runDiagnostics, getDiagnosticsTool } from './js/tools/diagnostics/TestRunner.js';
     import { GameManager } from './js/core/GameManager.js';
-    
+
     // DOM Elements
     const runDiagnosticsBtn = document.getElementById('run-diagnostics');
     const testStateMachineBtn = document.getElementById('test-state-machine');
@@ -117,20 +116,20 @@
     const testGameFlowBtn = document.getElementById('test-game-flow');
     const resetGameBtn = document.getElementById('reset-game');
     const resultsContainer = document.getElementById('results-container');
-    
+
     // Game manager instance
     let gameManager = null;
-    
+
     // Display results in the container
     function displayResult(title, content, isError = false) {
       const resultBlock = document.createElement('div');
       resultBlock.className = `result-block ${isError ? 'error' : 'success'}`;
-      
+
       const titleElement = document.createElement('h3');
       titleElement.textContent = title;
-      
+
       const contentElement = document.createElement('div');
-      
+
       if (typeof content === 'object') {
         const pre = document.createElement('pre');
         pre.textContent = JSON.stringify(content, null, 2);
@@ -138,18 +137,18 @@
       } else {
         contentElement.textContent = content;
       }
-      
+
       resultBlock.appendChild(titleElement);
       resultBlock.appendChild(contentElement);
-      
+
       resultsContainer.appendChild(resultBlock);
     }
-    
+
     // Clear results container
     function clearResults() {
       resultsContainer.innerHTML = '<h2>Test Results</h2>';
     }
-    
+
     // Initialize the game manager
     async function initializeGameManager() {
       try {
@@ -158,7 +157,7 @@
           debugMode: true,
           testing: true
         });
-        
+
         await gameManager.initialize();
         return true;
       } catch (error) {
@@ -167,16 +166,16 @@
         return false;
       }
     }
-    
+
     // Run diagnostics button
     runDiagnosticsBtn.addEventListener('click', async () => {
       clearResults();
       displayResult('Starting Diagnostics', 'Running core architecture tests...');
-      
+
       try {
         const results = await runDiagnostics(false);
         const tool = getDiagnosticsTool();
-        
+
         if (results.error) {
           displayResult('Diagnostics Failed', results.error.message, true);
         } else {
@@ -185,7 +184,7 @@
             Passed: ${results.summary.passed}
             Failed: ${results.summary.failed}
           `);
-          
+
           // Insert HTML report
           const reportContainer = document.createElement('div');
           reportContainer.innerHTML = tool.generateHTMLReport();
@@ -195,63 +194,63 @@
         displayResult('Diagnostics Error', error.message, true);
       }
     });
-    
+
     // Test state machine button
     testStateMachineBtn.addEventListener('click', async () => {
       clearResults();
       displayResult('State Machine Test', 'Testing state transitions...');
-      
+
       if (!gameManager && !(await initializeGameManager())) {
         return;
       }
-      
+
       try {
         const stateManager = gameManager.stateManager;
         const initialState = stateManager.currentState;
-        
+
         displayResult('Current State', `Initial state: ${initialState}`);
-        
+
         // Try a few transitions
         const transitions = [];
-        
+
         if (stateManager.canTransitionTo('GameSetup')) {
           const result = await stateManager.changeState('GameSetup');
           transitions.push({ to: 'GameSetup', success: result });
         }
-        
+
         displayResult('State Transitions', transitions);
       } catch (error) {
         displayResult('State Machine Test Error', error.message, true);
       }
     });
-    
+
     // Test events button
     testEventsBtn.addEventListener('click', async () => {
       clearResults();
       displayResult('Event System Test', 'Testing event registration and triggering...');
-      
+
       if (!gameManager && !(await initializeGameManager())) {
         return;
       }
-      
+
       try {
         const eventSystem = gameManager.eventSystem;
         const events = [];
-        
+
         // Register test event
         const testEventName = 'test_event_' + Date.now();
         let eventReceived = false;
         let eventData = null;
-        
+
         eventSystem.registerListener(testEventName, (data) => {
           eventReceived = true;
           eventData = data;
         });
-        
+
         // Trigger event
         const testPayload = { test: true, time: Date.now() };
         eventSystem.triggerEvent(testEventName, testPayload);
-        
+
         // Check result
         events.push({
           name: testEventName,
@@ -259,18 +258,18 @@
           received: eventReceived,
           dataMatch: JSON.stringify(eventData) === JSON.stringify(testPayload)
         });
-        
+
         displayResult('Event Test Results', events);
       } catch (error) {
         displayResult('Event System Test Error', error.message, true);
       }
     });
-    
+
     // Test game flow button
     testGameFlowBtn.addEventListener('click', async () => {
       clearResults();
       displayResult('Game Flow Test', 'Testing game initialization and flow...');
-      
+
       try {
         // Create fresh game manager for this test
         const testGame = new GameManager({
@@ -278,35 +277,35 @@
           debugMode: true,
           testing: true
         });
-        
+
         await testGame.initialize();
-        
+
         const flowResults = {
           initialized: testGame._isInitialized,
           gameInProgress: testGame.isGameInProgress,
           currentState: testGame.stateManager.currentState,
         };
-        
+
         // Try to start game
         const startResult = testGame.startGame();
         flowResults.gameStarted = startResult;
         flowResults.stateAfterStart = testGame.stateManager.currentState;
         flowResults.gameInProgressAfterStart = testGame.isGameInProgress;
-        
+
         displayResult('Game Flow Results', flowResults);
       } catch (error) {
         displayResult('Game Flow Test Error', error.message, true);
       }
     });
-    
+
     // Reset game button
     resetGameBtn.addEventListener('click', async () => {
       clearResults();
       displayResult('Game Reset', 'Resetting game state...');
-      
+
       // Clear any existing game manager
       gameManager = null;
-      
+
       try {
         // Re-initialize
         if (await initializeGameManager()) {
