@@ -1,8 +1,53 @@
 // Import Three.js from CDN
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js";
 
+// Import game architecture
+import { GameManager } from "./js/core/GameManager.js";
+import { Logger } from "./js/utils/Logger.js";
+
 // Logging setup
 console.log("Beast Tactics script loaded and starting...");
+
+// Game manager instance
+let gameManager = null;
+
+// Initialize core game architecture
+async function initializeGameArchitecture() {
+  try {
+    console.log("Initializing Beast Tactics core architecture...");
+    
+    // Create game manager
+    gameManager = new GameManager({
+      version: '1.0.0',
+      debugMode: true
+    });
+    
+    // Initialize the game
+    await gameManager.initialize({
+      players: [
+        { name: 'Player 1', color: 'Red' }
+      ]
+    });
+    
+    console.log("Core architecture initialized successfully");
+    return gameManager;
+  } catch (error) {
+    console.error("Failed to initialize game architecture:", error);
+    console.debug("Error details:", {
+      name: error.name,
+      message: error.message,
+      stack: error.stack
+    });
+    throw error;
+  }
+}
+
+// Initialize game architecture in the background
+initializeGameArchitecture().then(manager => {
+  console.log("Game architecture ready, manager:", manager);
+}).catch(error => {
+  console.error("Game architecture initialization failed:", error);
+});
 
 // Track mouse state for camera controls
 const mouseState = {
@@ -21,7 +66,7 @@ const mouseState = {
 // Debug function to log mouse control events
 function logMouseControl(action, data) {
   if (!DEBUG) return;
-  console.log(`[MOUSE] ${action}`, data);
+  //console.log(`[MOUSE] ${action}`, data);
 }
 
 // Global error handler for debugging
@@ -58,7 +103,7 @@ try {
   // Scene setup
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x222222);
-  debugLog("Scene created with dark background");
+  //debugLog("Scene created with dark background");
 
   // Camera setup with logging of parameters
   const cameraParams = {
@@ -67,7 +112,7 @@ try {
     near: 0.1,
     far: 1000,
   };
-  debugLog("Creating camera with parameters:", cameraParams);
+  //debugLog("Creating camera with parameters:", cameraParams);
 
   const camera = new THREE.PerspectiveCamera(
     cameraParams.fov,
@@ -96,14 +141,12 @@ try {
   debugLog("Renderer canvas added to document");
 
   // Add lights to scene
-  debugLog("Setting up lighting...");
   const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
   scene.add(ambientLight);
 
   const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
   dirLight.position.set(5, 10, 5);
   scene.add(dirLight);
-  debugLog("Lighting setup complete: ambient and directional lights added");
 
   // Hexagonal grid setup
   const hexRadius = 1;
@@ -218,7 +261,7 @@ try {
   camera.position.set(0, 30, 10);
   mouseState.target.set(0, 0, 0);
   camera.lookAt(mouseState.target);
-  debugLog("Camera positioned at:", camera.position);
+  //debugLog("Camera positioned at:", camera.position);
 
   // Set up camera controls for mouse interaction
 
@@ -229,7 +272,7 @@ try {
       mouseState.leftDragging = true;
       mouseState.lastX = event.clientX;
       mouseState.lastY = event.clientY;
-      logMouseControl("Pan started", { x: event.clientX, y: event.clientY });
+      //logMouseControl("Pan started", { x: event.clientX, y: event.clientY });
       event.preventDefault(); // Prevent default browser behavior
     } else if (event.button === 2) {
       // Right mouse button for rotation
