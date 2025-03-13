@@ -26,13 +26,25 @@ export class BiomeDistributionTest {
     this.biomeCount = {};
     this.totalHexes = hexes.length;
     
+    // Initialize expected biome types with zero counts
+    const expectedBiomes = [
+      'plains', 'forest', 'mountains', 'desert', 'water', 
+      'volcanic', 'storm', 'tundra', 'swamp', 'dark', 
+      'sacred', 'battlefield'
+    ];
+    
+    expectedBiomes.forEach(biome => {
+      this.biomeCount[biome] = 0;
+    });
+    
     // Count biomes
     hexes.forEach(hex => {
-      const biomeType = hex.biomeType;
-      if (!this.biomeCount[biomeType]) {
-        this.biomeCount[biomeType] = 0;
+      const biomeType = hex.userData?.biomeType || hex.biomeType;
+      if (biomeType) {
+        this.biomeCount[biomeType]++;
+      } else {
+        Logger.warn('BiomeDistributionTest', 'Hex without biome type found', hex);
       }
-      this.biomeCount[biomeType]++;
     });
     
     // Log results
@@ -64,6 +76,21 @@ export class BiomeDistributionTest {
     let html = '<h2>Biome Distribution Analysis</h2>';
     
     html += `<p>Total hexes analyzed: ${this.totalHexes}</p>`;
+    
+    // Add distribution equality metrics
+    const equalityMetrics = this.calculateDistributionEquality();
+    
+    html += `
+    <div style="margin: 10px 0; padding: 10px; background-color: rgba(255,255,255,0.1); border-radius: 5px;">
+      <h3>Distribution Equality</h3>
+      <p><strong>Equality Score:</strong> ${equalityMetrics.equalityScore}/100</p>
+      <p><strong>Analysis:</strong> ${equalityMetrics.message}</p>
+      <div style="background-color: #333; height: 20px; width: 100%; border-radius: 3px; margin-top: 5px;">
+        <div style="background-color: ${parseFloat(equalityMetrics.equalityScore) > 85 ? '#4CAF50' : 
+          parseFloat(equalityMetrics.equalityScore) > 70 ? '#FFC107' : '#F44336'}; 
+          height: 100%; width: ${equalityMetrics.equalityScore}%; border-radius: 3px;"></div>
+      </div>
+    </div>`;
     
     // Create table for results
     html += '<table border="1" style="border-collapse: collapse; width: 100%;">';
@@ -176,3 +203,71 @@ export function createBiomeDistributionUI(hexGridRenderer) {
   
   return biomeTest;
 }
+
+
+  /**
+   * Calculate how evenly distributed the biomes are
+   * @returns {Object} Object containing distribution metrics
+   */
+  calculateDistributionEquality() {
+    if (this.totalHexes === 0) {
+      return { 
+        equalityScore: 0, 
+        message: "No hexes analyzed" 
+      };
+    }
+    
+    // Calculate the ideal number of each biome for perfect equality
+    const biomeTypes = Object.keys(this.biomeCount);
+    const idealCount = this.totalHexes / biomeTypes.length;
+    
+    Logger.debug('BiomeDistributionTest', `Ideal count per biome: ${idealCount.toFixed(2)}`);
+    
+    // Calculate the variance from ideal
+    let totalVariance = 0;
+    let missingBiomes = 0;
+    let maxVariancePercent = 0;
+    
+    biomeTypes.forEach(biome => {
+      const count = this.biomeCount[biome] || 0;
+      const variance = Math.abs(count - idealCount);
+      const variancePercent = (variance / idealCount) * 100;
+      
+      totalVariance += variance;
+      maxVariancePercent = Math.max(maxVariancePercent, variancePercent);
+      
+      if (count === 0) {
+        missingBiomes++;
+      }
+    });
+    
+    // Calculate an overall equality score (100 = perfect equality, 0 = worst)
+    const averageVariancePercent = totalVariance / biomeTypes.length / idealCount * 100;
+    const equalityScore = Math.max(0, 100 - averageVariancePercent);
+    
+    // Generate message about equality
+    let message = "";
+    if (equalityScore > 95) {
+      message = "Excellent distribution! All biomes are nearly equally represented.";
+    } else if (equalityScore > 85) {
+      message = "Good distribution with minor variations.";
+    } else if (equalityScore > 70) {
+      message = "Fair distribution with noticeable variations.";
+    } else if (equalityScore > 50) {
+      message = "Poor distribution with significant imbalance.";
+    } else {
+      message = "Very uneven distribution.";
+    }
+    
+    if (missingBiomes > 0) {
+      message += ` ${missingBiomes} biome types are missing entirely.`;
+    }
+    
+    return {
+      equalityScore: equalityScore.toFixed(2),
+      averageVariance: (totalVariance / biomeTypes.length).toFixed(2),
+      maxVariancePercent: maxVariancePercent.toFixed(2),
+      missingBiomes,
+      message
+    };
+  }

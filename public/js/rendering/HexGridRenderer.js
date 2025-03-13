@@ -51,22 +51,29 @@ export class HexGridRenderer {
 
     // Store biome distribution for the map
     this._biomeDistribution = config.biomeDistribution || {
-      plains: 0.12,      // Earth
-      forest: 0.12,      // Plant
-      mountains: 0.12,   // Metal
-      desert: 0.08,      // Light
-      water: 0.08,       // Water
-      volcanic: 0.08,    // Fire
-      storm: 0.08,       // Electric
-      tundra: 0.08,      // Wind
-      swamp: 0.08,       // Corrosion
-      dark: 0.06,        // Dark
-      sacred: 0.06,      // Spirit
-      battlefield: 0.04  // Combat
+      plains: 1,      // Earth
+      forest: 1,      // Plant
+      mountains: 1,   // Earth (was Metal)
+      desert: 1,      // Light
+      water: 1,       // Water
+      volcanic: 1,    // Fire
+      storm: 1,       // Electric
+      tundra: 1,      // Wind
+      swamp: 1,       // Corrosion
+      dark: 1,        // Dark
+      sacred: 1,      // Spirit
+      battlefield: 1  // Combat
     };
 
-    // Log the full biome distribution to verify all types are present
-    Logger.debug('HexGridRenderer', 'Biome distribution:', this._biomeDistribution);
+    // With equal distribution, we're just using these as a list of biome types
+    // Values are set to 1 to indicate "include this biome" but actual distribution
+    // will be calculated to be equal
+    
+    // Log the biome types we're using
+    Logger.debug('HexGridRenderer', 'Biome types to distribute equally:', Object.keys(this._biomeDistribution));
+    
+    // The actual allocation will be calculated in _initializeEqualBiomeDistribution
+    this._biomeAllocation = null;
 
     Logger.debug('HexGridRenderer', 'Created instance');
   }
@@ -152,29 +159,110 @@ export class HexGridRenderer {
   }
 
   /**
-   * Determine biome type for a hex based on coordinates and configured distribution
+   * Initialize the distribution map to ensure equal representation of biomes
+   * @private
+   */
+  _initializeEqualBiomeDistribution() {
+    Logger.debug('HexGridRenderer', 'Initializing equal biome distribution');
+    
+    // Calculate total number of hexes in the grid
+    const hexCount = 3 * this._gridRadius * (this._gridRadius + 1) + 1;
+    Logger.debug('HexGridRenderer', `Grid will contain approximately ${hexCount} hexes`);
+    
+    // Get all biome types
+    const allBiomeTypes = Object.keys(this._biomeDistribution);
+    const biomeCount = allBiomeTypes.length;
+    
+    // Calculate how many hexes of each type we need
+    const hexesPerBiome = Math.floor(hexCount / biomeCount);
+    Logger.debug('HexGridRenderer', `Allocating ~${hexesPerBiome} hexes per biome`);
+    
+    // Create a distribution array with equal parts of each biome
+    this._biomeAllocation = [];
+    
+    allBiomeTypes.forEach(biomeType => {
+      // Add this biome type hexesPerBiome times
+      for (let i = 0; i < hexesPerBiome; i++) {
+        this._biomeAllocation.push(biomeType);
+      }
+    });
+    
+    // If we have remaining hexes, distribute them evenly
+    const remaining = hexCount - (hexesPerBiome * biomeCount);
+    for (let i = 0; i < remaining; i++) {
+      this._biomeAllocation.push(allBiomeTypes[i % biomeCount]);
+    }
+    
+    // Shuffle the allocation array thoroughly to randomize positions
+    this._shuffleArray(this._biomeAllocation);
+    
+    Logger.info('HexGridRenderer', `Created equal distribution map with ${this._biomeAllocation.length} allocated hexes`, {
+      biomeTypes: allBiomeTypes,
+      hexesPerBiome: hexesPerBiome
+    });
+  }
+  
+  /**
+   * Shuffle an array using Fisher-Yates algorithm
+   * @param {Array} array - The array to shuffle
+   * @private
+   */
+  _shuffleArray(array) {
+    // Logger for deep debugging of the shuffling process
+    Logger.debug('HexGridRenderer', `Shuffling array of ${array.length} elements`);
+    
+    // Perform Fisher-Yates shuffle for thorough randomization
+    for (let i = array.length - 1; i > 0; i--) {
+      // Generate random index
+      const j = Math.floor(Math.random() * (i + 1));
+      
+      // Swap elements
+      [array[i], array[j]] = [array[j], array[i]];
+    }
+    
+    // Log sample of shuffled results for verification
+    const sampleSize = Math.min(10, array.length);
+    Logger.debug('HexGridRenderer', `Shuffle complete. Sample of first ${sampleSize} elements:`, 
+      array.slice(0, sampleSize));
+  }
+
+  /**
+   * Determine biome type for a hex based on coordinates in an equal distribution
    * @param {Number} q - Q coordinate
    * @param {Number} r - R coordinate
    * @returns {String} Biome type
    */
   _determineBiomeType(q, r) {
-    // Use a simplex noise function to generate more natural biome clusters
-    // For now, we'll use a simple random distribution based on coordinates
-
-    // Get a value between 0-1 that's deterministic for these coordinates
-    const seed = Math.abs(Math.sin(q * 12.9898 + r * 78.233) * 43758.5453) % 1;
-
-    // Distribute based on configured weights
-    let cumulative = 0;
-    for (const [biome, weight] of Object.entries(this._biomeDistribution)) {
-      cumulative += weight;
-      if (seed <= cumulative) {
-        return biome;
-      }
+    // Initialize the equal distribution on first call if needed
+    if (!this._biomeAllocation) {
+      this._initializeEqualBiomeDistribution();
+      this._usedPositions = new Map();
+      this._positionIndex = 0;
     }
-
-    // Default to plains if something went wrong
-    return BiomeTypes.PLAINS;
+    
+    // Create a position key from coordinates
+    const posKey = `${q},${r}`;
+    
+    // If this position already has an assigned biome, return it
+    if (this._usedPositions.has(posKey)) {
+      return this._usedPositions.get(posKey);
+    }
+    
+    // Get the next biome from the pre-generated equal distribution
+    const biomeType = this._biomeAllocation[this._positionIndex] || BiomeTypes.PLAINS;
+    
+    // Increment position index and wrap around if needed
+    this._positionIndex = (this._positionIndex + 1) % this._biomeAllocation.length;
+    
+    // Store the assignment for this position
+    this._usedPositions.set(posKey, biomeType);
+    
+    // Log every 20th assignment for debugging
+    if (this._positionIndex % 20 === 0) {
+      Logger.debug('HexGridRenderer', `Assigned biome ${biomeType} to position (${q},${r}). Used ${this._positionIndex} of ${this._biomeAllocation.length} allocations.`);
+    }
+    
+    return biomeType;
   }
 
   /**

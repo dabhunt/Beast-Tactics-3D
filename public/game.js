@@ -175,25 +175,25 @@ try {
   scene.add(hemisphereLight);
   console.log("Hemisphere light added for environmental lighting");
 
-  // Set up hex grid renderer with biome distribution from game config
+  // Set up hex grid renderer with all biome types for equal distribution
   hexGridRenderer = new HexGridRenderer({
     gridRadius: 7,
     hexRadius: 1,
     hexHeight: 0.2,
     scene: scene,
     biomeDistribution: {
-      plains: 0.1,
-      forest: 0.1,
-      mountains: 0.1,
-      desert: 0.1,
-      water: 0.1,
-      fire: 0.05,
-      earth: 0.05,
-      air: 0.05,
-      light: 0.05,
-      shadow: 0.05,
-      metal: 0.05,
-      spirit: 0.05
+      plains: 1,     // Earth
+      forest: 1,     // Plant
+      mountains: 1,  // Earth (was Metal)
+      desert: 1,     // Light
+      water: 1,      // Water
+      volcanic: 1,   // Fire
+      storm: 1,      // Electric
+      tundra: 1,     // Wind
+      swamp: 1,      // Corrosion 
+      dark: 1,       // Dark
+      sacred: 1,     // Spirit
+      battlefield: 1 // Combat
     }
   });
 
