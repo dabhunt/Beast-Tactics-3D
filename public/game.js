@@ -65,15 +65,15 @@ try {
   debugLog("Initializing camera manager...");
   const cameraManager = new CameraManager(scene);
   const camera = cameraManager.camera; // Get the camera instance for use in the render loop
-  
+
   // Add enhanced lighting setup for better visibility
   debugLog("Setting up enhanced lighting...");
-  
+
   // Create a lights container to organize and reference lights
   const lights = {};
-  
+
   // Enhanced lighting configuration for better color vibrancy
-  
+
   // Brighter ambient light with warmer tone
   lights.ambient = new THREE.AmbientLight(0xfffcf0, 0.85); // Increased intensity, slightly warmer
   scene.add(lights.ambient);
@@ -85,22 +85,22 @@ try {
   lights.directional.castShadow = true;
   scene.add(lights.directional);
   debugLog("Created enhanced directional light with intensity:", lights.directional.intensity);
-  
+
   // Secondary fill light from opposite side with complementary cooler tint
   lights.fill = new THREE.DirectionalLight(0xd0e8ff, 0.5); // Slightly higher intensity
   lights.fill.position.set(-5, 8, -5);
   scene.add(lights.fill);
-  
+
   // Small overhead point light for specular highlights - brighter
   lights.point = new THREE.PointLight(0xffffff, 0.7, 50); // Increased intensity
   lights.point.position.set(0, 15, 0);
   scene.add(lights.point);
-  
+
   // Add an additional low rim light for edge definition
   lights.rim = new THREE.DirectionalLight(0xffe8d0, 0.3);
   lights.rim.position.set(0, 3, -12);
   scene.add(lights.rim);
-  
+
   debugLog("Enhanced lighting setup complete with main, fill, and point lights");
 
   // Hexagonal grid setup
@@ -130,19 +130,19 @@ try {
     'Water',
     'Wind'
   ];
-  
+
   // Create URLs for local assets
   const elemUrls = {};
   elementTypes.forEach(element => {
     elemUrls[element] = `/assets/BiomeTiles/${element}.png`;
   });
-  
+
   debugLog("Element types defined:", elementTypes);
   debugLog("Element URLs mapped:", elemUrls);
-  
+
   // Create texture loader with error handling
   const textureLoader = new THREE.TextureLoader();
-  
+
   // Create a loading tracker
   const textureLoadingTracker = {
     total: elementTypes.length,
@@ -150,13 +150,13 @@ try {
     failed: 0,
     textures: {}
   };
-  
+
   // Texture configuration (reverted to default)
   const textureConfig = {
     verticalMarginRatio: 0, // No margin adjustment
     debug: true // Set to true to see debugging logs about texture adjustments
   };
-  
+
   // Default fallback material (used if textures fail to load)
   const fallbackMaterials = [
     new THREE.MeshPhongMaterial({ color: 0xff5733, shininess: 50, specular: 0x555555 }), // Combat
@@ -172,40 +172,40 @@ try {
     new THREE.MeshPhongMaterial({ color: 0x3498db, shininess: 50, specular: 0x555555 }), // Water
     new THREE.MeshPhongMaterial({ color: 0xc6e2ff, shininess: 50, specular: 0x555555 })  // Wind
   ];
-  
+
   // Load all textures
   const hexMaterials = {};
-  
+
   function updateLoadingStatus() {
     const total = textureLoadingTracker.total;
     const loaded = textureLoadingTracker.loaded;
     const failed = textureLoadingTracker.failed;
-    
+
     debugLog(`Texture loading progress: ${loaded}/${total} loaded, ${failed} failed`);
-    
+
     // Check if all textures are processed (either loaded or failed)
     if (loaded + failed === total) {
       debugLog("All textures processed. Ready to generate map.");
       generateHexagonGrid();
     }
   }
-  
+
   // Start loading all textures
   elementTypes.forEach((element, index) => {
     debugLog(`Loading texture for ${element} element...`);
-    
+
     textureLoader.load(
       // URL
       elemUrls[element],
-      
+
       // onLoad callback
       (texture) => {
         debugLog(`Successfully loaded ${element} texture`);
-        
+
         // Use default texture mapping (no offset)
         texture.repeat.set(1, 1);
         texture.offset.set(0, 0);
-        
+
         if (textureConfig.debug) {
           console.log(`[TEXTURE] Applied texture offset for ${element}:`, {
             verticalMargin: textureConfig.verticalMarginRatio,
@@ -213,7 +213,7 @@ try {
             offset: texture.offset.toArray()
           });
         }
-        
+
         // Create material with the loaded texture and enhanced properties for more vibrant colors
         const material = new THREE.MeshPhongMaterial({
           map: texture,
@@ -225,7 +225,7 @@ try {
           side: THREE.DoubleSide, // Ensure both sides render properly
           color: 0xffffff // Full brightness base color to avoid muting
         });
-        
+
         // Log material creation with enhanced properties
         if (textureConfig.debug) {
           console.log(`[MATERIAL] Created enhanced material for ${element} with properties:`, {
@@ -235,27 +235,27 @@ try {
             emissiveIntensity: material.emissiveIntensity
           });
         }
-        
+
         // Store the material
         hexMaterials[element] = material;
         textureLoadingTracker.textures[element] = texture;
         textureLoadingTracker.loaded++;
-        
+
         updateLoadingStatus();
       },
-      
+
       // onProgress callback (not used)
       undefined,
-      
+
       // onError callback
       (error) => {
         console.error(`Failed to load texture for ${element}:`, error);
-        
+
         // Use fallback material
         debugLog(`Using fallback material for ${element}`);
         hexMaterials[element] = fallbackMaterials[index];
         textureLoadingTracker.failed++;
-        
+
         updateLoadingStatus();
       }
     );
@@ -271,7 +271,7 @@ try {
   function createHex(q, r, horizontalSpacing = 1.5, verticalFactor = 1.0) {
     // Assign element type - for now, random selection
     const randomElement = elementTypes[Math.floor(Math.random() * elementTypes.length)];
-    
+
     // Get appropriate material based on element type
     const hexMaterial = hexMaterials[randomElement] || fallbackMaterials[0];
 
@@ -284,7 +284,7 @@ try {
 
     // Create mesh with geometry and materials
     const hex = new THREE.Mesh(hexGeometry, materials);
-    
+
     // Store element data for game logic
     hex.userData.element = randomElement;
     hex.userData.q = q;
@@ -323,11 +323,11 @@ try {
     // Generate grid (radius 7 - about 3x as many hexagons as radius 4)
     const gridRadius = 7;
     debugLog(`Generating hex grid with radius ${gridRadius}, spacing: h=${horizontalSpacing}, v=${verticalFactor}`);
-    
+
     // Track element distribution for debugging
     const elementDistribution = {};
     elementTypes.forEach(element => { elementDistribution[element] = 0; });
-    
+
     // Clear any existing hexagons if we're regenerating
     if (hexagons.length > 0) {
       debugLog("Clearing existing hexagons before regeneration");
@@ -347,7 +347,7 @@ try {
         const hex = createHex(q, r, horizontalSpacing, verticalFactor);
         hexagons.push(hex);
         hexCount++;
-        
+
         // Track element distribution if hex has element data
         if (hex.userData.element) {
           elementDistribution[hex.userData.element]++;
@@ -363,7 +363,7 @@ try {
     debugLog(`Grid generation complete: ${hexagons.length} hexagons created`);
     debugLog("Element distribution:", elementDistribution);
   }
-  
+
   // Wait for texture loading to complete before generating the grid
   // The grid will be generated from the updateLoadingStatus function
   // when all textures are processed
@@ -382,13 +382,13 @@ try {
       lights,
       textureLoadingTracker.textures
     );
-    
+
     // Connect camera manager to debug menu
     debugMenu.setCameraManager(cameraManager);
-    
+
     // Connect grid generator to debug menu
     debugMenu.setGridGenerator(generateHexagonGrid);
-    
+
     debugLog("Debug menu initialized and connected to game components");
   } catch (error) {
     console.error("Failed to initialize debug menu:", error);
@@ -414,7 +414,7 @@ try {
         fpsUpdateTime = currentTime;
         updateDebugInfo(); // Update the debug overlay
       }
-      
+
       // Log FPS every 100 frames (to console)
       if (frameCount % 100 === 0) {
         const elapsed = currentTime - lastTime;
@@ -458,7 +458,7 @@ try {
 
     // Update camera aspect ratio via camera manager
     cameraManager.updateAspect(window.innerWidth, window.innerHeight);
-    
+
     // Update renderer size
     renderer.setSize(window.innerWidth, window.innerHeight);
     debugLog("Renderer and camera updated for new dimensions");
@@ -485,26 +485,26 @@ try {
     <div id="debug-hovered">Hovered: None</div>
   `;
   document.body.appendChild(debugInfo);
-  
+
   // Function to update debug info
   function updateDebugInfo() {
     if (!DEBUG) return;
-    
+
     const fpsElement = document.getElementById("debug-fps");
     const hexCountElement = document.getElementById("debug-hex-count");
     const cameraElement = document.getElementById("debug-camera");
     const texturesElement = document.getElementById("debug-textures");
-    
-    if (fpsElement) fpsElement.textContent = `FPS: ${currentFps}`;
-    if (hexCountElement) hexCountElement.textContent = `Hexagons: ${hexagons.length}`;
+
+    if (fpsElement) fpsElement.textContent = "FPS: " + currentFps;
+    if (hexCountElement) hexCountElement.textContent = "Hexagons: " + hexagons.length;
     if (cameraElement) {
-      cameraElement.textContent = `Camera: X:${camera.position.x.toFixed(1)} Y:${camera.position.y.toFixed(1)} Z:${camera.position.z.toFixed(1)}`;
+      cameraElement.textContent = "Camera: X:" + camera.position.x.toFixed(1) + " Y:" + camera.position.y.toFixed(1) + " Z:" + camera.position.z.toFixed(1);
     }
     if (texturesElement) {
-      texturesElement.textContent = `Textures: ${textureLoadingTracker.loaded}/${textureLoadingTracker.total} loaded, ${textureLoadingTracker.failed} failed`;
+      texturesElement.textContent = "Textures: " + textureLoadingTracker.loaded + "/" + textureLoadingTracker.total + " loaded, " + textureLoadingTracker.failed + " failed";
     }
   }
-  
+
   // Add variable to store current FPS
   let currentFps = 0;
 
@@ -517,22 +517,22 @@ try {
 
   // Import Beast functionality
   import { Beast, findRandomHexOfElement } from "./beast.js";
-  
+
   // Add Beast to scene after grid generation
   let fireBeast = null;
-  
+
   // Function to spawn a Fire Beast on a random Fire tile
   function spawnFireBeast() {
     debugLog("Attempting to spawn Fire Beast on a random Fire tile");
-    
+
     if (hexagons.length === 0) {
       console.warn("Cannot spawn beast: No hexagons in scene");
       return null;
     }
-    
+
     // Find a random Fire hex
     const fireHex = findRandomHexOfElement(hexagons, 'Fire');
-    
+
     if (!fireHex) {
       console.warn("No Fire hexagons found, using first available hex instead");
       // Fallback to any hex
@@ -541,7 +541,7 @@ try {
     } else {
       createBeastAtHex(fireHex);
     }
-    
+
     function createBeastAtHex(hex) {
       // Create beast at hex position (slightly elevated)
       const beastPosition = {
@@ -549,12 +549,12 @@ try {
         y: hex.position.y + 1.2, // Raise above the hex
         z: hex.position.z
       };
-      
+
       debugLog(`Creating Fire Beast at position`, beastPosition);
-      
+
       // Create the beast
       fireBeast = new Beast('Fire', scene, camera, beastPosition, 3);
-      
+
       // Log the hex where the beast spawned
       debugLog(`Fire Beast spawned on hex`, {
         position: hex.position,
@@ -563,36 +563,36 @@ try {
       });
     }
   }
-  
+
   // Add beast update to animation loop
   const originalAnimate = animate;
   function enhancedAnimate() {
     // Call original animation function
     originalAnimate();
-    
+
     // Update beast if it exists
     if (fireBeast) {
       fireBeast.update();
     }
   }
-  
+
   // Replace the animate function with our enhanced version
   animate = enhancedAnimate;
-  
+
   // Trigger beast spawn after grid is generated
   debugLog("Setting up Fire Beast spawn after grid generation");
-  
+
   // Modified version of updateLoadingStatus to spawn beast when ready
   const originalUpdateLoadingStatus = updateLoadingStatus;
   function enhancedUpdateLoadingStatus() {
     // Call original function
     originalUpdateLoadingStatus();
-    
+
     // Check if grid is generated
     const total = textureLoadingTracker.total;
     const loaded = textureLoadingTracker.loaded;
     const failed = textureLoadingTracker.failed;
-    
+
     // If all textures processed, grid should be generated
     if (loaded + failed === total && hexagons.length > 0) {
       // Wait a bit to make sure grid is fully set up
@@ -604,10 +604,10 @@ try {
       }, 1000);
     }
   }
-  
+
   // Replace the updateLoadingStatus function
   updateLoadingStatus = enhancedUpdateLoadingStatus;
-  
+
   debugLog("Fire Beast integration complete");
   debugLog("Three.js setup complete - game should be visible now");
 } catch (error) {
