@@ -212,14 +212,23 @@ export class ArrowDebugger {
 
     // Update value display when range changes
     range.oninput = () => {
-      valueDisplay.textContent = parseFloat(range.value).toFixed(2);
+      const newValue = parseFloat(range.value);
+      valueDisplay.textContent = newValue.toFixed(2);
 
-      // Update settings in real-time if it's a direction angle setting
+      // Update the corresponding setting in our settings object
       if (name.startsWith('directionAngle_')) {
         const direction = name.split('_')[1];
-        this.settings.directionOffsets[direction].angle = parseFloat(range.value);
-        this.applyChanges();
+        this.settings.directionOffsets[direction].angle = newValue;
+      } else {
+        // Update basic settings immediately
+        this.settings[name] = newValue;
       }
+      
+      // Apply changes in real-time for all controls
+      this.applyChanges();
+      
+      // Log the change for debugging
+      console.log(`[ARROW-DEBUG] Updated ${name} to ${newValue.toFixed(2)}`);
     };
 
     controlRow.appendChild(range);

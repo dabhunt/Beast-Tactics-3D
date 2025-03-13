@@ -20,8 +20,43 @@ function runDiagnostics() {
   // Run all checks
   checkDuplicateDeclarations();
   checkGIFAnimation();
+  checkDebugMenuConnections();
   
   console.log("[DEBUG-FIXER] Diagnostics complete. Check console for issues.");
+}
+
+// Make diagnostics functions available globally for console usage
+window.debugFixer = {
+  runDiagnostics,
+  checkDuplicateDeclarations,
+  checkGIFAnimation,
+  checkDebugMenuConnections
+};
+
+console.log("[DEBUG-FIXER] Debug tools initialized and exposed to window.debugFixer");
+
+/**
+ * Check if debug menu is properly connected to other components
+ */
+function checkDebugMenuConnections() {
+  console.log("[DEBUG-FIXER] Checking debug menu connections");
+  
+  // Check if the debug menu exists in global scope
+  if (window.gameDebugMenu) {
+    console.log("[DEBUG-FIXER] Debug menu found in global scope");
+    
+    // Check if it has expected methods
+    const methods = ["initArrowDebugger", "updateArrowDebuggerBeast", "setCameraManager"];
+    const missingMethods = methods.filter(method => typeof window.gameDebugMenu[method] !== 'function');
+    
+    if (missingMethods.length === 0) {
+      console.log("[DEBUG-FIXER] Debug menu has all expected methods");
+    } else {
+      console.warn(`[DEBUG-FIXER] Debug menu missing methods: ${missingMethods.join(", ")}`);
+    }
+  } else {
+    console.warn("[DEBUG-FIXER] Debug menu not found in global scope");
+  }
 }
 
 /**
@@ -74,9 +109,6 @@ function checkGIFAnimation() {
   // Look for any animated GIFs in the page
   const images = document.querySelectorAll('img[src$=".gif"]');
   console.log(`[DEBUG-FIXER] Found ${images.length} GIF images in the DOM`);
-}
-function checkGIFAnimation() {
-  console.log("[DEBUG-FIXER] Checking GIF animation functionality");
   
   // Try to import the GIF loader module
   import('../AnimatedGIFLoader.js')
