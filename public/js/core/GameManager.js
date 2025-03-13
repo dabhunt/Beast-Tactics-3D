@@ -1,7 +1,7 @@
+
 /**
  * GameManager.js
- * Central controller for the Beast Tactics game
- * Manages game state, turn flow, and subsystem communication
+ * Central game controller that manages all subsystems and game flow
  */
 
 import { StateManager } from './StateManager.js';
@@ -13,6 +13,10 @@ import { GameConfig } from '../models/GameConfig.js';
 import { GameStates } from '../models/GameStates.js';
 import { Logger } from '../utils/Logger.js';
 
+/**
+ * Central game controller that manages the entire game state
+ * and coordinates between different subsystems
+ */
 export class GameManager {
   /**
    * Creates the main game controller instance
@@ -56,17 +60,25 @@ export class GameManager {
       // Initialize all subsystems
       await this._initializeSubsystems();
 
+      // Initialize the state manager (must happen after subsystems so states can access them)
+      await this._stateManager.initialize();
 
       // Register all subsystems with the service locator (after initialization)
       this._serviceLocator.registerService('stateManager', this._stateManager);
       this._serviceLocator.registerService('turnManager', this._turnManager);
       this._serviceLocator.registerService('playerManager', this._playerManager);
       this._serviceLocator.registerService('eventSystem', this._eventSystem);
-      this._serviceLocator.registerService('weatherSystem', this.getSubsystem('weatherSystem')); // Register WeatherSystem
-
+      
+      // Register the weather system if it exists
+      const weatherSystem = this.getSubsystem('weatherSystem');
+      if (weatherSystem) {
+        this._serviceLocator.registerService('weatherSystem', weatherSystem);
+      } else {
+        Logger.warning('GameManager', 'Weather system not available for registration');
+      }
 
       // Set initial game state
-      this._stateManager.changeState(GameStates.GAME_SETUP);
+      await this._stateManager.changeState(GameStates.GAME_SETUP);
 
       // Trigger initialization complete event
       this._eventSystem.triggerEvent('onGameInitialized', { 
@@ -92,26 +104,38 @@ export class GameManager {
    * Starts the game, moving from setup to first turn
    * @returns {Boolean} Success status
    */
-  startGame() {
+  async startGame() {
     if (!this._isInitialized) {
       Logger.error('GameManager', 'Cannot start game - not initialized');
       return false;
     }
 
     Logger.info('GameManager', 'Starting game');
-    this._isGameInProgress = true;
+    
+    try {
+      this._isGameInProgress = true;
 
-    // Trigger game start event
-    this._eventSystem.triggerEvent('onGameStart', {
-      timestamp: Date.now(),
-      players: this._playerManager.getAllPlayers()
-    });
+      // Trigger game start event
+      this._eventSystem.triggerEvent('onGameStart', {
+        timestamp: Date.now(),
+        players: this._playerManager.getAllPlayers()
+      });
 
-    // Move to first turn state
-    this._stateManager.changeState(GameStates.TURN_START);
+      // Move to first turn state
+      const success = await this._stateManager.changeState(GameStates.TURN_START);
+      
+      if (!success) {
+        Logger.error('GameManager', 'Failed to transition to TURN_START state');
+        return false;
+      }
 
-    Logger.info('GameManager', 'Game started successfully');
-    return true;
+      Logger.info('GameManager', 'Game started successfully');
+      return true;
+    } catch (error) {
+      Logger.error('GameManager', 'Error during game start', error);
+      console.error('Error starting game:', error);
+      return false;
+    }
   }
 
   /**
@@ -119,7 +143,7 @@ export class GameManager {
    * @param {Object} results - Game outcome data
    * @returns {Boolean} Success status
    */
-  endGame(results) {
+  async endGame(results) {
     if (!this._isGameInProgress) {
       Logger.warning('GameManager', 'Cannot end game - no game in progress');
       return false;
@@ -127,18 +151,28 @@ export class GameManager {
 
     Logger.info('GameManager', 'Ending game', results);
 
-    // Trigger game end event
-    this._eventSystem.triggerEvent('onGameEnd', {
-      timestamp: Date.now(),
-      results: results
-    });
+    try {
+      // Trigger game end event
+      this._eventSystem.triggerEvent('onGameEnd', {
+        timestamp: Date.now(),
+        results: results
+      });
 
-    // Move to game over state
-    this._stateManager.changeState(GameStates.GAME_OVER);
+      // Move to game over state
+      const success = await this._stateManager.changeState(GameStates.GAME_OVER);
+      
+      if (!success) {
+        Logger.error('GameManager', 'Failed to transition to GAME_OVER state');
+        return false;
+      }
 
-    this._isGameInProgress = false;
-    Logger.info('GameManager', 'Game ended successfully');
-    return true;
+      this._isGameInProgress = false;
+      Logger.info('GameManager', 'Game ended successfully');
+      return true;
+    } catch (error) {
+      Logger.error('GameManager', 'Error during game end', error);
+      return false;
+    }
   }
 
   /**
