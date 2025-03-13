@@ -694,41 +694,33 @@ export class DebugMenu {
     this.gridGeneratorFn = gridGeneratorFn;
     console.log("[DEBUG] Grid generator function connected to debug menu");
   }
-  
+
   /**
    * Initialize the Arrow Debugger tab
    * @param {Object} beast - The beast object to debug arrows for
    */
   initArrowDebugger(beast) {
     console.log("[DEBUG] Initializing Arrow Debugger with beast:", beast);
-    
+
     try {
-      // Dynamically import the ArrowDebugger class
+      // Load ArrowDebugger dynamically as ES module
       import('./ArrowDebugger.js')
         .then(module => {
-          const { ArrowDebugger } = module;
-          
-          // Get or create the container for the arrow debugger
+          // Create container for arrow debugger
           const container = this.tabContents["arrow"];
-          
-          if (!container) {
-            console.error("[DEBUG] Arrow debugger tab container not found");
-            return;
+
+          // Initialize arrow debugger with beast reference
+          if (container) {
+            // Use the imported ArrowDebugger class from the module
+            this.arrowDebugger = new module.ArrowDebugger(beast, container);
+            console.log("[DEBUG] Arrow debugger initialized successfully");
+          } else {
+            console.error("[DEBUG] Arrow debugger container not found");
           }
-          
-          // Clear any existing content
-          container.innerHTML = '';
-          
-          // Create and store the arrow debugger instance
-          this.arrowDebugger = new ArrowDebugger(beast, container);
-          console.log("[DEBUG] Arrow debugger initialized successfully");
-          
-          // Store reference to this instance globally for easy access
-          window.gameDebugMenu = this;
         })
         .catch(error => {
-          console.error("[DEBUG] Failed to load ArrowDebugger module:", error);
-          
+          console.log("[DEBUG] Failed to load ArrowDebugger module:", error);
+
           // Show error message in the tab
           const container = this.tabContents["arrow"];
           if (container) {
@@ -745,7 +737,7 @@ export class DebugMenu {
       console.error("[DEBUG] Error initializing arrow debugger:", err);
     }
   }
-  
+
   /**
    * Update beast reference in ArrowDebugger
    * @param {Object} beast - Beast object to connect to the debugger

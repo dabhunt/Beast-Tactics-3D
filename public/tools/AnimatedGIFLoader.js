@@ -26,9 +26,9 @@ function debugLog(message, data = null) {
 }
 
 /**
- * Class to handle animated GIF loading and playback with THREE.js
+ * Animated GIF loader class to handle loading and animating GIFs in THREE.js
  */
-export class AnimatedGIFLoader {
+class AnimatedGIFLoader {
   constructor() {
     debugLog("Initializing AnimatedGIFLoader");
     
@@ -235,5 +235,5 @@ export class AnimatedGIFLoader {
   }
 }
 
-// Create a global instance for easy access
+// Create a singleton instance of the loader
 export const gifLoader = new AnimatedGIFLoader();
