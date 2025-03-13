@@ -38,7 +38,11 @@ export class TextureLoaderTest {
   async testBiomeTileLoading() {
     Logger.info('TextureLoaderTest', 'Testing BiomeTile texture loading...');
     
-    const biomeTypes = ['plains', 'forest', 'mountains', 'desert', 'water'];
+    const biomeTypes = [
+      'plains', 'forest', 'mountains', 'desert', 'water',
+      'volcanic', 'storm', 'tundra', 'swamp', 'dark', 'sacred', 'battlefield'
+    ];
+    
     const results = {
       success: [],
       failure: []
@@ -47,10 +51,33 @@ export class TextureLoaderTest {
     // Mapping from biome types to element texture files
     const biomeToElementMap = {
       'plains': 'Earth',
-      'forest': 'Nature',
+      'forest': 'Plant', // Changed from Nature to Plant
       'mountains': 'Metal',
       'desert': 'Light',
-      'water': 'Water'
+      'water': 'Water',
+      'volcanic': 'Fire',
+      'storm': 'Electric',
+      'tundra': 'Wind',
+      'swamp': 'Corrosion',
+      'dark': 'Dark',
+      'sacred': 'Spirit',
+      'battlefield': 'Combat'
+    };
+    
+    // Complete element file mapping (for reference)
+    const elementFiles = {
+      'Combat': 'Combat.png',
+      'Corrosion': 'Corrosion.png',
+      'Dark': 'Dark.png',
+      'Earth': 'Earth.png',
+      'Electric': 'Electric.png',
+      'Fire': 'Fire.png',
+      'Light': 'Light.png',
+      'Metal': 'Metal.png',
+      'Plant': 'Plant.png',
+      'Spirit': 'Spirit.png',
+      'Water': 'Water.png',
+      'Wind': 'Wind.png'
     };
     
     Logger.debug('TextureLoaderTest', 'Using biome to element mapping:', biomeToElementMap);

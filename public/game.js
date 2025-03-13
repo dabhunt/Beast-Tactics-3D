@@ -108,10 +108,10 @@ let hexGridRenderer = null;
 let hexagons = [];
 
 try {
-  // Scene setup
+  // Scene setup with improved background
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x222222);
-  debugLog("Scene created with dark background");
+  scene.background = new THREE.Color(0x333344); // Slightly bluish dark color for better contrast
+  debugLog("Scene created with improved background color");
 
   // Camera setup with logging of parameters
   const cameraParams = {
@@ -148,13 +148,29 @@ try {
   document.body.appendChild(renderer.domElement);
   debugLog("Renderer canvas added to document");
 
-  // Add lights to scene
-  const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+  // Add improved lighting to scene
+  // Increase ambient light intensity for better base illumination
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.7); // Increased from 0.5 to 0.7
   scene.add(ambientLight);
+  console.log("Enhanced ambient lighting added with intensity 0.7");
 
-  const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
-  dirLight.position.set(5, 10, 5);
-  scene.add(dirLight);
+  // Add primary directional light (sun-like)
+  const primaryLight = new THREE.DirectionalLight(0xffffee, 1.0); // Slightly warm white, increased intensity
+  primaryLight.position.set(5, 15, 10); // Higher position for better top-down lighting
+  primaryLight.castShadow = true; // Enable shadows for depth
+  scene.add(primaryLight);
+  console.log("Primary directional light added with position:", primaryLight.position);
+  
+  // Add secondary fill light to reduce harsh shadows
+  const secondaryLight = new THREE.DirectionalLight(0xaaccff, 0.4); // Slightly blue for contrast
+  secondaryLight.position.set(-10, 10, -5); // Coming from opposite direction
+  scene.add(secondaryLight);
+  console.log("Secondary directional light added for fill lighting");
+  
+  // Add subtle hemisphere light for realistic environmental lighting
+  const hemisphereLight = new THREE.HemisphereLight(0xffffbb, 0x080820, 0.5); // Sky/ground colors
+  scene.add(hemisphereLight);
+  console.log("Hemisphere light added for environmental lighting");
 
   // Set up hex grid renderer with biome distribution from game config
   hexGridRenderer = new HexGridRenderer({

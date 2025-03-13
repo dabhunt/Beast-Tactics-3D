@@ -12,13 +12,20 @@ import { Logger } from '../../public/js/utils/Logger.js';
 export async function testTextureLoading() {
   Logger.info('TextureLoader', 'Starting texture loading test');
   
-  const biomeTypes = ['plains', 'forest', 'mountains', 'desert', 'water'];
+  const biomeTypes = [
+    'plains', 'forest', 'mountains', 'desert', 'water',
+    'volcanic', 'storm', 'tundra', 'swamp', 'dark', 'sacred', 'battlefield'
+  ];
+  
   const results = {
     success: [],
     failed: [],
     dimensions: {},
     totalSize: 0
   };
+  
+  // Log the start of the process with details
+  Logger.info('TextureLoader', `Starting texture loading test for ${biomeTypes.length} biome types`);
   
   for (const biome of biomeTypes) {
     try {
@@ -43,10 +50,17 @@ export async function testTextureLoading() {
       // Mapping from biome types to element texture files
       const biomeToElementMap = {
         'plains': 'Earth',
-        'forest': 'Nature',
+        'forest': 'Plant', // Changed from Nature to Plant
         'mountains': 'Metal',
         'desert': 'Light',
-        'water': 'Water'
+        'water': 'Water',
+        'volcanic': 'Fire',
+        'storm': 'Electric',
+        'tundra': 'Wind',
+        'swamp': 'Corrosion',
+        'dark': 'Dark',
+        'sacred': 'Spirit',
+        'battlefield': 'Combat'
       };
       
       // Use the element mapping instead of capitalization
