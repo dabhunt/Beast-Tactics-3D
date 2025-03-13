@@ -166,14 +166,21 @@ export class Beast {
       { q: 1, r: -1, name: "SE", angle: 5 * Math.PI / 3 }, // Southeast
     ];
 
-    // Distance from center to arrow
-    const arrowDistance = 1.5;
-
+    // Distance from center to adjacent hex center (matches hex spacing in game.js)
+    const horizontalSpacing = 1.5; // Should match the hex grid spacing
+    const hexRadius = 1; // Should match the hex radius in game.js
+    
     // Create arrows for each direction
     hexDirections.forEach((direction) => {
-      // Convert axial coordinates to world position for a flat-topped hex
-      const x = arrowDistance * Math.cos(direction.angle);
-      const z = arrowDistance * Math.sin(direction.angle);
+      // Calculate position of the arrow to be over the adjacent hex
+      // For a flat-topped hex grid using axial coordinates
+      const x = horizontalSpacing * direction.q;
+      const z = hexRadius * Math.sqrt(3) * (direction.r + direction.q/2);
+      
+      console.log(`[BEAST] Calculating position for ${direction.name} arrow:`, {
+        moveOffset: { q: direction.q, r: direction.r },
+        calculatedPosition: { x, z }
+      });
       
       // Create triangle geometry for arrow
       const arrowGeometry = new THREE.ConeGeometry(0.15, 0.4, 3);
@@ -186,25 +193,30 @@ export class Beast {
 
       const arrow = new THREE.Mesh(arrowGeometry, arrowMaterial);
 
-      // Position the arrow at the right position
+      // Position the arrow at the center of the adjacent hex
       arrow.position.set(
         x,
         0.7, // Higher above the base for better visibility
         z,
       );
 
-      // Calculate rotation to point TOWARDS the adjacent hex
-      // Point the tip of the cone toward the direction of travel
-      arrow.rotation.y = Math.PI + direction.angle; // Point toward the hex
-      arrow.rotation.x = Math.PI / 4; // Tilt downward for visibility
-
-      // Add debug log for arrow positioning
+      // Calculate rotation to point TOWARDS the current beast hex (opposite of direction angle)
+      // We need to rotate the cone so its tip points toward our current hex
+      // This means pointing in the opposite direction of the movement direction
+      const pointingAngle = (direction.angle + Math.PI) % (2 * Math.PI);
+      
+      // Apply rotation - need to rotate cone to point in right direction (cone points up by default)
+      arrow.rotation.x = Math.PI / 2; // First rotate to point horizontally (90 degrees)
+      arrow.rotation.y = pointingAngle; // Then rotate to point in the correct direction
+      
+      // Add debug log for arrow positioning and rotation
       console.log(`[BEAST] Positioned ${direction.name} arrow at:`, {
         x: x,
         y: 0.7,
         z: z,
         rotationY: arrow.rotation.y,
-        pointingTo: { q: direction.q, r: direction.r }
+        pointingAngle: (pointingAngle * 180 / Math.PI).toFixed(1) + '°',
+        pointingTo: { q: -direction.q, r: -direction.r }
       });
 
       // Make arrow interactive
