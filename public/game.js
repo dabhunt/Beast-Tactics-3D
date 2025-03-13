@@ -144,12 +144,15 @@ try {
     // Debug rotation values for troubleshooting
     debugLog(`Creating hex at (${q},${r}) with position (${x},0,${z})`);
     
-    // For cylinders to lie flat (disk facing up), we need to rotate 90 degrees around X-axis
-    // PI/2 = 90 degrees in radians
-    hex.rotation.x = -Math.PI / 2;
+    // In THREE.js, cylinders stand upright along Y axis by default
+    // To make them flat on the XZ plane, we don't need any rotation
+    // Explicitly setting all rotations to 0 to ensure flat orientation
+    hex.rotation.x = 0;
+    hex.rotation.y = 0;
+    hex.rotation.z = 0;
     
     // Log rotation for verification
-    debugLog(`Hex rotation set to: ${hex.rotation.x} radians (${hex.rotation.x * 180 / Math.PI} degrees)`);
+    debugLog(`Hex rotation reset to zero for flat orientation`);
     
     // Add to scene
     scene.add(hex);
