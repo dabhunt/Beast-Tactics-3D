@@ -47,15 +47,33 @@ export class StateManager {
     try {
       Logger.info('StateManager', 'Beginning initialization');
       
-      // Create all state implementations
-      this._states[GameStates.GAME_SETUP] = new GameSetupState(this._gameManager);
-      this._states[GameStates.TURN_START] = new TurnStartState(this._gameManager);
-      this._states[GameStates.PLAYER_INPUT] = new PlayerInputState(this._gameManager);
-      this._states[GameStates.HAZARD_ROLLS] = new HazardRollsState(this._gameManager);
-      this._states[GameStates.TURN_ORDER] = new TurnOrderState(this._gameManager);
-      this._states[GameStates.TURN_EXECUTION] = new TurnExecutionState(this._gameManager);
-      this._states[GameStates.TURN_END] = new TurnEndState(this._gameManager);
-      this._states[GameStates.GAME_OVER] = new GameOverState(this._gameManager);
+      // Import state implementations dynamically
+      Logger.debug('StateManager', 'Importing state implementations...');
+      
+      try {
+        // Import states with proper error handling
+        const { GameSetupState } = await import('../states/GameSetupState.js');
+        const { TurnStartState } = await import('../states/TurnStartState.js');
+        
+        // Create state instances
+        this._states[GameStates.GAME_SETUP] = new GameSetupState(this._gameManager);
+        this._states[GameStates.TURN_START] = new TurnStartState(this._gameManager);
+        
+        Logger.debug('StateManager', 'Successfully imported and instantiated states', {
+          availableStates: Object.keys(this._states)
+        });
+      } catch (importError) {
+        Logger.error('StateManager', 'Failed to import state implementations', importError);
+        throw new Error(`State import failed: ${importError.message}`);
+      }
+      
+      // These states will be implemented later
+      // this._states[GameStates.PLAYER_INPUT] = new PlayerInputState(this._gameManager);
+      // this._states[GameStates.HAZARD_ROLLS] = new HazardRollsState(this._gameManager);
+      // this._states[GameStates.TURN_ORDER] = new TurnOrderState(this._gameManager);
+      // this._states[GameStates.TURN_EXECUTION] = new TurnExecutionState(this._gameManager);
+      // this._states[GameStates.TURN_END] = new TurnEndState(this._gameManager);
+      // this._states[GameStates.GAME_OVER] = new GameOverState(this._gameManager);
       
       // Initialize allowed state transitions
       this._setupTransitionRules();

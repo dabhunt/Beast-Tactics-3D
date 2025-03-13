@@ -107,6 +107,11 @@ export class HexGridRenderer {
 
     Logger.debug('HexGridRenderer', 'Using biome to element mapping:', biomeToElementMap);
 
+    // Define the texture offset to account for transparent padding (17px at top and bottom)
+    const textureOffsetY = 17; // 17px offset from top and bottom
+    
+    Logger.debug('HexGridRenderer', `Applying texture offset of ${textureOffsetY}px to account for transparent space`);
+
     const texturePromises = Object.values(BiomeTypes).map(biomeType => {
       return new Promise((resolve, reject) => {
         console.log(`Loading texture for biome: ${biomeType}`);
@@ -123,6 +128,34 @@ export class HexGridRenderer {
           (texture) => {
             // Success callback
             console.log(`Successfully loaded texture: ${biomeType}`);
+            
+            // Apply offset to texture to account for transparent padding
+            // This adjusts the texture coordinates to trim the transparent edges
+            texture.center.set(0.5, 0.5); // Set center point for transformations
+            
+            // Store texture dimensions for debugging
+            const dimensions = {
+              width: texture.image.width,
+              height: texture.image.height
+            };
+            
+            // Calculate the percentage of the image that's actual content (excluding transparent padding)
+            // For a 17px offset on top and bottom on e.g. a 100px tall image, we'd have: (100 - 34) / 100 = 0.66
+            const contentHeight = Math.max(0, texture.image.height - (textureOffsetY * 2));
+            const contentRatio = contentHeight / texture.image.height;
+            
+            // Set the repeat and offset to account for the transparent padding
+            texture.repeat.set(1, contentRatio);
+            texture.offset.set(0, (1 - contentRatio) / 2);
+            
+            Logger.debug('HexGridRenderer', `Applied texture transform for ${biomeType}:`, {
+              dimensions,
+              contentHeight,
+              contentRatio,
+              offset: texture.offset.y
+            });
+            
+            // Store the processed texture
             this._biomeTextures[biomeType] = texture;
             resolve();
           },

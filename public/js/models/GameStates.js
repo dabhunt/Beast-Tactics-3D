@@ -1,4 +1,3 @@
-
 /**
  * GameStates.js
  * Constants for game state values
@@ -14,3 +13,15 @@ export const GameStates = {
   TURN_END: 'TURN_END',             // Process end-of-turn effects
   GAME_OVER: 'GAME_OVER'            // Handle victory conditions and end game
 };
+
+/**
+ * Check if a string is a valid game state
+ * @param {String} state - State to check
+ * @returns {Boolean} Whether the state is valid
+ */
+export function isValidGameState(state) {
+  return Object.values(GameStates).includes(state);
+}
+
+// TODO: Add further improvements to address state transition errors and hexgrid offset as described in the <thinking> section.
+// This might involve reviewing the StateManager, GameManager, and hexgrid rendering code.
