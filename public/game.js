@@ -145,14 +145,14 @@ try {
     debugLog(`Creating hex at (${q},${r}) with position (${x},0,${z})`);
     
     // In THREE.js, cylinders stand upright along Y axis by default
-    // To make them flat on the XZ plane, we don't need any rotation
-    // Explicitly setting all rotations to 0 to ensure flat orientation
+    // We need to rotate them 30 degrees (π/6 radians) around the Y axis
+    // for the hexagons to align properly in the grid
     hex.rotation.x = 0;
-    hex.rotation.y = 0;
+    hex.rotation.y = Math.PI / 6; // 30 degrees rotation
     hex.rotation.z = 0;
     
     // Log rotation for verification
-    debugLog(`Hex rotation reset to zero for flat orientation`);
+    debugLog(`Hex rotation set to Y: ${hex.rotation.y} radians (${hex.rotation.y * 180 / Math.PI} degrees)`);
     
     // Add to scene
     scene.add(hex);
