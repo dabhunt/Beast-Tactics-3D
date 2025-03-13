@@ -98,25 +98,34 @@ try {
   // Add enhanced lighting setup for better visibility
   debugLog("Setting up enhanced lighting...");
   
-  // Brighter ambient light for better base illumination
-  const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+  // Enhanced lighting configuration for better color vibrancy
+  
+  // Brighter ambient light with warmer tone
+  const ambientLight = new THREE.AmbientLight(0xfffcf0, 0.85); // Increased intensity, slightly warmer
   scene.add(ambientLight);
+  debugLog("Created enhanced ambient light with intensity:", ambientLight.intensity);
 
-  // Primary directional light (sun-like)
-  const dirLight = new THREE.DirectionalLight(0xffffcc, 1.0);
+  // Primary directional light (sun-like) with warmer color
+  const dirLight = new THREE.DirectionalLight(0xfff0d0, 1.2); // Warmer color and higher intensity
   dirLight.position.set(5, 15, 5);
   dirLight.castShadow = true;
   scene.add(dirLight);
+  debugLog("Created enhanced directional light with intensity:", dirLight.intensity);
   
-  // Secondary fill light from opposite side
-  const fillLight = new THREE.DirectionalLight(0xccddff, 0.4);
+  // Secondary fill light from opposite side with complementary cooler tint
+  const fillLight = new THREE.DirectionalLight(0xd0e8ff, 0.5); // Slightly higher intensity
   fillLight.position.set(-5, 8, -5);
   scene.add(fillLight);
   
-  // Small overhead point light for specular highlights
-  const pointLight = new THREE.PointLight(0xffffff, 0.5, 50);
+  // Small overhead point light for specular highlights - brighter
+  const pointLight = new THREE.PointLight(0xffffff, 0.7, 50); // Increased intensity
   pointLight.position.set(0, 15, 0);
   scene.add(pointLight);
+  
+  // Add an additional low rim light for edge definition
+  const rimLight = new THREE.DirectionalLight(0xffe8d0, 0.3);
+  rimLight.position.set(0, 3, -12);
+  scene.add(rimLight);
   
   debugLog("Enhanced lighting setup complete with main, fill, and point lights");
 
@@ -231,16 +240,27 @@ try {
           });
         }
         
-        // Create material with the loaded texture and improved lighting properties
+        // Create material with the loaded texture and enhanced properties for more vibrant colors
         const material = new THREE.MeshPhongMaterial({
           map: texture,
-          shininess: 60, // Increased shininess
-          specular: 0x555555, // Increased specular highlight
-          emissive: 0x222222, // Add slight emissive to enhance colors
-          emissiveIntensity: 0.2,
+          shininess: 70, // Higher shininess for more defined reflections
+          specular: 0x666666, // Brighter specular highlights
+          emissive: 0x333333, // Stronger emissive for better color representation
+          emissiveIntensity: 0.4, // Doubled emissive intensity to enhance colors
           transparent: true,
-          side: THREE.DoubleSide // Ensure both sides render properly
+          side: THREE.DoubleSide, // Ensure both sides render properly
+          color: 0xffffff // Full brightness base color to avoid muting
         });
+        
+        // Log material creation with enhanced properties
+        if (textureConfig.debug) {
+          console.log(`[MATERIAL] Created enhanced material for ${element} with properties:`, {
+            shininess: material.shininess,
+            specular: material.specular.getHexString(),
+            emissive: material.emissive.getHexString(),
+            emissiveIntensity: material.emissiveIntensity
+          });
+        }
         
         // Store the material
         hexMaterials[element] = material;
@@ -483,9 +503,30 @@ try {
       );
       let azimuthAngle = Math.atan2(offset.z, offset.x);
 
-      // Apply rotation
+      // Camera constraints configuration
+      const cameraConstraints = {
+        minPolarAngle: 0.1,           // Minimum angle (rad) - close to top-down
+        maxPolarAngle: Math.PI * 0.6, // Maximum angle (rad) - prevents looking from below
+        minAzimuthAngle: -Infinity,   // No constraint on horizontal rotation
+        maxAzimuthAngle: Infinity     // No constraint on horizontal rotation
+      };
+      
+      // Apply rotation with constraints
       azimuthAngle -= theta;
-      polarAngle = Math.max(0.1, Math.min(Math.PI - 0.1, polarAngle + phi));
+      
+      // Constrain polar angle to prevent looking from below the map
+      polarAngle = Math.max(
+        cameraConstraints.minPolarAngle, 
+        Math.min(cameraConstraints.maxPolarAngle, polarAngle + phi)
+      );
+      
+      // Log constraint application if significant angle adjustment made
+      if (DEBUG && Math.abs(polarAngle - (polarAngle + phi)) > 0.1) {
+        console.log("[CAMERA] Polar angle constrained:", { 
+          requested: ((polarAngle + phi) * 180/Math.PI).toFixed(1),
+          constrained: (polarAngle * 180/Math.PI).toFixed(1)
+        });
+      }
 
       // Convert back to Cartesian coordinates
       offset.x = radius * Math.sin(polarAngle) * Math.cos(azimuthAngle);
