@@ -443,8 +443,12 @@ try {
 
   // Initialize the debug menu after all components are created
   debugLog("Initializing debug menu...");
+  
+  // Define debugMenu in outer scope so it's accessible throughout the file
+  let debugMenu = null;
+  
   try {
-    const debugMenu = new DebugMenu(
+    debugMenu = new DebugMenu(
       scene,
       camera,
       renderer,
@@ -458,6 +462,9 @@ try {
 
     // Connect grid generator to debug menu
     debugMenu.setGridGenerator(generateHexagonGrid);
+    
+    // Make debug menu globally accessible immediately
+    window.gameDebugMenu = debugMenu;
 
     debugLog("Debug menu initialized and connected to game components");
   } catch (error) {
@@ -643,11 +650,22 @@ try {
       if (window.gameDebugMenu) {
         debugLog("Connecting Fire Beast to Arrow Debugger");
         window.gameDebugMenu.initArrowDebugger(fireBeast);
-      } else if (debugMenu) {
-        debugLog("Connecting Fire Beast to local debugMenu instance");
-        debugMenu.initArrowDebugger(fireBeast);
-        // Make the debug menu globally accessible for other components
-        window.gameDebugMenu = debugMenu;
+      } else {
+        // Check if we need to look for a debug menu in parent scope
+        debugLog("Global gameDebugMenu not found, checking for alternatives");
+        
+        // Try to find any existing debug menu instance
+        const existingMenus = document.querySelectorAll('#debug-menu');
+        if (existingMenus.length > 0) {
+          debugLog("Found existing debug menu in DOM, but no global reference");
+        }
+        
+        // Log diagnostic information to help track down the issue
+        console.log("[BEAST] Debug state:", {
+          globalDebugMenu: !!window.gameDebugMenu,
+          beastObject: !!fireBeast,
+          beastType: fireBeast ? fireBeast.type : 'undefined'
+        });
       }
 
       // Log the hex where the beast spawned

@@ -5,6 +5,435 @@
  * to help visualize and debug the directional arrows around beasts.
  */
 
+/**
+ * Class for debugging arrow positioning around beasts
+ */
+export class ArrowDebugger {
+  /**
+   * Create a new ArrowDebugger instance
+   * @param {Object} beast - The beast object to debug arrows for
+   * @param {HTMLElement} container - The container element for the UI
+   */
+  constructor(beast, container) {
+    console.log("[ARROW_DEBUGGER] Initializing with beast:", beast);
+    
+    this.beast = beast;
+    this.container = container;
+    
+    // Default arrow adjustment settings
+    this.settings = {
+      distance: 1.2,
+      yPosition: 0.7,
+      angleOffsets: [0, 0, 0, 0, 0, 0] // One per arrow
+    };
+    
+    // Store references to UI elements
+    this.elements = {};
+    
+    // Create UI
+    this._createUI();
+    
+    console.log("[ARROW_DEBUGGER] Initialization complete");
+  }
+  
+  /**
+   * Update the beast reference
+   * @param {Object} beast - New beast object to debug
+   */
+  setBeast(beast) {
+    console.log("[ARROW_DEBUGGER] Updating beast reference:", beast);
+    
+    if (!beast) {
+      console.error("[ARROW_DEBUGGER] Invalid beast object provided");
+      this._showError("Invalid beast object provided");
+      return;
+    }
+    
+    this.beast = beast;
+    this._updateArrowInfo();
+  }
+  
+  /**
+   * Create the debugging UI
+   * @private
+   */
+  _createUI() {
+    console.log("[ARROW_DEBUGGER] Creating UI in container:", this.container);
+    
+    try {
+      if (!this.container) {
+        throw new Error("No container element provided");
+      }
+      
+      // Create main panel
+      const panel = document.createElement("div");
+      panel.className = "arrow-debugger-panel";
+      panel.style.padding = "10px";
+      
+      // Create title
+      const title = document.createElement("h3");
+      title.textContent = "Beast Arrow Debugger";
+      title.style.marginTop = "0";
+      panel.appendChild(title);
+      
+      // Create status info section
+      const infoSection = document.createElement("div");
+      infoSection.className = "arrow-debugger-info";
+      infoSection.style.marginBottom = "15px";
+      infoSection.style.padding = "8px";
+      infoSection.style.backgroundColor = "#222";
+      infoSection.style.borderRadius = "4px";
+      infoSection.style.fontSize = "13px";
+      
+      // Info panel content
+      this.elements.infoPanel = infoSection;
+      this._updateArrowInfo();
+      
+      panel.appendChild(infoSection);
+      
+      // Create controls section
+      this._createControlPanel(panel);
+      
+      // Add to container
+      this.container.appendChild(panel);
+      
+      console.log("[ARROW_DEBUGGER] UI creation complete");
+    } catch (err) {
+      console.error("[ARROW_DEBUGGER] Error creating UI:", err);
+      this._showError(`Failed to create UI: ${err.message}`);
+    }
+  }
+  
+  /**
+   * Create the control panel section
+   * @param {HTMLElement} parent - Parent element
+   * @private 
+   */
+  _createControlPanel(parent) {
+    console.log("[ARROW_DEBUGGER] Creating control panel");
+    
+    // Create control section
+    const controlSection = document.createElement("div");
+    controlSection.className = "arrow-debugger-controls";
+    
+    // Global controls
+    this._createGlobalControls(controlSection);
+    
+    // Direction-specific controls
+    this._createDirectionControls(controlSection);
+    
+    // Apply changes button
+    const applyButton = document.createElement("button");
+    applyButton.textContent = "Apply Changes";
+    applyButton.style.width = "100%";
+    applyButton.style.padding = "8px";
+    applyButton.style.marginTop = "15px";
+    applyButton.style.backgroundColor = "#4CAF50";
+    applyButton.style.color = "white";
+    applyButton.style.border = "none";
+    applyButton.style.borderRadius = "4px";
+    applyButton.style.cursor = "pointer";
+    
+    applyButton.addEventListener("click", () => {
+      this._applyChanges();
+    });
+    
+    controlSection.appendChild(applyButton);
+    parent.appendChild(controlSection);
+  }
+  
+  /**
+   * Create global arrow controls (distance, height)
+   * @param {HTMLElement} parent - Parent element
+   * @private
+   */
+  _createGlobalControls(parent) {
+    // Create global section
+    const globalSection = document.createElement("div");
+    globalSection.style.marginBottom = "15px";
+    globalSection.style.padding = "10px";
+    globalSection.style.backgroundColor = "#333";
+    globalSection.style.borderRadius = "4px";
+    
+    // Title
+    const title = document.createElement("h4");
+    title.textContent = "Global Arrow Settings";
+    title.style.margin = "0 0 10px 0";
+    globalSection.appendChild(title);
+    
+    // Create distance slider
+    const distanceContainer = document.createElement("div");
+    distanceContainer.style.marginBottom = "10px";
+    
+    const distanceLabel = document.createElement("label");
+    distanceLabel.textContent = "Arrow Distance: ";
+    distanceLabel.htmlFor = "arrow-distance";
+    distanceContainer.appendChild(distanceLabel);
+    
+    const distanceValue = document.createElement("span");
+    distanceValue.textContent = this.settings.distance.toFixed(1);
+    distanceValue.style.float = "right";
+    distanceLabel.appendChild(distanceValue);
+    
+    const distanceSlider = document.createElement("input");
+    distanceSlider.type = "range";
+    distanceSlider.id = "arrow-distance";
+    distanceSlider.min = "0.5";
+    distanceSlider.max = "3.0";
+    distanceSlider.step = "0.1";
+    distanceSlider.value = this.settings.distance;
+    distanceSlider.style.width = "100%";
+    
+    distanceSlider.addEventListener("input", () => {
+      const value = parseFloat(distanceSlider.value);
+      distanceValue.textContent = value.toFixed(1);
+      this.settings.distance = value;
+    });
+    
+    distanceContainer.appendChild(distanceSlider);
+    globalSection.appendChild(distanceContainer);
+    
+    // Create height slider
+    const heightContainer = document.createElement("div");
+    
+    const heightLabel = document.createElement("label");
+    heightLabel.textContent = "Arrow Height: ";
+    heightLabel.htmlFor = "arrow-height";
+    heightContainer.appendChild(heightLabel);
+    
+    const heightValue = document.createElement("span");
+    heightValue.textContent = this.settings.yPosition.toFixed(1);
+    heightValue.style.float = "right";
+    heightLabel.appendChild(heightValue);
+    
+    const heightSlider = document.createElement("input");
+    heightSlider.type = "range";
+    heightSlider.id = "arrow-height";
+    heightSlider.min = "0.1";
+    heightSlider.max = "2.0";
+    heightSlider.step = "0.1";
+    heightSlider.value = this.settings.yPosition;
+    heightSlider.style.width = "100%";
+    
+    heightSlider.addEventListener("input", () => {
+      const value = parseFloat(heightSlider.value);
+      heightValue.textContent = value.toFixed(1);
+      this.settings.yPosition = value;
+    });
+    
+    heightContainer.appendChild(heightSlider);
+    globalSection.appendChild(heightContainer);
+    
+    parent.appendChild(globalSection);
+  }
+  
+  /**
+   * Create direction-specific controls for each arrow
+   * @param {HTMLElement} parent - Parent element
+   * @private
+   */
+  _createDirectionControls(parent) {
+    // Create direction section
+    const directionSection = document.createElement("div");
+    directionSection.style.padding = "10px";
+    directionSection.style.backgroundColor = "#333";
+    directionSection.style.borderRadius = "4px";
+    
+    // Title
+    const title = document.createElement("h4");
+    title.textContent = "Direction-Specific Adjustments";
+    title.style.margin = "0 0 10px 0";
+    directionSection.appendChild(title);
+    
+    // Direction names
+    const directions = ["E", "NE", "NW", "W", "SW", "SE"];
+    
+    // Create controls for each direction
+    directions.forEach((dir, index) => {
+      const container = document.createElement("div");
+      container.style.marginBottom = index < directions.length - 1 ? "10px" : "0";
+      
+      const label = document.createElement("label");
+      label.textContent = `${dir} Angle Offset: `;
+      label.htmlFor = `arrow-angle-${dir}`;
+      container.appendChild(label);
+      
+      const value = document.createElement("span");
+      value.textContent = "0°";
+      value.style.float = "right";
+      label.appendChild(value);
+      
+      const slider = document.createElement("input");
+      slider.type = "range";
+      slider.id = `arrow-angle-${dir}`;
+      slider.min = "-180";
+      slider.max = "180";
+      slider.step = "5";
+      slider.value = "0";
+      slider.style.width = "100%";
+      
+      slider.addEventListener("input", () => {
+        const degrees = parseInt(slider.value);
+        value.textContent = `${degrees}°`;
+        this.settings.angleOffsets[index] = degrees * (Math.PI / 180); // Convert to radians
+      });
+      
+      container.appendChild(slider);
+      directionSection.appendChild(container);
+    });
+    
+    parent.appendChild(directionSection);
+  }
+  
+  /**
+   * Apply the current settings to the beast's arrows
+   * @private
+   */
+  _applyChanges() {
+    console.log("[ARROW_DEBUGGER] Applying arrow changes:", this.settings);
+    
+    try {
+      if (!this.beast || !this.beast.directionalArrows) {
+        throw new Error("Beast or directional arrows not available");
+      }
+      
+      // Get the beast's hexDirections
+      const hexDirections = this.beast.hexDirections;
+      if (!hexDirections) {
+        throw new Error("Beast's hexDirections not available");
+      }
+      
+      // Apply changes to each arrow
+      this.beast.directionalArrows.forEach((arrow, index) => {
+        if (!arrow.mesh) {
+          console.warn(`[ARROW_DEBUGGER] Arrow ${index} mesh not found`);
+          return;
+        }
+        
+        // Get base angle from hex directions
+        const baseAngle = hexDirections[index].angle;
+        
+        // Apply offset angle
+        const finalAngle = baseAngle + this.settings.angleOffsets[index];
+        
+        // Calculate new position with current distance setting
+        const x = this.settings.distance * Math.cos(finalAngle);
+        const z = this.settings.distance * Math.sin(finalAngle);
+        
+        // Update arrow position
+        arrow.mesh.position.set(
+          x,
+          this.settings.yPosition,
+          z
+        );
+        
+        // Update arrow rotation 
+        // Calculate rotation
+        const xAxis = new THREE.Vector3(1, 0, 0);
+        const yAxis = new THREE.Vector3(0, 1, 0);
+        
+        // Create rotation quaternion
+        const quaternion = new THREE.Quaternion();
+        
+        // Apply X rotation first (90 degrees to make horizontal)
+        quaternion.setFromAxisAngle(xAxis, Math.PI / 2);
+        
+        // Create temporary quaternion for Y rotation
+        const yRotation = new THREE.Quaternion();
+        yRotation.setFromAxisAngle(yAxis, finalAngle);
+        
+        // Combine rotations
+        quaternion.premultiply(yRotation);
+        
+        // Apply the combined rotation
+        arrow.mesh.setRotationFromQuaternion(quaternion);
+        
+        console.log(`[ARROW_DEBUGGER] Updated arrow ${index} (${arrow.direction}):`, {
+          position: {x, y: this.settings.yPosition, z},
+          angle: (finalAngle * 180 / Math.PI).toFixed(1) + '°',
+          baseAngle: (baseAngle * 180 / Math.PI).toFixed(1) + '°',
+          offset: (this.settings.angleOffsets[index] * 180 / Math.PI).toFixed(1) + '°'
+        });
+      });
+      
+      console.log("[ARROW_DEBUGGER] All arrow changes applied");
+    } catch (err) {
+      console.error("[ARROW_DEBUGGER] Error applying changes:", err);
+      this._showError(`Failed to apply changes: ${err.message}`);
+    }
+  }
+  
+  /**
+   * Update the arrow information display
+   * @private
+   */
+  _updateArrowInfo() {
+    console.log("[ARROW_DEBUGGER] Updating arrow information display");
+    
+    try {
+      if (!this.elements.infoPanel) return;
+      
+      let infoContent = "";
+      
+      if (!this.beast) {
+        infoContent = `<div style="color: #ff9900;">No beast connected</div>`;
+      } else if (!this.beast.directionalArrows || this.beast.directionalArrows.length === 0) {
+        infoContent = `
+          <div>Beast: ${this.beast.type || "Unknown"}</div>
+          <div style="color: #ff9900;">No directional arrows found</div>
+        `;
+      } else {
+        infoContent = `
+          <div>Beast: ${this.beast.type || "Unknown"}</div>
+          <div>Arrow count: ${this.beast.directionalArrows.length}</div>
+          <div>Position: ${JSON.stringify({
+            x: this.beast.group.position.x.toFixed(1),
+            y: this.beast.group.position.y.toFixed(1),
+            z: this.beast.group.position.z.toFixed(1)
+          })}</div>
+        `;
+      }
+      
+      this.elements.infoPanel.innerHTML = infoContent;
+    } catch (err) {
+      console.error("[ARROW_DEBUGGER] Error updating info panel:", err);
+    }
+  }
+  
+  /**
+   * Show an error message in the container
+   * @param {string} message - Error message
+   * @private
+   */
+  _showError(message) {
+    console.error("[ARROW_DEBUGGER] " + message);
+    
+    if (!this.container) return;
+    
+    const errorElement = document.createElement("div");
+    errorElement.style.color = "red";
+    errorElement.style.padding = "10px";
+    errorElement.style.backgroundColor = "rgba(255,0,0,0.1)";
+    errorElement.style.borderRadius = "4px";
+    errorElement.style.marginBottom = "10px";
+    errorElement.textContent = message;
+    
+    // Add to top of container
+    if (this.container.firstChild) {
+      this.container.insertBefore(errorElement, this.container.firstChild);
+    } else {
+      this.container.appendChild(errorElement);
+    }
+    
+    // Remove after 5 seconds
+    setTimeout(() => {
+      if (errorElement.parentNode) {
+        errorElement.parentNode.removeChild(errorElement);
+      }
+    }, 5000);
+  }
+}
+
 class ArrowDebugger {
   /**
    * Create a new arrow debugger
