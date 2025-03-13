@@ -4,9 +4,6 @@ import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.m
 // Import game architecture
 import { GameManager } from "./js/core/GameManager.js";
 import { Logger } from "./js/utils/Logger.js";
-import { createDiagnosticsUI } from '../tools/diagnostics/DiagnosticsUI.js';
-import { runFullDiagnostics } from '../tools/diagnostics/RunDiagnostics.js';
-import { diagnoseStateTransitions } from '../tools/diagnostics/StateTransitionDebugger.js';
 
 // Import biome distribution test tool
 import { createBiomeDistributionUI } from '../tools/diagnostics/BiomeDistributionTest.js';
@@ -472,36 +469,16 @@ try {
         console.log('Game instance created');
         this.gridRenderer = hexGridRenderer; // Use existing hex grid renderer
       }
-
+      
       init() {
         console.log('Game initialized');
-
-        // Make grid renderer accessible to other systems
-        window.hexGridRenderer = this.gridRenderer;
       }
     }
 
     // Initialize the game
     const game = new Game();
     game.init();
-
-    // Set up diagnostics tools - will be available via Ctrl+D 
-    if (gameManager) {
-      import('./tools/diagnostics/DiagnosticsUI.js')
-        .then(module => {
-          module.setupDiagnosticsShortcut(gameManager);
-          console.log('Diagnostics tools loaded - Press Ctrl+D to open');
-
-          // Show diagnostics panel immediately in development
-          if (gameManager.debugMode) {
-            module.createDiagnosticsPanel(gameManager);
-          }
-        })
-        .catch(err => {
-          console.error('Failed to load diagnostics tools:', err);
-        });
-    }
-
+    
     // Load diagnostic tools asynchronously
     import('../tools/diagnostics/SystemCheck.js')
       .then(module => {
@@ -511,7 +488,7 @@ try {
       .catch(err => {
         console.error('Failed to load system check diagnostic:', err);
       });
-
+    
     // Add debug keyboard shortcuts
     document.addEventListener('keydown', (e) => {
       // Press 'B' to toggle biome distribution panel
@@ -533,14 +510,14 @@ try {
           }
         }
       }
-
+      
       // Press 'S' to toggle system check panel
       if (e.key === 's' && e.ctrlKey) {
         console.log('Toggling system check panel');
-
+        
         // Check if panel exists
         let panel = document.getElementById('system-check-panel');
-
+        
         if (panel) {
           // Remove existing panel
           panel.remove();
@@ -591,241 +568,3 @@ try {
   `;
   document.body.appendChild(errorElement);
 }
-
-// Import necessary modules
-import { GameManager } from './js/core/GameManager.js';
-import { Logger } from './js/utils/Logger.js';
-import { createDiagnosticsUI } from '../tools/diagnostics/DiagnosticsUI.js';
-import { runFullDiagnostics } from '../tools/diagnostics/RunDiagnostics.js';
-import { diagnoseStateTransitions } from '../tools/diagnostics/StateTransitionDebugger.js';
-
-// Global game manager reference for debugging
-let gameManager = null;
-
-// Initialize the game when the DOM is loaded
-document.addEventListener('DOMContentLoaded', async () => {
-  Logger.info('Main', 'Game initializing...');
-
-  try {
-    // Create debug UI toggle button
-    createDebugToggle();
-
-    // Create and initialize the game manager
-    gameManager = new GameManager({
-      // Enable debug mode during development
-      debugMode: true
-    });
-
-    // Initialize the game manager
-    await gameManager.initialize();
-
-    // Create diagnostic UI if in debug mode
-    if (gameManager.debugMode) {
-      const diagUI = createDiagnosticsUI(gameManager);
-      diagUI.initialize();
-
-      // Add to window for console access
-      window.diagUI = diagUI;
-    }
-
-    // Start the game
-    await gameManager.startGame();
-
-    Logger.info('Main', 'Game initialized successfully');
-
-    // Start game loop
-    startGameLoop();
-  } catch (error) {
-    Logger.error('Main', 'Error initializing game', error);
-    console.error('Game initialization failed:', error);
-
-    // Show error UI
-    showErrorUI(error);
-  }
-});
-
-/**
- * Create a debug toggle button
- */
-function createDebugToggle() {
-  const debugButton = document.createElement('button');
-  debugButton.textContent = '🔧 Debug Tools';
-  debugButton.style.cssText = `
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    z-index: 1000;
-    background: rgba(0, 0, 0, 0.7);
-    color: #0f0;
-    border: 1px solid #0f0;
-    border-radius: 5px;
-    padding: 8px 12px;
-    font-family: monospace;
-    cursor: pointer;
-  `;
-
-  debugButton.addEventListener('click', () => {
-    // Open diagnostics in new window or show diagnostics UI
-    window.open('./diagnostics.html', '_blank');
-  });
-
-  document.body.appendChild(debugButton);
-}
-
-/**
- * Show error UI when initialization fails
- * @param {Error} error - The initialization error
- */
-function showErrorUI(error) {
-  const errorContainer = document.createElement('div');
-  errorContainer.style.cssText = `
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    background: rgba(0, 0, 0, 0.9);
-    border: 2px solid #f00;
-    border-radius: 5px;
-    padding: 20px;
-    color: #f00;
-    font-family: monospace;
-    z-index: 1000;
-    max-width: 80%;
-    text-align: center;
-  `;
-
-  const errorTitle = document.createElement('h2');
-  errorTitle.textContent = 'Game Initialization Error';
-  errorContainer.appendChild(errorTitle);
-
-  const errorMessage = document.createElement('div');
-  errorMessage.textContent = error.message;
-  errorContainer.appendChild(errorMessage);
-
-  const errorStack = document.createElement('pre');
-  errorStack.textContent = error.stack;
-  errorStack.style.cssText = `
-    text-align: left;
-    margin-top: 15px;
-    font-size: 12px;
-    max-height: 200px;
-    overflow-y: auto;
-    background: rgba(0, 0, 0, 0.5);
-    padding: 10px;
-    border-radius: 3px;
-  `;
-  errorContainer.appendChild(errorStack);
-
-  const diagnosticButton = document.createElement('button');
-  diagnosticButton.textContent = 'Run Diagnostics';
-  diagnosticButton.style.cssText = `
-    margin-top: 15px;
-    background: #300;
-    color: #f00;
-    border: 1px solid #f00;
-    padding: 8px 15px;
-    border-radius: 3px;
-    cursor: pointer;
-  `;
-  diagnosticButton.addEventListener('click', async () => {
-    console.log('Running diagnostics...');
-    try {
-      await runFullDiagnostics();
-    } catch (diagError) {
-      console.error('Diagnostic error:', diagError);
-    }
-  });
-  errorContainer.appendChild(diagnosticButton);
-
-  document.body.appendChild(errorContainer);
-}
-
-/**
- * Start the main game loop
- */
-function startGameLoop() {
-  Logger.info('Main', 'Starting game loop');
-
-  let lastTime = performance.now();
-
-  // Game loop function
-  function gameLoop(currentTime) {
-    // Calculate delta time in seconds
-    const deltaTime = (currentTime - lastTime) / 1000;
-    lastTime = currentTime;
-
-    // Update game state
-    if (gameManager) {
-      try {
-        // Update state manager
-        if (gameManager.stateManager) {
-          gameManager.stateManager.update(deltaTime);
-        }
-
-        // Update any animated systems
-        // ...
-      } catch (error) {
-        Logger.error('Main', 'Error in game loop', error);
-        console.error('Game loop error:', error);
-      }
-    }
-
-    // Continue the loop
-    requestAnimationFrame(gameLoop);
-  }
-
-  // Start the loop
-  requestAnimationFrame(gameLoop);
-}
-
-// Expose game manager to window for debugging
-window.gameManager = gameManager;
-
-// Expose diagnostic functions to console
-window.runDiagnostics = runFullDiagnostics;
-window.diagnoseStates = () => {
-  if (gameManager?.stateManager) {
-    return diagnoseStateTransitions(gameManager.stateManager, gameManager);
-  } else {
-    console.error('Game manager or state manager not available');
-    return null;
-  }
-};
-
-// Function to help reset when things go wrong
-window.resetGame = async () => {
-  console.log('Resetting game...');
-
-  if (!gameManager) {
-    console.error('Game manager not available');
-    return false;
-  }
-
-  try {
-    // Reset turn counter
-    gameManager.currentTurn = 0;
-
-    // Try to go back to setup state
-    if (gameManager.stateManager) {
-      await gameManager.stateManager.changeState('GAME_SETUP');
-      console.log('Reset game to GAME_SETUP state');
-      return true;
-    } else {
-      console.error('State manager not available');
-      return false;
-    }
-  } catch (error) {
-    console.error('Error resetting game:', error);
-    return false;
-  }
-};
-
-// Handle game cleanup
-window.addEventListener('beforeunload', () => {
-  Logger.info('Main', 'Cleaning up game resources');
-
-  if (gameManager) {
-    // Perform any necessary cleanup
-    // ...
-  }
-});

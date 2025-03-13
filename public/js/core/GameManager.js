@@ -265,19 +265,13 @@ export class GameManager {
       // Initialize and track all subsystems
       this._subsystems = {};
 
-      // Import required systems
+      // Import WeatherSystem
       const { WeatherSystem } = await import('../systems/WeatherSystem.js');
-      const { MapSystem } = await import('../systems/MapSystem.js');
 
       // Create and initialize weather system
       this._subsystems.weatherSystem = new WeatherSystem(this);
       await this._subsystems.weatherSystem.initialize();
       Logger.info('GameManager', 'Weather system initialized');
-
-      // Create and initialize map system
-      this._subsystems.mapSystem = new MapSystem(this);
-      await this._subsystems.mapSystem.initialize();
-      Logger.info('GameManager', 'Map system initialized');
 
       // TODO: Initialize additional subsystems as they are implemented
 

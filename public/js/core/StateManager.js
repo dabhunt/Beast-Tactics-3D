@@ -54,23 +54,16 @@ export class StateManager {
         // Import states with proper error handling
         const { GameSetupState } = await import('../states/GameSetupState.js');
         const { TurnStartState } = await import('../states/TurnStartState.js');
-        const { PlayerInputState } = await import('../states/PlayerInputState.js');
         
         // Create state instances
         this._states[GameStates.GAME_SETUP] = new GameSetupState(this._gameManager);
         this._states[GameStates.TURN_START] = new TurnStartState(this._gameManager);
-        this._states[GameStates.PLAYER_INPUT] = new PlayerInputState(this._gameManager);
         
         Logger.debug('StateManager', 'Successfully imported and instantiated states', {
           availableStates: Object.keys(this._states)
         });
       } catch (importError) {
         Logger.error('StateManager', 'Failed to import state implementations', importError);
-        console.error('State import error details:', {
-          name: importError.name,
-          message: importError.message,
-          stack: importError.stack
-        });
         throw new Error(`State import failed: ${importError.message}`);
       }
       

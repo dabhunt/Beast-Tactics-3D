@@ -89,16 +89,16 @@
   </div>
 
   <script type="module">
-    import { testTextureLoading } from '/tools/diagnostics/TextureLoader.js';
-    import { analyzeMapGeneration } from '/tools/diagnostics/BiomeDistributionTest.js';
-    import { runSystemCheck } from '/tools/diagnostics/SystemCheck.js';
-    import { analyzeStateManager } from '/tools/diagnostics/StateRegistryCheck.js';
+    import { testTextureLoading } from '../tools/diagnostics/TextureLoader.js';
+    import { analyzeMapGeneration } from '../tools/diagnostics/BiomeDistributionTest.js';
+    import { runSystemCheck } from '../tools/diagnostics/SystemCheck.js';
+    import { analyzeStateManager } from '../tools/diagnostics/StateRegistryCheck.js';
 
     // Helper to instantiate the game manager for diagnostics
     async function getTestGameManager() {
       try {
         // Dynamically import GameManager
-        const { GameManager } = await import('/public/js/core/GameManager.js');
+        const { GameManager } = await import('../public/js/core/GameManager.js');
 
         // Create a fresh instance with testing flags
         const gameManager = new GameManager({
