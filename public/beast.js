@@ -156,79 +156,200 @@ export class Beast {
     this.directionalArrows = [];
 
     // Hex directions - these should match your hex grid layout
+    // Using axial coordinates offsets for flat-topped hexes
     const hexDirections = [
-      { x: Math.cos(0), y: 0, z: Math.sin(0), name: "E" }, // East (0°)
-      { x: Math.cos(Math.PI / 3), y: 0, z: Math.sin(Math.PI / 3), name: "NE" }, // Northeast (60°)
-      {
-        x: Math.cos((2 * Math.PI) / 3),
-        y: 0,
-        z: Math.sin((2 * Math.PI) / 3),
-        name: "NW",
-      }, // Northwest (120°)
-      { x: Math.cos(Math.PI), y: 0, z: Math.sin(Math.PI), name: "W" }, // West (180°)
-      {
-        x: Math.cos((4 * Math.PI) / 3),
-        y: 0,
-        z: Math.sin((4 * Math.PI) / 3),
-        name: "SW",
-      }, // Southwest (240°)
-      {
-        x: Math.cos((5 * Math.PI) / 3),
-        y: 0,
-        z: Math.sin((5 * Math.PI) / 3),
-        name: "SE",
-      }, // Southeast (300°)
+      { q: 1, r: 0, name: "E", angle: 0 }, // East
+      { q: 0, r: -1, name: "NE", angle: Math.PI / 3 }, // Northeast
+      { q: -1, r: 0, name: "NW", angle: 2 * Math.PI / 3 }, // Northwest
+      { q: -1, r: 1, name: "W", angle: Math.PI }, // West
+      { q: 0, r: 1, name: "SW", angle: 4 * Math.PI / 3 }, // Southwest
+      { q: 1, r: -1, name: "SE", angle: 5 * Math.PI / 3 }, // Southeast
     ];
 
-    // Distance from center to arrow - increased to match hex grid spacing
+    // Distance from center to arrow
     const arrowDistance = 1.5;
 
     // Create arrows for each direction
-    hexDirections.forEach((direction, index) => {
-      // Create triangle geometry for arrow - smaller and more visible
+    hexDirections.forEach((direction) => {
+      // Convert axial coordinates to world position for a flat-topped hex
+      const x = arrowDistance * Math.cos(direction.angle);
+      const z = arrowDistance * Math.sin(direction.angle);
+      
+      // Create triangle geometry for arrow
       const arrowGeometry = new THREE.ConeGeometry(0.15, 0.4, 3);
       const arrowMaterial = new THREE.MeshBasicMaterial({
-        color: 0xff8800, // Brighter orange-yellow for better visibility
+        color: 0xff8800, // Bright orange-yellow
         transparent: true,
         opacity: 0.9,
-        // Disable depth test so arrows always show even if behind tiles
-        depthTest: false,
+        depthTest: false, // Always show even if behind tiles
       });
 
       const arrow = new THREE.Mesh(arrowGeometry, arrowMaterial);
 
-      // Position the arrow in the right direction - slightly higher for visibility
+      // Position the arrow at the right position
       arrow.position.set(
-        direction.x * arrowDistance,
+        x,
         0.7, // Higher above the base for better visibility
-        direction.z * arrowDistance,
+        z,
       );
 
-      // Rotate to point outward from center (away from beast)
-      arrow.rotation.y = -Math.atan2(direction.z, direction.x);
-      arrow.rotation.x = Math.PI / 4; // Angled to be more visible
+      // Calculate rotation to point TOWARDS the adjacent hex
+      // Point the tip of the cone toward the direction of travel
+      arrow.rotation.y = Math.PI + direction.angle; // Point toward the hex
+      arrow.rotation.x = Math.PI / 4; // Tilt downward for visibility
 
       // Add debug log for arrow positioning
       console.log(`[BEAST] Positioned ${direction.name} arrow at:`, {
-        x: direction.x * arrowDistance,
+        x: x,
         y: 0.7,
-        z: direction.z * arrowDistance,
+        z: z,
+        rotationY: arrow.rotation.y,
+        pointingTo: { q: direction.q, r: direction.r }
       });
+
+      // Make arrow interactive
+      arrow.userData = { 
+        direction: direction.name, 
+        moveOffset: { q: direction.q, r: direction.r },
+        isMovementArrow: true
+      };
 
       // Add arrow to group
       this.group.add(arrow);
 
-      // Store reference
+      // Store reference with additional data
       this.directionalArrows.push({
         mesh: arrow,
         direction: direction.name,
-        vec: direction,
+        moveOffset: { q: direction.q, r: direction.r }
       });
 
-      debugLog(`Created ${direction.name} direction indicator`);
+      debugLog(`Created ${direction.name} direction indicator with movement data`);
     });
 
     debugLog(`All directional indicators created`);
+  }
+
+  /**
+   * Set up click detection for beast arrows
+   * @param {Array} hexagons - Array of hexagons in the scene
+   */
+  setupClickHandling(hexagons) {
+    // Store the hexagons reference for movement
+    this.hexagons = hexagons;
+    
+    // Create raycaster for click detection
+    this.raycaster = new THREE.Raycaster();
+    
+    // Current hex position in axial coordinates
+    this.currentAxialPos = { q: 0, r: 0 };
+    
+    // Find the hexagon we're currently on
+    this._updateCurrentHexPosition();
+    
+    // Set up click listener
+    window.addEventListener('click', this._handleClick.bind(this));
+    
+    debugLog(`Click handling set up for ${this.type} Beast`);
+  }
+  
+  /**
+   * Handle click events for beast movement
+   * @private
+   */
+  _handleClick(event) {
+    // Only process if beast is loaded
+    if (!this.isLoaded) return;
+    
+    // Calculate mouse position in normalized device coordinates (-1 to +1)
+    const mouse = new THREE.Vector2();
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+    
+    // Update the picking ray
+    this.raycaster.setFromCamera(mouse, this.camera);
+    
+    // Find intersections with directional arrows
+    const arrowMeshes = this.directionalArrows.map(arrow => arrow.mesh);
+    const intersects = this.raycaster.intersectObjects(arrowMeshes, false);
+    
+    // If an arrow was clicked
+    if (intersects.length > 0) {
+      const clickedArrow = intersects[0].object;
+      
+      // Log click info for debugging
+      console.log(`[BEAST] Arrow clicked:`, {
+        direction: clickedArrow.userData.direction,
+        offset: clickedArrow.userData.moveOffset
+      });
+      
+      // Calculate the new axial position
+      const newQ = this.currentAxialPos.q + clickedArrow.userData.moveOffset.q;
+      const newR = this.currentAxialPos.r + clickedArrow.userData.moveOffset.r;
+      
+      // Find the corresponding hex at this position
+      const targetHex = this._findHexAtAxialPosition(newQ, newR);
+      
+      if (targetHex) {
+        // Move to the new hex position
+        this.moveTo({
+          x: targetHex.position.x,
+          y: targetHex.position.y + 0.7, // Offset above the hex
+          z: targetHex.position.z
+        });
+        
+        // Update current axial position
+        this.currentAxialPos = { q: newQ, r: newR };
+        
+        debugLog(`Moving to new hex at q=${newQ}, r=${newR}`);
+      } else {
+        console.warn(`[BEAST] No hex found at q=${newQ}, r=${newR}`);
+      }
+    }
+  }
+  
+  /**
+   * Update the beast's current hex position
+   * @private
+   */
+  _updateCurrentHexPosition() {
+    if (!this.hexagons) return;
+    
+    // Find the closest hex to the beast's current position
+    let closestHex = null;
+    let closestDistance = Infinity;
+    
+    this.hexagons.forEach(hex => {
+      const distance = Math.sqrt(
+        Math.pow(hex.position.x - this.group.position.x, 2) +
+        Math.pow(hex.position.z - this.group.position.z, 2)
+      );
+      
+      if (distance < closestDistance) {
+        closestDistance = distance;
+        closestHex = hex;
+      }
+    });
+    
+    if (closestHex) {
+      this.currentAxialPos = { q: closestHex.userData.q, r: closestHex.userData.r };
+      debugLog(`Beast is on hex at q=${this.currentAxialPos.q}, r=${this.currentAxialPos.r}`);
+    }
+  }
+  
+  /**
+   * Find a hex at specified axial coordinates
+   * @param {number} q - q axial coordinate
+   * @param {number} r - r axial coordinate
+   * @returns {Object} - The hex mesh object or null if not found
+   * @private
+   */
+  _findHexAtAxialPosition(q, r) {
+    if (!this.hexagons) return null;
+    
+    return this.hexagons.find(hex => 
+      hex.userData.q === q && hex.userData.r === r
+    );
   }
 
   /**

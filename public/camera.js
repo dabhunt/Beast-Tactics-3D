@@ -35,7 +35,7 @@ export class CameraManager {
       maxZoom: 50,
       constraints: {
         minPolarAngle: 0.1,           // Minimum angle (rad) - close to top-down
-        maxPolarAngle: Math.PI * 0.6,  // Maximum angle (rad) - prevents looking from below
+        maxPolarAngle: Math.PI * 0.45, // Maximum angle (rad) - stricter to prevent looking from below
         minAzimuthAngle: -Infinity,    // No constraint on horizontal rotation
         maxAzimuthAngle: Infinity      // No constraint on horizontal rotation
       }
@@ -178,35 +178,50 @@ export class CameraManager {
 
     // Convert to spherical coordinates
     const radius = offset.length();
-    let polarAngle = Math.atan2(
-      Math.sqrt(offset.x * offset.x + offset.z * offset.z),
-      offset.y
-    );
-    let azimuthAngle = Math.atan2(offset.z, offset.x);
-
-    // Apply rotation with constraints
-    azimuthAngle -= theta;
     
-    // Constrain polar angle to prevent looking from below the map
+    // Use THREE.js Spherical for more reliable angle calculations
+    const spherical = new THREE.Spherical();
+    spherical.setFromVector3(offset);
+    
+    // Apply rotations to the spherical coordinates
+    spherical.theta -= theta; // Horizontal
+    spherical.phi += phi;     // Vertical
+    
+    // Apply constraints to polar (phi) angle
     const constraints = this.settings.constraints;
-    polarAngle = Math.max(
-      constraints.minPolarAngle, 
-      Math.min(constraints.maxPolarAngle, polarAngle + phi)
-    );
     
-    // Log constraint application if significant angle adjustment made
-    if (DEBUG && Math.abs(polarAngle - (polarAngle + phi)) > 0.1) {
-      console.log("[CAMERA] Polar angle constrained:", { 
-        requested: ((polarAngle + phi) * 180/Math.PI).toFixed(1),
-        constrained: (polarAngle * 180/Math.PI).toFixed(1)
+    // Fix the constraint logic by properly clamping spherical.phi
+    if (spherical.phi < constraints.minPolarAngle) {
+      this._logCameraAction("Constraint applied - minimum polar angle", {
+        requested: (spherical.phi * 180/Math.PI).toFixed(1),
+        constrained: (constraints.minPolarAngle * 180/Math.PI).toFixed(1)
       });
+      spherical.phi = constraints.minPolarAngle;
     }
-
+    
+    if (spherical.phi > constraints.maxPolarAngle) {
+      this._logCameraAction("Constraint applied - maximum polar angle", {
+        requested: (spherical.phi * 180/Math.PI).toFixed(1),
+        constrained: (constraints.maxPolarAngle * 180/Math.PI).toFixed(1)
+      });
+      spherical.phi = constraints.maxPolarAngle;
+    }
+    
+    // Apply constraints to azimuthal (theta) angle if they exist
+    if (constraints.minAzimuthAngle > -Infinity) {
+      spherical.theta = Math.max(spherical.theta, constraints.minAzimuthAngle);
+    }
+    
+    if (constraints.maxAzimuthAngle < Infinity) {
+      spherical.theta = Math.min(spherical.theta, constraints.maxAzimuthAngle);
+    }
+    
+    // Ensure radius stays constant
+    spherical.radius = radius;
+    
     // Convert back to Cartesian coordinates
-    offset.x = radius * Math.sin(polarAngle) * Math.cos(azimuthAngle);
-    offset.y = radius * Math.cos(polarAngle);
-    offset.z = radius * Math.sin(polarAngle) * Math.sin(azimuthAngle);
-
+    offset.setFromSpherical(spherical);
+    
     // Update camera position
     this.camera.position.copy(this.target).add(offset);
     this.camera.lookAt(this.target);
@@ -216,8 +231,8 @@ export class CameraManager {
         deltaX,
         deltaY,
         rotation: {
-          azimuth: ((azimuthAngle * 180) / Math.PI).toFixed(1),
-          polar: ((polarAngle * 180) / Math.PI).toFixed(1),
+          azimuth: ((spherical.theta * 180) / Math.PI).toFixed(1),
+          polar: ((spherical.phi * 180) / Math.PI).toFixed(1),
         },
       });
     }

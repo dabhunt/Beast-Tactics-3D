@@ -635,6 +635,9 @@ try {
 
       // Create the beast
       fireBeast = new Beast("Fire", scene, camera, beastPosition, 1);
+      
+      // Set up click handling for beast movement
+      fireBeast.setupClickHandling(hexagons);
 
       // Log the hex where the beast spawned
       debugLog(`Fire Beast spawned on hex`, {
