@@ -2,7 +2,13 @@
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js";
 import { CameraManager } from "./camera.js";
 import { DebugMenu } from "./tools/diagnostics/DebugMenu.js";
-import { Beast, findRandomHexOfElement, createBeast } from './beast.js';
+import { Beast } from './beast.js';
+
+// Debug log to verify Beast import was successful
+console.log("[GAME] Imported Beast class successfully:", { 
+  beastClassAvailable: typeof Beast === 'function',
+  staticMethodsAvailable: typeof Beast.findRandomHexOfElement === 'function'
+});
 // Logging setup
 console.log("Beast Tactics script loaded and starting...");
 
