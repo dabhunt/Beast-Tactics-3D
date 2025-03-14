@@ -227,20 +227,29 @@ class AnimatedGIFLoader {
     // Clear canvas
     animation.ctx.clearRect(0, 0, animation.width, animation.height);
 
-    // Draw image using slightly different source coordinates to force a redraw
-    // This is a trick to make sure the browser doesn't cache the image
-    const offsetX = animation.frameIndex % 2 === 0 ? 0 : 0.25;
+    // Create a slight visual change on each frame to force browser redraw
+    // This ensures the animation cycles even with a single frame GIF
+    const randomOffset = Math.random() * 0.001; // Tiny random offset
+    
+    // Draw the image with a very slight random offset to force redraw
     animation.ctx.drawImage(
       animation.img, 
       0, 0, animation.width, animation.height,
-      offsetX, 0, animation.width, animation.height
+      randomOffset, randomOffset, animation.width, animation.height
     );
+
+    // Log detailed information about this update
+    console.log(`[GIF-LOADER] Updating frame for ${animation.url}`, {
+      frameIndex: animation.frameIndex,
+      totalFrames: animation.frames.length,
+      timestamp: Date.now()
+    });
 
     // Signal THREE.js that the texture needs updating
     animation.texture.needsUpdate = true;
 
-    if (this.debugMode && animation.frameIndex % 10 === 0) {
-      debugLog(`Updated animation frame: ${animation.url}`, {
+    if (this.debugMode) {
+      console.log(`[GIF-LOADER] Updated animation frame: ${animation.url}`, {
         frame: animation.frameIndex,
         frames: animation.frames.length
       });

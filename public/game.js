@@ -603,15 +603,36 @@ try {
   let animationDebugger = null;
   
   // Import and initialize the animation debugger
+  console.log("[DEBUG] Loading Animation Debugger module...");
   import('./tools/diagnostics/AnimationDebugger.js')
     .then(module => {
-      console.log("[DEBUG] Initializing Animation Debugger");
+      console.log("[DEBUG] Successfully imported AnimationDebugger module");
+      // Create new instance
       animationDebugger = new module.AnimationDebugger();
-      // Make it globally available for debugging
+      
+      // Make it globally available for debugging with a clear name
       window.animationDebugger = animationDebugger;
+      
+      // Also make available under an alternate name for better discovery
+      window.gifDebugger = animationDebugger;
+      
+      console.log("[DEBUG] Animation Debugger initialized and made globally available");
+      
+      // Force an immediate animation update to ensure beast animations start
+      animationDebugger.update();
+      
+      // If fire beast already exists, register it with the animation debugger
+      if (fireBeast && fireBeast.beastTexture) {
+        console.log("[DEBUG] Registering existing Fire Beast with animation debugger");
+        fireBeast.animationDebuggerIndex = animationDebugger.registerTexture(
+          fireBeast.beastTexture, 
+          "FireBeast"
+        );
+      }
     })
     .catch(err => {
       console.error("[DEBUG] Failed to load Animation Debugger:", err);
+      console.error("Error details:", err);
     });
 
   // Hide loading screen
@@ -620,6 +641,17 @@ try {
     loadingElement.classList.add("hidden");
     debugLog("Loading screen hidden");
   }
+  
+  // Load additional GIF debugging tools
+  console.log("[DEBUG] Loading additional GIF debugging tools");
+  import('./tools/diagnostics/GifDebugger.js')
+    .then(module => {
+      console.log("[DEBUG] GIF debugging tools loaded successfully");
+      // The module automatically initializes itself and attaches to window.gifDebugger
+    })
+    .catch(err => {
+      console.error("[DEBUG] Failed to load GIF debugging tools:", err);
+    });
 
   // Add Beast to scene after grid generation
   let fireBeast = null;

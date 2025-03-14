@@ -9,7 +9,8 @@ export class AnimationDebugger {
   constructor() {
     console.log("[ANIM-DEBUG] Initializing Animation Debugger");
     
-    this.active = false;
+    // Start with animation enabled by default
+    this.active = true;
     this.animatedTextures = [];
     this.lastFrameUpdate = Date.now();
     this.frameCounter = 0;
@@ -17,6 +18,13 @@ export class AnimationDebugger {
     
     // Create debug UI
     this._createDebugUI();
+    
+    // Log initialization state to console
+    console.log("[ANIM-DEBUG] Animation Debugger initialized with state:", {
+      active: this.active,
+      timeInitialized: new Date().toISOString(),
+      visibilityState: document.visibilityState
+    });
   }
   
   /**
@@ -24,13 +32,13 @@ export class AnimationDebugger {
    * @private
    */
   _createDebugUI() {
-    // Create debug panel
+    // Create debug panel - make visible by default
     this.debugElement = document.createElement('div');
     this.debugElement.id = 'animation-debug-panel';
     this.debugElement.style.position = 'fixed';
     this.debugElement.style.left = '10px';
     this.debugElement.style.top = '10px';
-    this.debugElement.style.backgroundColor = 'rgba(0,0,0,0.7)';
+    this.debugElement.style.backgroundColor = 'rgba(0,0,0,0.85)';
     this.debugElement.style.color = 'white';
     this.debugElement.style.padding = '10px';
     this.debugElement.style.borderRadius = '5px';
@@ -38,7 +46,8 @@ export class AnimationDebugger {
     this.debugElement.style.zIndex = '1000';
     this.debugElement.style.maxHeight = '300px';
     this.debugElement.style.overflowY = 'auto';
-    this.debugElement.style.display = 'none';
+    this.debugElement.style.display = 'block'; // Always visible initially
+    this.debugElement.style.border = '2px solid #ff5500'; // Make it more noticeable
     
     // Add debug content
     this.debugElement.innerHTML = `
@@ -55,12 +64,19 @@ export class AnimationDebugger {
     // Add to document
     document.body.appendChild(this.debugElement);
     
-    // Set up button handlers
-    document.getElementById('anim-toggle').addEventListener('click', () => {
+    // Set up button handlers and initialize button text correctly
+    const toggleBtn = document.getElementById('anim-toggle');
+    toggleBtn.textContent = this.active ? 'Disable Animation' : 'Enable Animation';
+    
+    toggleBtn.addEventListener('click', () => {
       this.active = !this.active;
-      document.getElementById('anim-toggle').textContent = 
-        this.active ? 'Disable Animation' : 'Enable Animation';
+      toggleBtn.textContent = this.active ? 'Disable Animation' : 'Enable Animation';
       console.log(`[ANIM-DEBUG] Animation ${this.active ? 'enabled' : 'disabled'}`);
+      
+      // Force immediate update when enabling
+      if (this.active) {
+        this._forceFrameUpdate();
+      }
     });
     
     document.getElementById('anim-force-update').addEventListener('click', () => {
@@ -156,16 +172,17 @@ export class AnimationDebugger {
    * Update animation - should be called in render loop
    */
   update() {
-    // Only process if active
-    if (!this.active) return;
-    
-    // Update frame counter
+    // Always update frame counter for debugging purposes
     this.frameCounter++;
     
-    // Only update debug info every 30 frames to avoid performance impact
+    // Update debug info every 30 frames
     if (this.frameCounter % 30 === 0) {
       this._updateDebugInfo();
+      console.log(`[ANIM-DEBUG] Animation cycle check - active: ${this.active}, textures: ${this.animatedTextures.length}`);
     }
+    
+    // Only process texture updates if active
+    if (!this.active) return;
     
     // Check if any textures need updating (every frame)
     this.animatedTextures.forEach(item => {
@@ -178,9 +195,20 @@ export class AnimationDebugger {
           item.frameCount++;
           item.lastFrameTime = Date.now();
           item.isUpdating = true;
+          
+          // Log updates occasionally
+          if (this.frameCounter % 60 === 0) {
+            console.log(`[ANIM-DEBUG] Updated ${item.name} texture - frame #${item.frameCount}`);
+          }
         } catch (err) {
           console.warn(`[ANIM-DEBUG] Error updating texture ${item.name}:`, err);
+          console.error(err);
           item.isUpdating = false;
+        }
+      } else {
+        // Log missing update method
+        if (this.frameCounter % 300 === 0) { // Log less frequently
+          console.warn(`[ANIM-DEBUG] Texture ${item.name} has no update method`);
         }
       }
     });
