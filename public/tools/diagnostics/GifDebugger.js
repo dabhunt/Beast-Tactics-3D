@@ -240,3 +240,352 @@ const gifDebugger = new GifDebugger();
 window.gifDebugger = gifDebugger;
 
 export default gifDebugger;
+/**
+ * GifDebugger.js - Advanced diagnostics for GIF animation issues
+ * 
+ * This utility helps diagnose and fix common GIF animation problems in THREE.js
+ * by providing enhanced logging, direct inspection of texture updates, and
+ * console commands for debugging.
+ */
+
+// Helper for console logging
+function log(message, data = null) {
+  const prefix = "[GIF-DEBUG]";
+  if (data) {
+    console.log(`${prefix} ${message}`, data);
+  } else {
+    console.log(`${prefix} ${message}`);
+  }
+}
+
+/**
+ * GifDebugger class - Provides tools to diagnose GIF animation issues
+ */
+class GifDebugger {
+  constructor() {
+    log("Initializing GIF animation debugger");
+    
+    this.activeTextures = [];
+    this.debugPanel = null;
+    this.isMonitoring = false;
+    this.monitorInterval = null;
+    
+    // Create debugger UI
+    this._createDebugUI();
+    
+    // Expose commands to the console
+    this._exposeConsoleCommands();
+    
+    // Start monitoring animations
+    this.startMonitoring();
+    
+    log("GIF debugger initialized and ready");
+  }
+  
+  /**
+   * Create debug UI panel
+   * @private
+   */
+  _createDebugUI() {
+    // Create debug panel
+    this.debugPanel = document.createElement('div');
+    this.debugPanel.id = 'gif-debug-panel';
+    this.debugPanel.style.cssText = `
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      background-color: rgba(0,0,0,0.8);
+      color: #00ff00;
+      padding: 10px;
+      border-radius: 5px;
+      font-family: monospace;
+      font-size: 12px;
+      z-index: 9999;
+      max-width: 400px;
+      max-height: 80vh;
+      overflow-y: auto;
+      display: none;
+    `;
+    
+    // Add header
+    const header = document.createElement('div');
+    header.innerHTML = '<h3>GIF Animation Debugger</h3>';
+    header.style.cssText = 'margin-bottom: 10px; text-align: center;';
+    this.debugPanel.appendChild(header);
+    
+    // Add control buttons
+    const controls = document.createElement('div');
+    controls.style.cssText = 'display: flex; justify-content: space-around; margin-bottom: 10px;';
+    
+    // Toggle monitor button
+    const toggleBtn = document.createElement('button');
+    toggleBtn.textContent = 'Toggle Monitor';
+    toggleBtn.onclick = () => this.toggleMonitoring();
+    controls.appendChild(toggleBtn);
+    
+    // Force update button
+    const updateBtn = document.createElement('button');
+    updateBtn.textContent = 'Force Update';
+    updateBtn.onclick = () => this.forceUpdate();
+    controls.appendChild(updateBtn);
+    
+    // Toggle visibility button
+    const showHideBtn = document.createElement('button');
+    showHideBtn.textContent = 'Show/Hide';
+    showHideBtn.onclick = () => this.toggleVisibility();
+    controls.appendChild(showHideBtn);
+    
+    this.debugPanel.appendChild(controls);
+    
+    // Add status display
+    this.statusDisplay = document.createElement('div');
+    this.statusDisplay.id = 'gif-debug-status';
+    this.statusDisplay.style.cssText = 'margin-top: 10px; border-top: 1px solid #333; padding-top: 10px;';
+    this.debugPanel.appendChild(this.statusDisplay);
+    
+    // Add to document
+    document.body.appendChild(this.debugPanel);
+    
+    log("Debug UI created");
+  }
+  
+  /**
+   * Toggle debug panel visibility
+   */
+  toggleVisibility() {
+    if (this.debugPanel.style.display === 'none') {
+      this.debugPanel.style.display = 'block';
+      log("Debug panel shown");
+    } else {
+      this.debugPanel.style.display = 'none';
+      log("Debug panel hidden");
+    }
+  }
+  
+  /**
+   * Start monitoring GIF animations
+   */
+  startMonitoring() {
+    if (this.isMonitoring) return;
+    
+    log("Starting animation monitoring");
+    this.isMonitoring = true;
+    
+    // Update status every second
+    this.monitorInterval = setInterval(() => {
+      this._updateStatus();
+    }, 1000);
+    
+    // Initial update
+    this._updateStatus();
+  }
+  
+  /**
+   * Stop monitoring GIF animations
+   */
+  stopMonitoring() {
+    if (!this.isMonitoring) return;
+    
+    log("Stopping animation monitoring");
+    this.isMonitoring = false;
+    
+    if (this.monitorInterval) {
+      clearInterval(this.monitorInterval);
+      this.monitorInterval = null;
+    }
+  }
+  
+  /**
+   * Toggle monitoring state
+   */
+  toggleMonitoring() {
+    if (this.isMonitoring) {
+      this.stopMonitoring();
+    } else {
+      this.startMonitoring();
+    }
+  }
+  
+  /**
+   * Force update all GIF animations
+   */
+  forceUpdate() {
+    log("Forcing update of all animations");
+    
+    // Check if AnimatedGIFLoader is available globally
+    if (window.animationDebugger) {
+      window.animationDebugger.update();
+      log("Animation update triggered through animationDebugger");
+    }
+    
+    // Try to find all GIF animations in the scene
+    let allTextures = [];
+    
+    // Look for THREE.js scene
+    if (window.scene) {
+      log("Found THREE.js scene, scanning for animated textures");
+      
+      window.scene.traverse((object) => {
+        if (object.material) {
+          if (object.material.map) {
+            allTextures.push(object.material.map);
+          } else if (Array.isArray(object.material)) {
+            object.material.forEach(mat => {
+              if (mat && mat.map) allTextures.push(mat.map);
+            });
+          }
+        }
+      });
+      
+      log(`Found ${allTextures.length} textures in scene`);
+      
+      // Force update of all textures
+      allTextures.forEach(texture => {
+        if (texture.update && typeof texture.update === 'function') {
+          texture.update();
+        }
+        texture.needsUpdate = true;
+      });
+    } else {
+      log("No THREE.js scene found, can't scan for textures");
+    }
+    
+    // Check for FireBeast
+    if (window.fireBeast && window.fireBeast.beastTexture) {
+      log("Found Fire Beast texture, forcing update");
+      window.fireBeast.beastTexture.needsUpdate = true;
+      
+      if (window.fireBeast.beastTexture.update && 
+          typeof window.fireBeast.beastTexture.update === 'function') {
+        window.fireBeast.beastTexture.update();
+      }
+    }
+  }
+  
+  /**
+   * Register a texture for monitoring
+   * @param {THREE.Texture} texture - The texture to monitor
+   * @param {string} name - Name for the texture
+   */
+  registerTexture(texture, name) {
+    this.activeTextures.push({
+      texture: texture,
+      name: name || `Texture_${this.activeTextures.length}`,
+      registeredAt: Date.now(),
+      updateCount: 0,
+      lastUpdated: 0
+    });
+    
+    log(`Registered texture: ${name}`, texture);
+    return this.activeTextures.length - 1;
+  }
+  
+  /**
+   * Update the status display with current animation info
+   * @private
+   */
+  _updateStatus() {
+    // Get animation stats
+    let activeCount = 0;
+    
+    // Check animationDebugger first
+    if (window.animationDebugger) {
+      const debugger = window.animationDebugger;
+      activeCount = debugger.activeTextures ? debugger.activeTextures.length : 0;
+    }
+    
+    // Check gifLoader if available
+    let gifLoaderStats = {};
+    try {
+      // Try to import and check AnimatedGIFLoader
+      import("../AnimatedGIFLoader.js")
+        .then(module => {
+          if (module.gifLoader) {
+            const animations = module.gifLoader.activeAnimations || [];
+            gifLoaderStats = {
+              loadedGifs: animations.length,
+              activeFrames: animations.reduce((sum, anim) => sum + (anim.frames ? anim.frames.length : 0), 0)
+            };
+            this._updateStatusDisplay(activeCount, gifLoaderStats);
+          }
+        })
+        .catch(err => {
+          console.error("[GIF-DEBUG] Error checking gifLoader:", err);
+        });
+    } catch (err) {
+      // Fallback if import fails
+      this._updateStatusDisplay(activeCount, {});
+    }
+    
+    // Log animation cycle check
+    console.log("[ANIM-DEBUG] Animation cycle check - active:", 
+      this.isMonitoring, 
+      "textures:", activeCount
+    );
+  }
+  
+  /**
+   * Update the status display with current stats
+   * @private
+   */
+  _updateStatusDisplay(activeCount, gifLoaderStats) {
+    if (!this.statusDisplay) return;
+    
+    let html = `<div>Monitoring: ${this.isMonitoring ? 'Active' : 'Paused'}</div>`;
+    html += `<div>Active Textures: ${activeCount}</div>`;
+    
+    if (gifLoaderStats.loadedGifs !== undefined) {
+      html += `<div>Loaded GIFs: ${gifLoaderStats.loadedGifs}</div>`;
+      html += `<div>Active Frames: ${gifLoaderStats.activeFrames}</div>`;
+    }
+    
+    // Check if sprite exists in the scene
+    let beastInfo = "Not Found";
+    if (window.fireBeast) {
+      beastInfo = window.fireBeast.isLoaded ? "Loaded" : "Loading";
+      beastInfo += window.fireBeast.sprite ? " (Sprite Created)" : " (No Sprite)";
+    }
+    html += `<div>Beast Status: ${beastInfo}</div>`;
+    
+    this.statusDisplay.innerHTML = html;
+  }
+  
+  /**
+   * Expose console commands for easy debugging
+   * @private
+   */
+  _exposeConsoleCommands() {
+    // Make methods available in console
+    window.gifDebugCommands = {
+      showPanel: () => this.toggleVisibility(),
+      startMonitor: () => this.startMonitoring(),
+      stopMonitor: () => this.stopMonitoring(),
+      forceUpdate: () => this.forceUpdate(),
+      checkBeast: () => {
+        if (window.fireBeast) {
+          console.table({
+            type: window.fireBeast.type,
+            loaded: window.fireBeast.isLoaded,
+            position: [
+              window.fireBeast.group.position.x, 
+              window.fireBeast.group.position.y, 
+              window.fireBeast.group.position.z
+            ],
+            hasTexture: !!window.fireBeast.beastTexture,
+            hasSprite: !!window.fireBeast.sprite
+          });
+        } else {
+          console.log("No Beast found in scene");
+        }
+      }
+    };
+    
+    log("Console commands exposed under window.gifDebugCommands");
+  }
+}
+
+// Create instance and expose globally
+const gifDebugger = new GifDebugger();
+window.gifDebugger = gifDebugger;
+
+export default gifDebugger;

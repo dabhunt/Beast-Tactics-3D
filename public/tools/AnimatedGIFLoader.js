@@ -30,6 +30,22 @@ debugLog("Initializing AnimatedGIFLoader");
 /**
  * Custom loader for animated GIFs
  */
+/**
+ * Animated GIF Loader for THREE.js
+ * 
+ * This module handles loading and animating GIF files as THREE.js textures.
+ * It provides a global gifLoader instance that can be used throughout the application.
+ */
+
+// Helper for logging
+function debugLog(message, data = null) {
+  if (data) {
+    console.log(`[GIF-LOADER] ${message}`, data);
+  } else {
+    console.log(`[GIF-LOADER] ${message}`);
+  }
+}
+
 class AnimatedGIFLoader {
   constructor() {
     this.fps = 10;
@@ -114,6 +130,8 @@ class AnimatedGIFLoader {
    * @private
    */
   _loadGifFrames(animation, onComplete, onError) {
+    console.log(`[GIF-LOADER] Starting to load frames from: ${animation.url}`);
+    
     // Create a new Image to load the GIF
     const img = new Image();
 
@@ -122,7 +140,7 @@ class AnimatedGIFLoader {
 
     // Setup load handler
     img.onload = () => {
-      debugLog(`GIF loaded: ${animation.url}`, {
+      console.log(`[GIF-LOADER] GIF loaded: ${animation.url}`, {
         width: img.width,
         height: img.height
       });
@@ -142,9 +160,27 @@ class AnimatedGIFLoader {
       animation.ctx.clearRect(0, 0, img.width, img.height);
       animation.ctx.drawImage(img, 0, 0, img.width, img.height);
 
-      // For standard GIFs, we'll just have one frame
-      // (this is a simplified implementation)
-      animation.frames = [animation.canvas];
+      // For GIF animation, we need to simulate multiple frames
+      // Create 8 artificial frames by slightly adjusting the canvas 
+      // to ensure the browser redraws it
+      animation.frames = [];
+      for (let i = 0; i < 8; i++) {
+        // Create a copy of the canvas for each frame
+        const frameCanvas = document.createElement('canvas');
+        frameCanvas.width = img.width;
+        frameCanvas.height = img.height;
+        const frameCtx = frameCanvas.getContext('2d');
+        
+        // Draw the image with a slight offset
+        // This forces browser to recognize it as a different frame
+        const offset = i * 0.001; // Very tiny offset
+        frameCtx.drawImage(img, offset, offset, img.width, img.height);
+        
+        // Add to frames array
+        animation.frames.push(frameCanvas);
+      }
+      
+      console.log(`[GIF-LOADER] Created ${animation.frames.length} virtual frames for animation`);
 
       // Update the texture with the canvas
       animation.texture.image = animation.canvas;
@@ -223,19 +259,27 @@ class AnimatedGIFLoader {
 
     // Increment frame index
     animation.frameIndex = (animation.frameIndex + 1) % animation.frames.length;
+    
+    // Get the current frame canvas
+    const currentFrame = animation.frames[animation.frameIndex];
 
     // Clear canvas
     animation.ctx.clearRect(0, 0, animation.width, animation.height);
-
-    // Create a slight visual change on each frame to force browser redraw
-    // This ensures the animation cycles even with a single frame GIF
-    const randomOffset = Math.random() * 0.001; // Tiny random offset
     
-    // Draw the image with a very slight random offset to force redraw
-    animation.ctx.drawImage(
-      animation.img, 
-      0, 0, animation.width, animation.height,
-      randomOffset, randomOffset, animation.width, animation.height
+    // Draw the current frame to the animation canvas
+    animation.ctx.drawImage(currentFrame, 0, 0);
+    
+    // Apply an additional random offset to ensure the browser sees changes
+    // This helps prevent the browser from caching the image
+    const jitterX = (Math.random() - 0.5) * 0.002;
+    const jitterY = (Math.random() - 0.5) * 0.002;
+    
+    // Add a tiny extra element with jitter to force redraw
+    animation.ctx.fillStyle = 'rgba(255,255,255,0.01)'; // Almost invisible
+    animation.ctx.fillRect(
+      animation.width - 2 + jitterX, 
+      animation.height - 2 + jitterY, 
+      1, 1
     );
 
     // Log detailed information about this update
@@ -288,7 +332,24 @@ class AnimatedGIFLoader {
 
     return false;
   }
+  
+  /**
+   * Manual update function to advance all animations one frame
+   * Useful for debugging or when animations seem stuck
+   */
+  update() {
+    console.log(`[GIF-LOADER] Manual update triggered for ${this.activeAnimations.length} animations`);
+    this.activeAnimations.forEach(animation => {
+      if (animation.loaded) {
+        this._updateTextureFrame(animation);
+      }
+    });
+  }
 }
+
+// Create and export a singleton instance
+const gifLoader = new AnimatedGIFLoader();
+export { gifLoader, AnimatedGIFLoader };
 
 // Create singleton instance
 export const gifLoader = new AnimatedGIFLoader();
