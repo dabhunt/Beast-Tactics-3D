@@ -1,4 +1,3 @@
-
 const express = require('express');
 const app = express();
 const port = process.env.PORT || 3000;
@@ -16,6 +15,8 @@ app.use(express.static('public', {
     }
   }
 }));
+
+app.use('/node_modules', express.static('node_modules'));
 
 // Log all requests in development
 if (process.env.NODE_ENV !== 'production') {

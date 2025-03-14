@@ -1069,8 +1069,16 @@ try {
     }
   }
 
-  // Add mousemove listener for hex hover detection
+  // Add mousemove and mouseleave listeners for hex hover detection
   window.addEventListener("mousemove", handleHexHover);
+  
+  // Add mouseleave handler for the renderer's canvas
+  renderer.domElement.addEventListener("mouseleave", () => {
+    console.log("[HEX] Mouse left canvas, resetting hover state");
+    if (hoveredHex) {
+      resetHoveredHex();
+    }
+  });
 
   // Trigger beast spawn after grid is generated
   debugLog("Setting up Fire Beast spawn after grid generation");

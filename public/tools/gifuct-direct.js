@@ -14,9 +14,9 @@ const loadGifuctFromCDN = async () => {
   return new Promise((resolve, reject) => {
     // Try multiple CDN sources
     const cdnUrls = [
-      'https://unpkg.com/gifuct-js@2.1.2/dist/gifuct.min.js',
-      'https://cdn.jsdelivr.net/npm/gifuct-js@2.1.2/dist/gifuct.min.js',
-      '/node_modules/gifuct-js/dist/gifuct.min.js'
+      '/node_modules/gifuct-js/dist/gifuct.js',
+      '/node_modules/gifuct-js/dist/gifuct.min.js',
+      'https://unpkg.com/gifuct-js@2.1.2/dist/gifuct.min.js'
     ];
 
     console.log("[GIFUCT-DIRECT] Attempting to load from multiple sources");
