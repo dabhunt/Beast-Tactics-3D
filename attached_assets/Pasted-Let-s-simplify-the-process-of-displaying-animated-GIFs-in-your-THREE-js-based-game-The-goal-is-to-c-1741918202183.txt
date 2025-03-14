@@ -1,0 +1,203 @@
+Let’s simplify the process of displaying animated GIFs in your THREE.js-based game. The goal is to create a lightweight solution to load and animate GIFs as textures on sprites, like your beasts, without overcomplicating the implementation. Since your game uses THREE.js (version 0.162.0 via CDN, as seen in the original code) and a hexagonal grid, we’ll focus on a minimal approach that gets animated GIFs working with the least amount of code and dependencies.
+Simplest Approach: Use THREE.js Sprites with a GIF Parsing Library
+The simplest way to show animated GIFs in THREE.js is to:
+Use a lightweight GIF parsing library to extract frames and their timing.
+
+Create a THREE.js texture that updates with each frame on a sprite.
+
+Run a basic animation loop to cycle through the frames.
+We’ll use gifuct-js (a lightweight GIF parser) instead of omggif because it’s simpler to use and widely available via CDN. We’ll avoid complex features like global animation loops or singletons for now, focusing on a standalone solution for a single beast sprite.
+Step-by-Step Implementation
+Here’s a minimal implementation to get animated GIFs working in your game:
+javascript
+/**
+ * SimpleGIFAnimator.js - Minimal animated GIF loader for THREE.js sprites
+ */
+
+// Import THREE.js
+import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js";
+// Import gifuct-js for GIF parsing
+import GIF from "https://cdn.jsdelivr.net/npm/gifuct-js@2.1.2/dist/gifuct-js.min.js";
+
+// Debug logging
+const DEBUG = true;
+function debugLog(message, data = null) {
+  if (!DEBUG) return;
+  if (data) {
+    console.log(`[SIMPLE-GIF] ${message}`, data);
+  } else {
+    console.log(`[SIMPLE-GIF] ${message}`);
+  }
+}
+
+/**
+ * Class to handle a single animated GIF sprite in THREE.js
+ */
+class SimpleGIFAnimator {
+  /**
+   * @param {string} url - URL of the GIF to load
+   * @param {THREE.Scene} scene - The THREE.js scene
+   * @param {Object} position - Position {x, y, z}
+   * @param {number} scale - Sprite scale
+   */
+  constructor(url, scene, position = { x: 0, y: 0.5, z: 0 }, scale = 1) {
+    this.url = url;
+    this.scene = scene;
+    this.position = position;
+    this.scale = scale;
+
+    this.frames = [];
+    this.frameDelays = [];
+    this.frameIndex = 0;
+    this.lastFrameTime = 0;
+
+    this.sprite = null;
+    this.texture = null;
+    this.canvas = document.createElement('canvas');
+    this.ctx = this.canvas.getContext('2d');
+
+    // Load the GIF and set up the sprite
+    this._loadGIF();
+  }
+
+  /**
+   * Load and parse the GIF
+   * @private
+   */
+  async _loadGIF() {
+    debugLog(`Loading GIF from: ${this.url}`);
+
+    try {
+      // Fetch the GIF as an array buffer
+      const response = await fetch(this.url);
+      const arrayBuffer = await response.arrayBuffer();
+      const gifData = new Uint8Array(arrayBuffer);
+
+      // Parse the GIF using gifuct-js
+      const gif = new GIF(gifData);
+      const frames = gif.decompressFrames(true); // Decompress all frames
+
+      debugLog(`GIF parsed with ${frames.length} frames`);
+
+      // Set up canvas dimensions
+      this.canvas.width = gif.header.width;
+      this.canvas.height = gif.header.height;
+
+      // Process each frame
+      frames.forEach(frame => {
+        const frameCanvas = document.createElement('canvas');
+        frameCanvas.width = gif.header.width;
+        frameCanvas.height = gif.header.height;
+        const frameCtx = frameCanvas.getContext('2d');
+
+        // Convert frame data to ImageData
+        const imageData = new ImageData(
+          new Uint8ClampedArray(frame.patch),
+          frame.dims.width,
+          frame.dims.height
+        );
+
+        // Draw frame to its canvas, accounting for position
+        frameCtx.putImageData(imageData, frame.dims.left, frame.dims.top);
+        this.frames.push(frameCanvas);
+        this.frameDelays.push(frame.delay || 100); // Default to 100ms if delay is 0
+      });
+
+      // Create texture and sprite
+      this.texture = new THREE.Texture(this.canvas);
+      this.texture.magFilter = THREE.NearestFilter; // Pixel-perfect rendering
+      this.texture.minFilter = THREE.NearestFilter;
+      this.texture.generateMipmaps = false;
+
+      const material = new THREE.SpriteMaterial({
+        map: this.texture,
+        transparent: true,
+        alphaTest: 0.1
+      });
+
+      this.sprite = new THREE.Sprite(material);
+      this.sprite.scale.set(this.scale, this.scale, 1);
+      this.sprite.position.set(this.position.x, this.position.y, this.position.z);
+
+      this.scene.add(this.sprite);
+
+      // Draw the first frame
+      this._updateFrame();
+      debugLog(`GIF sprite created and added to scene`);
+    } catch (err) {
+      console.error(`[SIMPLE-GIF] Failed to load GIF: ${this.url}`, err);
+    }
+  }
+
+  /**
+   * Update the current frame
+   * @private
+   */
+  _updateFrame() {
+    if (this.frames.length === 0) return;
+
+    const currentFrame = this.frames[this.frameIndex];
+    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    this.ctx.drawImage(currentFrame, 0, 0);
+    this.texture.needsUpdate = true;
+  }
+
+  /**
+   * Update method to be called in the game loop
+   */
+  update() {
+    if (!this.frames.length) return;
+
+    const now = Date.now();
+    if (now - this.lastFrameTime >= this.frameDelays[this.frameIndex]) {
+      this.frameIndex = (this.frameIndex + 1) % this.frames.length;
+      this.lastFrameTime = now;
+      this._updateFrame();
+    }
+  }
+
+  /**
+   * Dispose of resources
+   */
+  dispose() {
+    if (this.sprite) {
+      this.scene.remove(this.sprite);
+      if (this.sprite.material) this.sprite.material.dispose();
+      if (this.texture) this.texture.dispose();
+    }
+    this.frames = [];
+    this.canvas = null;
+    this.ctx = null;
+    debugLog(`GIF sprite disposed`);
+  }
+}
+
+export { SimpleGIFAnimator };
+
+How to Use This in Your Game
+Import and Instantiate:
+In your game code (e.g., where you set up the scene), create an instance of SimpleGIFAnimator for each beast:
+javascript
+import { SimpleGIFAnimator } from './SimpleGIFAnimator.js';
+
+// Assuming you have a scene and a beast GIF URL
+const beastGIF = new SimpleGIFAnimator(
+  '/assets/Beasts/Fire.gif', // Path to your GIF
+  scene,
+  { x: 0, y: 0.5, z: 0 }, // Position on a hex
+  1 // Scale
+);
+Update in Animation Loop:
+In your game’s animation loop, call the update method to animate the GIF:
+javascript
+function animate() {
+  requestAnimationFrame(animate);
+  beastGIF.update();
+  renderer.render(scene, camera);
+}
+animate();
+Cleanup:
+When the beast is removed, dispose of resources:
+javascript
+beastGIF.dispose();
+
