@@ -1004,7 +1004,7 @@ try {
     hexHoverDirection = 'down';
     hexHoverAnimationStart = performance.now();
     
-    // Remove highlight mesh
+    // Remove highlight mesh immediately
     if (hoveredHex.userData.highlightMesh) {
       scene.remove(hoveredHex.userData.highlightMesh);
       hoveredHex.userData.highlightMesh = null;
