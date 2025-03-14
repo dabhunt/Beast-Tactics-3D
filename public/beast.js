@@ -314,15 +314,29 @@ export class Beast {
 
     // Font for debug labels
     let font = null;
-    // Try to load font for labels asynchronously
-    const fontLoader = new THREE.FontLoader();
-    fontLoader.load('/assets/fonts/helvetiker_regular.typeface.json', loadedFont => {
-      font = loadedFont;
-      this._createDebugLabels();
-      console.log("[BEAST] Loaded font for debug labels");
-    }, undefined, error => {
-      console.warn("[BEAST] Failed to load font:", error);
-    });
+    // Try to load font for labels asynchronously - using dynamic import for FontLoader
+    try {
+      // Import the FontLoader properly from three.js modules
+      import('https://cdn.jsdelivr.net/npm/three@0.162.0/examples/jsm/loaders/FontLoader.js')
+        .then(module => {
+          const FontLoader = module.FontLoader;
+          const fontLoader = new FontLoader();
+          fontLoader.load('/assets/fonts/helvetiker_regular.typeface.json', loadedFont => {
+            font = loadedFont;
+            this._createDebugLabels();
+            console.log("[BEAST] Loaded font for debug labels using proper module import");
+          }, undefined, error => {
+            console.warn("[BEAST] Failed to load font:", error);
+          });
+        })
+        .catch(error => {
+          console.error("[BEAST] Error loading FontLoader module:", error);
+          console.log("[BEAST] Using text sprites instead of 3D text for debug labels");
+        });
+    } catch (error) {
+      console.error("[BEAST] FontLoader import error:", error);
+      console.log("[BEAST] Using text sprites for labels (fallback)");
+    }
 
     // Store references to debug objects
     this.debugObjects = {
