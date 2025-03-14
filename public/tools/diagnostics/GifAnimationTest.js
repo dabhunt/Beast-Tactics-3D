@@ -1,15 +1,20 @@
 
 /**
- * GifAnimationTest.js - Test tool for GIF animations
+ * GifAnimationTest.js - Test tool for GIF animations in THREE.js
  * 
- * This simple utility creates a testing panel to verify the AnimatedGIFTexture 
- * class is working correctly with different beast GIFs.
+ * Provides a UI for testing GIF animations with the AnimatedGIFTexture class
  */
 
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js";
-import { AnimatedGIFTexture } from "../AnimatedGIFTexture.js";
+import { AnimatedGIFTexture } from '../AnimatedGIFTexture.js';
 
+/**
+ * Class for testing GIF animations
+ */
 export class GifAnimationTest {
+  /**
+   * Create a new GIF animation test tool
+   */
   constructor() {
     console.log("[GIF-TEST] Initializing GIF Animation Test Tool");
     
@@ -107,27 +112,33 @@ export class GifAnimationTest {
    * @private
    */
   _initRenderer() {
-    // Create mini scene
-    this.scene = new THREE.Scene();
-    
-    // Create camera
-    this.camera = new THREE.PerspectiveCamera(
-      75, 1, 0.1, 1000
-    );
-    this.camera.position.z = 5;
-    
-    // Create renderer
-    this.renderer = new THREE.WebGLRenderer({ alpha: true });
-    this.renderer.setSize(200, 200);
-    this.renderer.setClearColor(0x000000, 0);
-    this.canvasContainer.appendChild(this.renderer.domElement);
-    
-    // Add light
-    const light = new THREE.AmbientLight(0xffffff, 1);
-    this.scene.add(light);
-    
-    // Start animation loop
-    this._animate();
+    try {
+      // Create mini scene
+      this.scene = new THREE.Scene();
+      
+      // Create camera
+      this.camera = new THREE.PerspectiveCamera(
+        75, 1, 0.1, 1000
+      );
+      this.camera.position.z = 5;
+      
+      // Create renderer
+      this.renderer = new THREE.WebGLRenderer({ alpha: true });
+      this.renderer.setSize(200, 200);
+      this.renderer.setClearColor(0x000000, 0);
+      this.canvasContainer.appendChild(this.renderer.domElement);
+      
+      // Add light
+      const light = new THREE.AmbientLight(0xffffff, 1);
+      this.scene.add(light);
+      
+      // Start animation loop
+      this._animate();
+      console.log("[GIF-TEST] Renderer initialized successfully");
+    } catch (error) {
+      console.error("[GIF-TEST] Error initializing renderer:", error);
+      this.statusArea.innerHTML = `<span style="color: #f66">Error initializing test renderer: ${error.message}</span>`;
+    }
   }
   
   /**
@@ -181,6 +192,7 @@ export class GifAnimationTest {
    * @private
    */
   _testBeastType(beastType) {
+    console.log(`[GIF-TEST] Testing ${beastType} animation`);
     this.statusArea.textContent = `Loading ${beastType} beast animation...`;
     
     // Clear previous sprites
@@ -213,9 +225,12 @@ export class GifAnimationTest {
           const sprite = new THREE.Sprite(material);
           sprite.scale.set(2, 2, 1);
           this.scene.add(sprite);
+          
+          console.log(`[GIF-TEST] ${beastType} animation loaded with ${gifTexture.frames.length} frames`);
         },
         // Error callback
         (error) => {
+          console.error(`[GIF-TEST] Error loading ${beastType}:`, error);
           this.statusArea.innerHTML = `
             <span style="color: #f66">
               Error loading ${beastType}:<br>
@@ -288,6 +303,7 @@ export class GifAnimationTest {
     });
     
     this.statusArea.textContent = `Animation speed set to ${speedFactor}x`;
+    console.log(`[GIF-TEST] Animation speed set to ${speedFactor}x`);
   }
   
   /**
@@ -323,15 +339,21 @@ export class GifAnimationTest {
   _animate() {
     requestAnimationFrame(() => this._animate());
     
-    // Update all active animators
-    this.activeAnimators.forEach(animator => {
-      if (animator && typeof animator.update === 'function') {
-        animator.update();
+    try {
+      // Update all active animators
+      this.activeAnimators.forEach(animator => {
+        if (animator && typeof animator.update === 'function') {
+          animator.update();
+        }
+      });
+      
+      // Render the scene
+      if (this.renderer && this.scene && this.camera) {
+        this.renderer.render(this.scene, this.camera);
       }
-    });
-    
-    // Render the scene
-    this.renderer.render(this.scene, this.camera);
+    } catch (error) {
+      console.error("[GIF-TEST] Error in animation loop:", error);
+    }
   }
   
   /**
@@ -340,6 +362,54 @@ export class GifAnimationTest {
   show() {
     this.panel.style.display = 'block';
     console.log("[GIF-TEST] Test tool shown");
+    
+    // Add a button to the game UI
+    this._addGameUIButton();
+  }
+  
+  /**
+   * Add a button to the game UI
+   * @private 
+   */
+  _addGameUIButton() {
+    try {
+      // Find debug info panel or create one
+      let debugPanel = document.querySelector("div[style*='position: absolute'][style*='top: 10px'][style*='right: 10px']");
+      
+      if (!debugPanel) {
+        console.log("[GIF-TEST] Debug menu not found, button not added");
+        return;
+      }
+      
+      // Check if button already exists
+      const existingButton = debugPanel.querySelector('button[data-gif-test-button]');
+      if (existingButton) {
+        return;
+      }
+      
+      // Create button
+      const button = document.createElement('button');
+      button.textContent = 'Test GIF Animations';
+      button.setAttribute('data-gif-test-button', 'true');
+      button.style.display = 'block';
+      button.style.marginTop = '10px';
+      button.style.padding = '5px';
+      button.style.width = '100%';
+      button.style.cursor = 'pointer';
+      button.style.backgroundColor = '#2a2a2a';
+      button.style.color = 'white';
+      button.style.border = '1px solid #444';
+      button.style.borderRadius = '3px';
+      
+      button.addEventListener('click', () => {
+        this.show();
+      });
+      
+      debugPanel.appendChild(button);
+      console.log("[GIF-TEST] Button added to game UI");
+    } catch (error) {
+      console.error("[GIF-TEST] Error adding button to game UI:", error);
+    }
   }
   
   /**
@@ -368,5 +438,5 @@ export class GifAnimationTest {
   }
 }
 
-// Make available globally for console access
+// Add a global accessor for easier debugging
 window.GifAnimationTest = GifAnimationTest;

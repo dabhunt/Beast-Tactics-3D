@@ -694,6 +694,42 @@ try {
     });
 
   // Add Beast to scene after grid generation
+
+    // Load new GIF animation test tool
+    import('./tools/diagnostics/GifAnimationTest.js')
+      .then(module => {
+        console.log("[DEBUG] GIF Animation Test Tool loaded successfully");
+        
+        // Create an instance and make globally available
+        window.gifAnimationTest = new module.GifAnimationTest();
+        
+        // Add a button directly to the page for easy access
+        const testButton = document.createElement('button');
+        testButton.textContent = 'Test GIF Animations';
+        testButton.style.position = 'fixed';
+        testButton.style.bottom = '10px';
+        testButton.style.right = '10px';
+        testButton.style.padding = '8px 16px';
+        testButton.style.backgroundColor = '#333';
+        testButton.style.color = 'white';
+        testButton.style.border = '1px solid #555';
+        testButton.style.borderRadius = '4px';
+        testButton.style.cursor = 'pointer';
+        testButton.style.zIndex = '1000';
+        
+        testButton.addEventListener('click', () => {
+          if (window.gifAnimationTest) {
+            window.gifAnimationTest.show();
+          }
+        });
+        
+        document.body.appendChild(testButton);
+        console.log("[DEBUG] GIF Animation Test button added to page");
+      })
+      .catch(err => {
+        console.error("[DEBUG] Failed to load GIF Animation Test Tool:", err);
+      });
+
   let fireBeast = null;
   let arrowDebugger = null;
 

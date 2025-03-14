@@ -1,33 +1,62 @@
 
 /**
- * AnimatedGIFTexture.js - Handles animated GIF loading and playback for THREE.js
+ * AnimatedGIFTexture.js - Animated GIF loader for THREE.js sprites
  * 
- * This module creates an animated texture from a GIF file by:
- * 1. Loading and parsing the GIF using gifuct-js
- * 2. Creating a canvas for frame rendering
- * 3. Updating a THREE.js texture with the current frame
- * 4. Managing animation timing based on GIF frame delays
+ * Handles loading, parsing and animating GIF files for use in THREE.js
+ * Uses the gifuct-js library for GIF parsing functionality.
  */
 
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js";
-import { parseGIF, decompressFrames } from "https://cdn.jsdelivr.net/npm/gifuct-js@2.1.2/dist/gifuct-js.min.js";
 
 // Debug flag
 const DEBUG = true;
 
 /**
- * Enhanced logging function that only logs in debug mode
- * @param {string} message - Log message
+ * Debug logging helper
+ * @param {string} message - Message to log
  * @param {Object} data - Optional data to log
  */
 function debugLog(message, data = null) {
   if (!DEBUG) return;
+  
   if (data) {
-    console.log(`[GIF-ANIMATOR] ${message}`, data);
+    console.log(`[ANIM-GIF] ${message}`, data);
   } else {
-    console.log(`[GIF-ANIMATOR] ${message}`);
+    console.log(`[ANIM-GIF] ${message}`);
   }
 }
+
+// Import the gifuct-js module from npm
+let parseGIF;
+let decompressFrames;
+
+// Initialize the gifuct-js parser functions
+(function initGifuctParser() {
+  debugLog("Initializing GIF parser...");
+  
+  // Create script element to load the library
+  const script = document.createElement('script');
+  script.src = '/node_modules/gifuct-js/dist/gifuct-js.js';
+  script.async = true;
+  
+  script.onload = () => {
+    if (window.gifuct) {
+      debugLog("GIF parser library loaded successfully");
+      // Set up the parser functions
+      parseGIF = window.gifuct.parseGIF;
+      decompressFrames = window.gifuct.decompressFrames;
+    } else {
+      console.error("[ANIM-GIF] Failed to load GIF parser: gifuct-js not found");
+    }
+  };
+  
+  script.onerror = (error) => {
+    console.error("[ANIM-GIF] Failed to load GIF parser library:", error);
+  };
+  
+  // Add to document
+  document.head.appendChild(script);
+})();
 
 /**
  * Class for handling animated GIF textures in THREE.js
@@ -75,8 +104,23 @@ export class AnimatedGIFTexture {
       totalFramesRendered: 0
     };
     
-    // Load the GIF
-    this._loadGIF();
+    // Wait for parser to initialize
+    this._waitForParser();
+  }
+  
+  /**
+   * Wait for the GIF parser to be initialized
+   * @private
+   */
+  _waitForParser() {
+    if (parseGIF && decompressFrames) {
+      // Parser is ready, load the GIF
+      this._loadGIF();
+    } else {
+      // Wait 100ms and try again
+      debugLog("Waiting for GIF parser to initialize...");
+      setTimeout(() => this._waitForParser(), 100);
+    }
   }
   
   /**
