@@ -1,4 +1,3 @@
-
 /**
  * gifuct-direct.js - Direct import of gifuct-js from CDN as a fallback
  */
@@ -11,44 +10,47 @@ const GIFUCT_CDN_URL = "https://cdn.jsdelivr.net/npm/gifuct-js@2.1.2/dist/gifuct
 // Create a promise to track when the library is fully loaded
 const loadGifuctFromCDN = async () => {
   console.log("[GIFUCT-DIRECT] Loading gifuct-js directly from CDN");
-  
+
   return new Promise((resolve, reject) => {
-    // Load the script dynamically
-    const script = document.createElement('script');
-    script.src = GIFUCT_CDN_URL;
-    script.async = true;
-    
-    script.onload = () => {
-      console.log("[GIFUCT-DIRECT] Successfully loaded gifuct-js from CDN");
-      
-      // Create a wrapper object for the library functions
-      const gifuct = {
-        parseGIF: (buffer) => {
-          if (typeof window.parseGIF === 'function') {
-            return window.parseGIF(buffer);
-          } else {
-            throw new Error("parseGIF function not found in global scope after loading from CDN");
-          }
-        },
-        decompressFrames: (gif, buildPatch) => {
-          if (typeof window.decompressFrames === 'function') {
-            return window.decompressFrames(gif, buildPatch);
-          } else {
-            throw new Error("decompressFrames function not found in global scope after loading from CDN");
-          }
-        }
+    // Try multiple CDN sources
+    const cdnUrls = [
+      'https://unpkg.com/gifuct-js@2.1.2/dist/gifuct.min.js',
+      'https://cdn.jsdelivr.net/npm/gifuct-js@2.1.2/dist/gifuct.min.js',
+      '/node_modules/gifuct-js/dist/gifuct.min.js'
+    ];
+
+    console.log("[GIFUCT-DIRECT] Attempting to load from multiple sources");
+
+    let loadAttempt = 0;
+    function tryNextCDN() {
+      if (loadAttempt >= cdnUrls.length) {
+        reject(new Error('Failed to load gifuct-js from all sources'));
+        return;
+      }
+
+      const script = document.createElement('script');
+      script.src = cdnUrls[loadAttempt];
+      script.async = true;
+
+      script.onload = () => {
+        console.log(`[GIFUCT-DIRECT] Successfully loaded gifuct-js from ${cdnUrls[loadAttempt]}`);
+        const gifuct = {
+          parseGIF: window.parseGIF,
+          decompressFrames: window.decompressFrames
+        };
+        resolve(gifuct);
       };
-      
-      resolve(gifuct);
-    };
-    
-    script.onerror = (err) => {
-      console.error("[GIFUCT-DIRECT] Failed to load gifuct-js from CDN:", err);
-      reject(err);
-    };
-    
-    // Add the script to the document
-    document.head.appendChild(script);
+
+      script.onerror = (err) => {
+        console.error(`[GIFUCT-DIRECT] Failed to load gifuct-js from ${cdnUrls[loadAttempt]}:`, err);
+        loadAttempt++;
+        tryNextCDN();
+      };
+
+      document.head.appendChild(script);
+    }
+
+    tryNextCDN();
   });
 };
 
@@ -60,7 +62,7 @@ async function getGifuct() {
   if (cachedGifuct) {
     return cachedGifuct;
   }
-  
+
   try {
     cachedGifuct = await loadGifuctFromCDN();
     return cachedGifuct;
