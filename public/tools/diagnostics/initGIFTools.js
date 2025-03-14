@@ -104,3 +104,48 @@ window.addEventListener('DOMContentLoaded', initGIFTools);
 window.initGIFTools = initGIFTools;
 
 console.log("[GIF-TOOLS] Initialization script loaded");
+/**
+ * initGIFTools.js - Initialize tools for GIF animation debugging
+ */
+
+console.log('[GIF-TOOLS] Initializing GIF animation tools');
+
+// Load omggif from CDN
+const loadScript = (url) => {
+  console.log(`[GIF-TOOLS] Loading script: ${url}`);
+  return new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = url;
+    script.onload = () => {
+      console.log(`[GIF-TOOLS] Script loaded: ${url}`);
+      resolve();
+    };
+    script.onerror = (err) => {
+      console.error(`[GIF-TOOLS] Failed to load script: ${url}`, err);
+      reject(err);
+    };
+    document.body.appendChild(script);
+  });
+};
+
+// Load required libraries
+Promise.all([
+  loadScript('https://cdn.jsdelivr.net/npm/omggif@1.0.10/omggif.min.js')
+])
+.then(() => {
+  console.log('[GIF-TOOLS] omggif loaded from CDN');
+  return import('./GifDebugger.js');
+})
+.then(() => {
+  console.log('[GIF-TOOLS] GifDebugger module loaded');
+  return import('../../tools/AnimatedGIFLoader.js');
+})
+.then(() => {
+  console.log('[GIF-TOOLS] AnimatedGIFLoader module loaded');
+  console.log('[GIF-TOOLS] GIF tools initialization complete');
+})
+.catch(error => {
+  console.error('[GIF-TOOLS] Error initializing GIF tools:', error);
+});
+
+console.log('[GIF-TOOLS] Initialization script loaded');
