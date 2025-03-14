@@ -589,3 +589,201 @@ const gifDebugger = new GifDebugger();
 window.gifDebugger = gifDebugger;
 
 export default gifDebugger;
+/**
+ * GifDebugger.js - Diagnostic tool for GIF animations
+ * 
+ * This script helps diagnose and resolve issues with GIF animations
+ * by providing visualization and logging tools.
+ */
+
+// Log initialization
+console.log("[GIF-DEBUGGER] Initializing GIF diagnostic tool");
+
+/**
+ * Checks if GIF animation related tools are working correctly
+ */
+function checkGIFAnimation() {
+  console.log("[GIF-DEBUGGER] Testing GIF animation capabilities");
+  
+  // Check if omggif is available
+  if (typeof window.omggif === 'undefined') {
+    console.warn("[GIF-DEBUGGER] omggif library not found in global scope. GIF parsing may fail.");
+    
+    // Try to check if it's available as a module
+    try {
+      const testRequire = require('omggif');
+      console.log("[GIF-DEBUGGER] omggif is available via require()");
+    } catch (err) {
+      console.warn("[GIF-DEBUGGER] omggif also not available via require(). Needs to be installed.");
+      console.log("[GIF-DEBUGGER] Run 'npm install omggif' or add via CDN.");
+    }
+  } else {
+    console.log("[GIF-DEBUGGER] omggif library found and available.");
+  }
+  
+  // Check for AnimatedGIFLoader
+  if (typeof window.AnimatedGIFLoader === 'undefined') {
+    console.warn("[GIF-DEBUGGER] AnimatedGIFLoader not found in global scope.");
+  } else {
+    console.log("[GIF-DEBUGGER] AnimatedGIFLoader available in global scope.");
+  }
+  
+  try {
+    // Try importing the module (this works in modern browsers with ES modules)
+    import('/public/tools/AnimatedGIFLoader.js')
+      .then(module => {
+        console.log("[GIF-DEBUGGER] AnimatedGIFLoader module successfully imported");
+      })
+      .catch(err => {
+        console.error("[GIF-DEBUGGER] Failed to import AnimatedGIFLoader:", err);
+      });
+  } catch (err) {
+    console.warn("[GIF-DEBUGGER] ES module import not supported in this context");
+  }
+  
+  console.log("[GIF-DEBUGGER] GIF animation check complete");
+}
+
+/**
+ * GifDebugger class for creating a visual debugging interface
+ */
+class GifDebugger {
+  constructor() {
+    this.debugContainer = null;
+    this.previewCanvas = null;
+    this.debugLog = [];
+    
+    console.log("[GIF-DEBUGGER] GifDebugger instance created");
+  }
+  
+  /**
+   * Create and show the debug UI
+   */
+  showDebugUI() {
+    if (this.debugContainer) return;
+    
+    // Create container
+    this.debugContainer = document.createElement('div');
+    this.debugContainer.id = 'gif-debugger';
+    this.debugContainer.style.cssText = `
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      width: 320px;
+      background: rgba(0, 0, 0, 0.8);
+      color: #fff;
+      padding: 10px;
+      border-radius: 5px;
+      font-family: monospace;
+      z-index: 10000;
+      max-height: 400px;
+      overflow: auto;
+    `;
+    
+    // Create header
+    const header = document.createElement('div');
+    header.textContent = 'GIF Animation Debugger';
+    header.style.fontSize = '14px';
+    header.style.fontWeight = 'bold';
+    header.style.marginBottom = '10px';
+    this.debugContainer.appendChild(header);
+    
+    // Create preview canvas
+    this.previewCanvas = document.createElement('canvas');
+    this.previewCanvas.width = 150;
+    this.previewCanvas.height = 150;
+    this.previewCanvas.style.border = '1px solid #444';
+    this.previewCanvas.style.display = 'block';
+    this.previewCanvas.style.margin = '0 auto 10px auto';
+    this.debugContainer.appendChild(this.previewCanvas);
+    
+    // Create log container
+    const logContainer = document.createElement('div');
+    logContainer.id = 'gif-debug-log';
+    logContainer.style.cssText = `
+      height: 150px;
+      overflow-y: auto;
+      font-size: 12px;
+      border-top: 1px solid #444;
+      padding-top: 5px;
+    `;
+    this.debugContainer.appendChild(logContainer);
+    
+    // Add to document
+    document.body.appendChild(this.debugContainer);
+    
+    this.log('GIF Debugger UI initialized');
+  }
+  
+  /**
+   * Log a message to the debug UI
+   * @param {string} message - Message to log
+   */
+  log(message) {
+    this.debugLog.push({
+      time: new Date(),
+      message
+    });
+    
+    // Update UI if visible
+    if (this.debugContainer) {
+      const logElement = document.getElementById('gif-debug-log');
+      if (logElement) {
+        const entry = document.createElement('div');
+        entry.textContent = `${new Date().toISOString().substr(11, 8)}: ${message}`;
+        logElement.appendChild(entry);
+        
+        // Auto-scroll to bottom
+        logElement.scrollTop = logElement.scrollHeight;
+      }
+    }
+    
+    // Also log to console
+    console.log(`[GIF-DEBUGGER] ${message}`);
+  }
+  
+  /**
+   * Preview a GIF frame on the debug canvas
+   * @param {HTMLCanvasElement|HTMLImageElement} frame - Frame to preview
+   */
+  previewFrame(frame) {
+    if (!this.previewCanvas) return;
+    
+    const ctx = this.previewCanvas.getContext('2d');
+    ctx.clearRect(0, 0, this.previewCanvas.width, this.previewCanvas.height);
+    
+    try {
+      // Draw and scale the frame to fit
+      const scale = Math.min(
+        this.previewCanvas.width / frame.width,
+        this.previewCanvas.height / frame.height
+      );
+      
+      const width = frame.width * scale;
+      const height = frame.height * scale;
+      const x = (this.previewCanvas.width - width) / 2;
+      const y = (this.previewCanvas.height - height) / 2;
+      
+      ctx.drawImage(frame, x, y, width, height);
+      this.log(`Previewing frame: ${frame.width}x${frame.height}`);
+    } catch (err) {
+      this.log(`Error previewing frame: ${err.message}`);
+    }
+  }
+  
+  /**
+   * Hide the debug UI
+   */
+  hideDebugUI() {
+    if (this.debugContainer && this.debugContainer.parentNode) {
+      this.debugContainer.parentNode.removeChild(this.debugContainer);
+      this.debugContainer = null;
+    }
+  }
+}
+
+// Export the GifDebugger class and checkGIFAnimation function
+window.GifDebugger = GifDebugger;
+window.checkGIFAnimation = checkGIFAnimation;
+
+console.log("[GIF-DEBUGGER] GIF debugging tools initialized");
