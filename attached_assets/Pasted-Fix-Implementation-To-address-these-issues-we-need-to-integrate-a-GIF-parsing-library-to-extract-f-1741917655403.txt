@@ -1,0 +1,248 @@
+Fix Implementation
+To address these issues, we need to integrate a GIF parsing library to extract frames and their timing data, then animate them correctly. Since the code imports THREE.js via CDN, we can use a lightweight GIF parser like omggif (available via CDN or as a module). Below is a revised version of AnimatedGIFLoader.js that fixes the frame extraction and animation logic:
+javascript
+/**
+ * AnimatedGIFLoader.js - Load and animate GIF files in THREE.js
+ * 
+ * This module provides a custom loader for animated GIFs that
+ * creates animated textures compatible with THREE.js materials.
+ */
+
+import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js";
+
+// Import omggif for GIF frame parsing
+import omggif from "https://cdn.jsdelivr.net/npm/omggif@1.0.10/dist/omggif.min.js";
+
+// Debug mode
+const DEBUG = true;
+
+/**
+ * Debug logging function
+ * @param {string} message - Log message 
+ * @param {Object} data - Optional data to log
+ */
+function debugLog(message, data = null) {
+  if (!DEBUG) return;
+  if (data) {
+    console.log(`[GIF-LOADER] ${message}`, data);
+  } else {
+    console.log(`[GIF-LOADER] ${message}`);
+  }
+}
+
+/**
+ * Animated GIF Loader for THREE.js
+ */
+class AnimatedGIFLoader {
+  constructor() {
+    this.fps = 10;
+    this.activeAnimations = [];
+    this.debugMode = true;
+
+    // Start the global animation loop
+    this._startAnimationLoop();
+
+    debugLog("AnimatedGIFLoader instance created");
+  }
+
+  /**
+   * Set animation frames per second
+   * @param {number} fps - Frames per second
+   */
+  setFPS(fps) {
+    this.fps = fps;
+    debugLog(`Animation speed set to ${fps} FPS (${Math.round(1000 / fps)}ms per frame)`);
+    return this;
+  }
+
+  /**
+   * Load an animated GIF and convert to THREE.js texture
+   * @param {string} url - URL of the GIF to load
+   * @param {Function} onComplete - Callback when loading is complete
+   * @param {Function} onError - Callback if an error occurs
+   */
+  load(url, onComplete, onError) {
+    debugLog(`Loading GIF from: ${url}`);
+
+    const animatedTexture = new THREE.Texture();
+
+    const animation = {
+      url,
+      frames: [],
+      frameIndex: 0,
+      frameDelays: [], // Store individual frame delays from GIF
+      lastFrameTime: 0,
+      texture: animatedTexture,
+      loaded: false,
+      canvas: document.createElement('canvas'),
+      ctx: null,
+      img: new Image(),
+      width: 0,
+      height: 0
+    };
+
+    this.activeAnimations.push(animation);
+    animation.ctx = animation.canvas.getContext('2d');
+
+    debugLog(`Starting GIF load: ${url}`);
+
+    animation.img.crossOrigin = "Anonymous";
+    animation.img.onload = () => this._loadGifFrames(animation, onComplete, onError);
+    animation.img.onerror = (err) => {
+      debugLog(`Error loading GIF: ${url}`, err);
+      if (onError) onError(err);
+    };
+    animation.img.src = url;
+
+    return animatedTexture;
+  }
+
+  /**
+   * Internal method to load GIF frames using omggif
+   * @private
+   */
+  _loadGifFrames(animation, onComplete, onError) {
+    debugLog(`Processing GIF frames from: ${animation.url}`);
+
+    const img = animation.img;
+    animation.width = img.width;
+    animation.height = img.height;
+    animation.canvas.width = img.width;
+    animation.canvas.height = img.height;
+
+    // Use omggif to decode GIF frames
+    const gif = new omggif.GifReader(new Uint8Array(img.src.replace(/^data:image\/gif;base64,/, "") || await (await fetch(img.src)).arrayBuffer()));
+    animation.frames = [];
+    animation.frameDelays = [];
+
+    for (let i = 0; i < gif.numFrames(); i++) {
+      const frameInfo = gif.frameInfo(i);
+      const delay = frameInfo.delay * 10; // Convert to milliseconds (omggif uses centiseconds)
+      animation.frameDelays.push(delay);
+
+      const frameCanvas = document.createElement('canvas');
+      frameCanvas.width = img.width;
+      frameCanvas.height = img.height;
+      const frameCtx = frameCanvas.getContext('2d');
+
+      const frameData = new Uint8ClampedArray(img.width * img.height * 4);
+      gif.decodeAndBlitFrameRGBA(i, frameData);
+
+      const imageData = new ImageData(frameData, img.width, img.height);
+      frameCtx.putImageData(imageData, 0, 0);
+      animation.frames.push(frameCanvas);
+    }
+
+    debugLog(`Extracted ${animation.frames.length} frames from ${animation.url}`);
+
+    animation.texture.image = animation.canvas;
+    animation.texture.needsUpdate = true;
+    animation.texture.magFilter = THREE.NearestFilter;
+    animation.texture.minFilter = THREE.NearestFilter;
+    animation.texture.generateMipmaps = false;
+
+    animation.texture.update = () => this._updateTextureFrame(animation);
+
+    animation.loaded = true;
+    debugLog(`GIF prepared for animation: ${animation.url}`);
+    if (onComplete) onComplete(animation.texture);
+    this._updateTextureFrame(animation);
+  }
+
+  /**
+   * Start the global animation loop
+   * @private
+   */
+  _startAnimationLoop() {
+    debugLog("Starting GIF animation loop");
+
+    const animate = () => {
+      const now = Date.now();
+      this.activeAnimations.forEach(animation => {
+        if (!animation.loaded) return;
+        if (now - animation.lastFrameTime >= animation.frameDelays[animation.frameIndex]) {
+          this._updateTextureFrame(animation);
+          animation.lastFrameTime = now;
+        }
+      });
+      requestAnimationFrame(animate);
+    };
+
+    animate();
+    debugLog("GIF animation loop started");
+  }
+
+  /**
+   * Update the texture with the next frame
+   * @private
+   */
+  _updateTextureFrame(animation) {
+    if (!animation.loaded) return;
+
+    animation.frameIndex = (animation.frameIndex + 1) % animation.frames.length;
+    const currentFrame = animation.frames[animation.frameIndex];
+
+    animation.ctx.clearRect(0, 0, animation.width, animation.height);
+    animation.ctx.drawImage(currentFrame, 0, 0);
+
+    animation.texture.needsUpdate = true;
+
+    if (this.debugMode) {
+      debugLog(`Updated animation frame: ${animation.url}`, {
+        frame: animation.frameIndex,
+        totalFrames: animation.frames.length
+      });
+    }
+  }
+
+  /**
+   * Dispose of animation resources
+   * @param {THREE.Texture} texture - The animated texture to dispose
+   */
+  dispose(texture) {
+    const index = this.activeAnimations.findIndex(a => a.texture === texture);
+    if (index >= 0) {
+      const animation = this.activeAnimations[index];
+      if (animation.canvas) {
+        animation.ctx = null;
+        animation.canvas = null;
+      }
+      if (animation.img) {
+        animation.img.onload = null;
+        animation.img.onerror = null;
+        animation.img = null;
+      }
+      this.activeAnimations.splice(index, 1);
+      debugLog(`Disposed animation: ${animation.url}`);
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Manual update function
+   */
+  update() {
+    debugLog(`Manual update triggered for ${this.activeAnimations.length} animations`);
+    this.activeAnimations.forEach(animation => {
+      if (animation.loaded) this._updateTextureFrame(animation);
+    });
+  }
+}
+
+// Create and export a singleton instance
+const gifLoader = new AnimatedGIFLoader();
+export { gifLoader, AnimatedGIFLoader };
+
+Key Fixes and Improvements
+Integrated omggif:
+Added omggif via CDN to parse GIF frames and extract their data, including delays.
+
+Replaced the artificial frame creation with proper frame decoding using gif.decodeAndBlitFrameRGBA.
+Frame Timing:
+Stored individual frame delays from the GIF metadata (in centiseconds, converted to milliseconds) and used them in the animation loop instead of a fixed FPS-based delay.
+Texture Updates:
+Ensured the texture updates by drawing the correct frame canvas to the animation canvas, avoiding the jitter workaround.
+Error Handling:
+Added a fallback for img.src to handle base64 or URL data, though this may need adjustment based on your GIF source (e.g., ensure fetch works with your setup).
+
