@@ -1,0 +1,75 @@
+gifuct-direct.js:46 [GIFUCT-DIRECT] Failed to load gifuct-js from CDN: Event {isTrusted: true, type: 'error', target: script, currentTarget: script, eventPhase: 2, …}
+script.onerror @ gifuct-direct.js:46
+script
+(anonymous) @ gifuct-direct.js:17
+loadGifuctFromCDN @ gifuct-direct.js:15
+getGifuct @ gifuct-direct.js:65
+parseGIF @ gifuct-direct.js:76
+_loadGIF @ AnimatedGIFTexture.js:112
+await in _loadGIF
+AnimatedGIFTexture @ AnimatedGIFTexture.js:75
+(anonymous) @ beast.js:77
+Promise.then
+loadStaticTexture @ beast.js:73
+Beast @ beast.js:56
+createBeastAtHex @ game.js:821
+spawnFireBeast @ game.js:807
+(anonymous) @ game.js:1087
+setTimeout
+enhancedUpdateLoadingStatus @ game.js:1084
+(anonymous) @ game.js:313
+(anonymous) @ three.module.js:44486
+onImageLoad @ three.module.js:44245Understand this errorAI
+gifuct-direct.js:68 [GIFUCT-DIRECT] Failed to load gifuct-js library: Event {isTrusted: true, type: 'error', target: script, currentTarget: script, eventPhase: 2, …}
+getGifuct @ gifuct-direct.js:68
+await in getGifuct
+parseGIF @ gifuct-direct.js:76
+_loadGIF @ AnimatedGIFTexture.js:112
+await in _loadGIF
+AnimatedGIFTexture @ AnimatedGIFTexture.js:75
+(anonymous) @ beast.js:77
+Promise.then
+loadStaticTexture @ beast.js:73
+Beast @ beast.js:56
+createBeastAtHex @ game.js:821
+spawnFireBeast @ game.js:807
+(anonymous) @ game.js:1087
+setTimeout
+enhancedUpdateLoadingStatus @ game.js:1084
+(anonymous) @ game.js:313
+(anonymous) @ three.module.js:44486
+onImageLoad @ three.module.js:44245Understand this errorAI
+AnimatedGIFTexture.js:132 Error loading or parsing GIF: Event {isTrusted: true, type: 'error', target: script, currentTarget: script, eventPhase: 2, …}
+_loadGIF @ AnimatedGIFTexture.js:132
+await in _loadGIF
+AnimatedGIFTexture @ AnimatedGIFTexture.js:75
+(anonymous) @ beast.js:77
+Promise.then
+loadStaticTexture @ beast.js:73
+Beast @ beast.js:56
+createBeastAtHex @ game.js:821
+spawnFireBeast @ game.js:807
+(anonymous) @ game.js:1087
+setTimeout
+enhancedUpdateLoadingStatus @ game.js:1084
+(anonymous) @ game.js:313
+(anonymous) @ three.module.js:44486
+onImageLoad @ three.module.js:44245Understand this errorAI
+AnimatedGIFTexture.js:255 Error loading or parsing GIF: Event {isTrusted: true, type: 'error', target: script, currentTarget: script, eventPhase: 2, …}
+_onError @ AnimatedGIFTexture.js:255
+_loadGIF @ AnimatedGIFTexture.js:133
+await in _loadGIF
+AnimatedGIFTexture @ AnimatedGIFTexture.js:75
+(anonymous) @ beast.js:77
+Promise.then
+loadStaticTexture @ beast.js:73
+Beast @ beast.js:56
+createBeastAtHex @ game.js:821
+spawnFireBeast @ game.js:807
+(anonymous) @ game.js:1087
+setTimeout
+enhancedUpdateLoadingStatus @ game.js:1084
+(anonymous) @ game.js:313
+(anonymous) @ three.module.js:44486
+onImageLoad @ three.module.js:44245Understand this errorAI
+beast.js:115 Failed to load animated texture for Fire Beast: Event {isTrusted: true, type: 'error', target: script, currentTarget: script, eventPhase: 2, …}
