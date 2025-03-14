@@ -1,25 +1,31 @@
+
 /**
- * GifDebugger.js - Debugging tool for GIF animations in THREE.js
+ * GifDebugger - Diagnostic tool for analyzing and debugging GIF animations
  * 
- * This tool helps diagnose and visualize GIF animation issues
- * by providing a debug panel with preview capabilities.
+ * This tool helps debug GIF animation loading and display issues within the THREE.js renderer.
  */
 
-class GifDebugger {
+import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js";
+
+export class GifDebugger {
   constructor() {
+    console.log("[GIF-DEBUGGER] Initializing GIF debugger tool");
+    
     this.debugContainer = null;
     this.previewCanvas = null;
     this.debugLog = [];
 
+    // Create debug UI automatically at startup
+    this._createDebugUI();
+    
     console.log("[GIF-DEBUGGER] GifDebugger instance created");
   }
 
   /**
-   * Create and show the debug UI
+   * Create the debug UI container but don't show it yet
+   * @private
    */
-  showDebugUI() {
-    if (this.debugContainer) return;
-
+  _createDebugUI() {
     // Create container
     this.debugContainer = document.createElement('div');
     this.debugContainer.id = 'gif-debugger';
@@ -36,6 +42,7 @@ class GifDebugger {
       z-index: 10000;
       max-height: 400px;
       overflow: auto;
+      display: none;
     `;
 
     // Create header
@@ -66,11 +73,44 @@ class GifDebugger {
       padding-top: 5px;
     `;
     this.debugContainer.appendChild(logContainer);
+    
+    // Create control buttons
+    const buttonContainer = document.createElement('div');
+    buttonContainer.style.marginTop = '10px';
+    buttonContainer.style.display = 'flex';
+    buttonContainer.style.justifyContent = 'space-between';
+    
+    // Clear logs button
+    const clearBtn = document.createElement('button');
+    clearBtn.textContent = 'Clear Logs';
+    clearBtn.onclick = () => this.clearLogs();
+    clearBtn.style.padding = '5px';
+    buttonContainer.appendChild(clearBtn);
+    
+    // Close button
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = 'Close';
+    closeBtn.onclick = () => this.hideDebugUI();
+    closeBtn.style.padding = '5px';
+    buttonContainer.appendChild(closeBtn);
+    
+    this.debugContainer.appendChild(buttonContainer);
 
-    // Add to document
+    // Add to document but keep hidden
     document.body.appendChild(this.debugContainer);
+    
+    this.addLogEntry('GIF Debugger UI initialized (hidden)');
+  }
 
-    this.addLogEntry('GIF Debugger UI initialized');
+  /**
+   * Show the debug UI
+   */
+  showDebugUI() {
+    if (this.debugContainer) {
+      this.debugContainer.style.display = 'block';
+      console.log("[GIF-DEBUGGER] Debug UI shown");
+      this.addLogEntry('Debug UI shown');
+    }
   }
 
   /**
@@ -78,22 +118,24 @@ class GifDebugger {
    * @param {string} message - Message to log
    */
   addLogEntry(message) {
-    this.debugLog.push({
-      time: new Date(),
-      message
-    });
+    // Add timestamp
+    const time = new Date().toLocaleTimeString();
+    const entry = {
+      time: time,
+      message: message
+    };
+    
+    this.debugLog.push(entry);
 
     // Update UI if visible
-    if (this.debugContainer) {
-      const logElement = document.getElementById('gif-debug-log');
-      if (logElement) {
-        const entry = document.createElement('div');
-        entry.textContent = `${new Date().toISOString().substr(11, 8)}: ${message}`;
-        logElement.appendChild(entry);
+    const logElement = document.getElementById('gif-debug-log');
+    if (logElement) {
+      const entryDiv = document.createElement('div');
+      entryDiv.textContent = `${time}: ${message}`;
+      logElement.appendChild(entryDiv);
 
-        // Auto-scroll to bottom
-        logElement.scrollTop = logElement.scrollHeight;
-      }
+      // Auto-scroll to bottom
+      logElement.scrollTop = logElement.scrollHeight;
     }
 
     // Also log to console
@@ -111,9 +153,21 @@ class GifDebugger {
     }
 
     const ctx = this.previewCanvas.getContext('2d');
+    if (!ctx) {
+      console.error("[GIF-DEBUGGER] Could not get 2D context from canvas");
+      return;
+    }
+    
+    // Clear the canvas
     ctx.clearRect(0, 0, this.previewCanvas.width, this.previewCanvas.height);
 
     try {
+      // Check if frame is valid
+      if (!frame || !frame.width || !frame.height) {
+        this.addLogEntry(`Invalid frame: ${frame ? 'Missing dimensions' : 'Null frame'}`);
+        return;
+      }
+      
       // Draw and scale the frame to fit
       const scale = Math.min(
         this.previewCanvas.width / frame.width,
@@ -137,9 +191,8 @@ class GifDebugger {
    * Hide the debug UI
    */
   hideDebugUI() {
-    if (this.debugContainer && this.debugContainer.parentNode) {
-      this.debugContainer.parentNode.removeChild(this.debugContainer);
-      this.debugContainer = null;
+    if (this.debugContainer) {
+      this.debugContainer.style.display = 'none';
       console.log("[GIF-DEBUGGER] Debug UI hidden");
     }
   }
@@ -150,11 +203,9 @@ class GifDebugger {
   clearLogs() {
     this.debugLog = [];
 
-    if (this.debugContainer) {
-      const logElement = document.getElementById('gif-debug-log');
-      if (logElement) {
-        logElement.innerHTML = '';
-      }
+    const logElement = document.getElementById('gif-debug-log');
+    if (logElement) {
+      logElement.innerHTML = '';
     }
 
     console.log("[GIF-DEBUGGER] Logs cleared");
@@ -166,6 +217,7 @@ class GifDebugger {
    */
   testGifFile(url) {
     this.addLogEntry(`Testing GIF file: ${url}`);
+    this.showDebugUI(); // Make sure UI is visible
 
     // Create an Image element to load the GIF
     const img = new Image();
@@ -192,9 +244,12 @@ class GifDebugger {
         ctx.drawImage(img, x, y, width, height);
       }
 
-      // Check if the omggif library is available
-      if (window.GifReader) {
+      // Check if GIF parser is available
+      if (typeof window.GifReader !== 'undefined') {
         this.addLogEntry('GIF parser available, analyzing frames...');
+        this.analyzeGifWithFetch(url);
+      } else if (typeof window.omggif !== 'undefined') {
+        this.addLogEntry('omggif library available, analyzing frames...');
         this.analyzeGifWithFetch(url);
       } else {
         this.addLogEntry('GIF parser not available, only static preview shown');
@@ -228,20 +283,26 @@ class GifDebugger {
         const data = new Uint8Array(buffer);
 
         try {
-          // Parse the GIF using omggif
-          if (!window.GifReader) {
-            throw new Error('GifReader not available');
+          // Try different known GIF reader implementations
+          let gifReader = null;
+          
+          if (typeof window.GifReader !== 'undefined') {
+            this.addLogEntry('Using GifReader implementation');
+            gifReader = new window.GifReader(data);
+          } else if (typeof window.omggif !== 'undefined' && typeof window.omggif.GifReader !== 'undefined') {
+            this.addLogEntry('Using omggif.GifReader implementation');
+            gifReader = new window.omggif.GifReader(data);
+          } else {
+            throw new Error('No compatible GIF parser found');
           }
 
-          const gif = new window.GifReader(data);
-
           // Log GIF info
-          this.addLogEntry(`GIF parsed successfully: ${gif.numFrames()} frames`);
-          this.addLogEntry(`GIF dimensions: ${gif.width}x${gif.height}`);
+          this.addLogEntry(`GIF parsed successfully: ${gifReader.numFrames()} frames`);
+          this.addLogEntry(`GIF dimensions: ${gifReader.width}x${gifReader.height}`);
 
           // Display frame info
-          for (let i = 0; i < gif.numFrames(); i++) {
-            const frameInfo = gif.frameInfo(i);
+          for (let i = 0; i < gifReader.numFrames(); i++) {
+            const frameInfo = gifReader.frameInfo(i);
             this.addLogEntry(`Frame ${i+1}: Delay ${frameInfo.delay * 10}ms, Disposal: ${frameInfo.disposal}`);
           }
         } catch (err) {
@@ -254,12 +315,30 @@ class GifDebugger {
         console.error('[GIF-DEBUGGER] Fetch error:', err);
       });
   }
+
+  /**
+   * Set up a button to connect with an existing debug menu
+   * @param {HTMLElement} debugMenu - The debug menu element to integrate with
+   */
+  connectToDebugMenu(debugMenu) {
+    if (!debugMenu) {
+      console.warn('[GIF-DEBUGGER] No debug menu provided to connect with');
+      return;
+    }
+    
+    // Create a button for the debug menu
+    const button = document.createElement('button');
+    button.textContent = 'GIF Debugger';
+    button.onclick = () => this.showDebugUI();
+    button.className = 'debug-button';
+    
+    // Add to debug menu
+    debugMenu.appendChild(button);
+    
+    this.addLogEntry('Connected to debug menu');
+  }
 }
 
-// Create and export singleton instance
-const gifDebugger = new GifDebugger();
-
-// Make it globally available
-window.gifDebugger = gifDebugger;
-
-console.log("[GIF-DEBUGGER] GIF Debugger initialized and available as window.gifDebugger");
+// Create global instance for backward compatibility
+window.gifDebugger = new GifDebugger();
+console.log("[GIF-DEBUGGER] GifDebugger initialized and available as window.gifDebugger");

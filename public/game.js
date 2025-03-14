@@ -2,7 +2,7 @@
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js";
 import { CameraManager } from "./camera.js";
 import { DebugMenu } from "./tools/diagnostics/DebugMenu.js";
-import { Beast } from "./beast.js"; // Removed findRandomHexOfElement import
+import { Beast } from "./beast.js";
 // Logging setup
 console.log("Beast Tactics script loaded and starting...");
 
