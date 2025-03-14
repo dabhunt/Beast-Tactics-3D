@@ -1,0 +1,56 @@
+Uncaught SyntaxError: Identifier 'loadScript' has already been declared (at initGIFTools.js:114:7)Understand this errorAI
+initGifTester.js:237 Uncaught SyntaxError: Identifier 'gifTester' has already been declared (at initGifTester.js:237:7)Understand this errorAI
+game.js:477 Failed to initialize debug menu: TypeError: debugMenu.setCameraManager is not a function
+    at game.js:467:15
+(anonymous) @ game.js:477Understand this errorAI
+game.js:17 Global error caught: {message: 'Uncaught TypeError: window.gameDebugMenu.initArrowDebugger is not a function', source: 'https://bee3f08a-a59a-409b-834e-6c256d3d3537-00-2zis6vnzxwkl4.spock.replit.dev/game.js', lineNo: 784, colNo: 30, error: TypeError: window.gameDebugMenu.initArrowDebugger is not a function
+    at createBeastAtHex (https:…}
+(anonymous) @ game.js:17
+setTimeout
+enhancedUpdateLoadingStatus @ game.js:852
+(anonymous) @ game.js:313
+(anonymous) @ three.module.js:44486
+onImageLoad @ three.module.js:44245Understand this errorAI
+game.js:784 Uncaught TypeError: window.gameDebugMenu.initArrowDebugger is not a function
+    at createBeastAtHex (game.js:784:30)
+    at spawnFireBeast (game.js:742:7)
+    at game.js:855:11
+createBeastAtHex @ game.js:784
+spawnFireBeast @ game.js:742
+(anonymous) @ game.js:855
+setTimeout
+enhancedUpdateLoadingStatus @ game.js:852
+(anonymous) @ game.js:313
+(anonymous) @ three.module.js:44486
+onImageLoad @ three.module.js:44245Understand this errorAI
+beast.js:333 [BEAST] Error loading FontLoader module: TypeError: Failed to resolve module specifier "three". Relative references must start with either "/", "./", or "../".
+(anonymous) @ beast.js:333
+Promise.catch
+_createDirectionalIndicators @ beast.js:332
+Beast @ beast.js:60
+createBeastAtHex @ game.js:756
+spawnFireBeast @ game.js:742
+(anonymous) @ game.js:855
+setTimeout
+enhancedUpdateLoadingStatus @ game.js:852
+(anonymous) @ game.js:313
+(anonymous) @ three.module.js:44486
+onImageLoad @ three.module.js:44245Understand this errorAI
+beast.js:949 [BEAST] Error importing SimpleGIFAnimator: SyntaxError: Identifier 'debugLog' has already been declared (at SimpleGIFAnimator.js:348:1)
+(anonymous) @ beast.js:949
+Promise.catch
+loadBeastTexture @ beast.js:948
+Beast @ beast.js:57
+createBeastAtHex @ game.js:756
+spawnFireBeast @ game.js:742
+(anonymous) @ game.js:855
+setTimeout
+enhancedUpdateLoadingStatus @ game.js:852
+(anonymous) @ game.js:313
+(anonymous) @ three.module.js:44486
+onImageLoad @ three.module.js:44245Understand this errorAI
+Fire.png:1 
+            
+            
+           GET https://bee3f08a-a59a-409b-834e-6c256d3d3537-00-2zis6vnzxwkl4.spock.replit.dev/assets/Beasts/Fire.png 404 (Not Found)Understand this errorAI
+beast.js:971 [BEAST] Failed to load static texture for Fire Beast: Event {isTrusted: true, type: 'error', target: img, currentTarget: img, eventPhase: 2, …}
