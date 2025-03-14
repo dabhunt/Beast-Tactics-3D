@@ -598,6 +598,21 @@ try {
 
   // Add variable to store current FPS
   let currentFps = 0;
+  
+  // Animation debugger for GIF animations
+  let animationDebugger = null;
+  
+  // Import and initialize the animation debugger
+  import('./tools/diagnostics/AnimationDebugger.js')
+    .then(module => {
+      console.log("[DEBUG] Initializing Animation Debugger");
+      animationDebugger = new module.AnimationDebugger();
+      // Make it globally available for debugging
+      window.animationDebugger = animationDebugger;
+    })
+    .catch(err => {
+      console.error("[DEBUG] Failed to load Animation Debugger:", err);
+    });
 
   // Hide loading screen
   const loadingElement = document.getElementById("loading");
@@ -688,6 +703,11 @@ try {
     // Update beast if it exists
     if (fireBeast) {
       fireBeast.update();
+    }
+    
+    // Update animation debugger if available
+    if (animationDebugger) {
+      animationDebugger.update();
     }
   }
 

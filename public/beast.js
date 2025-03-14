@@ -114,6 +114,17 @@ export class Beast {
                 }
               );
               
+              // Register with animation debugger if available
+              if (window.animationDebugger) {
+                console.log(`[BEAST] Registering ${this.type} Beast with animation debugger`);
+                this.animationDebuggerIndex = window.animationDebugger.registerTexture(
+                  texture, 
+                  `${this.type}Beast`
+                );
+              } else {
+                console.log(`[BEAST] Animation debugger not available, animation may not work correctly`);
+              }
+              
               // Add sprite to group
               this.group.add(this.sprite);
               
