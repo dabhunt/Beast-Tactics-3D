@@ -1,12 +1,12 @@
 
 /**
- * GifDebugger - Diagnostic tool for analyzing and debugging GIF animations
+ * GifDebugger.js - Debugging tool for GIF animations
  * 
- * This tool helps debug GIF animation loading and display issues within the THREE.js renderer.
+ * This module provides tools for debugging GIF animation loading and rendering
+ * in THREE.js applications.
  */
 
-import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js";
-
+// Export the class properly as an ES module
 export class GifDebugger {
   constructor() {
     console.log("[GIF-DEBUGGER] Initializing GIF debugger tool");
@@ -338,7 +338,3 @@ export class GifDebugger {
     this.addLogEntry('Connected to debug menu');
   }
 }
-
-// Create global instance for backward compatibility
-window.gifDebugger = new GifDebugger();
-console.log("[GIF-DEBUGGER] GifDebugger initialized and available as window.gifDebugger");

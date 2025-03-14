@@ -2,7 +2,7 @@
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js";
 import { CameraManager } from "./camera.js";
 import { DebugMenu } from "./tools/diagnostics/DebugMenu.js";
-import { Beast } from "./beast.js";
+import { Beast, findRandomHexOfElement, createBeast } from './beast.js';
 // Logging setup
 console.log("Beast Tactics script loaded and starting...");
 
@@ -657,27 +657,59 @@ try {
   let fireBeast = null;
   let arrowDebugger = null;
 
+
+  // Import the debugger tools with dynamic imports to handle module loading properly
+  let ArrowDebugger;
+  let GifDebugger;
+
+  // Dynamically load debugger modules
+  async function loadDebuggerModules() {
+    try {
+      console.log("[GAME] Loading debugger modules...");
+
+      // Import the debugger modules
+      const arrowModule = await import('./tools/diagnostics/ArrowDebugger.js');
+      const gifModule = await import('./tools/diagnostics/GifDebugger.js');
+
+      // Store the imported classes
+      ArrowDebugger = arrowModule.ArrowDebugger;
+      GifDebugger = gifModule.GifDebugger;
+
+      console.log("[GAME] Debugger modules loaded successfully:", {
+        arrowDebugger: !!ArrowDebugger,
+        gifDebugger: !!GifDebugger
+      });
+    } catch (err) {
+      console.error("[GAME] Error loading debugger modules:", err);
+    }
+  }
+
+  // Start loading debugger modules
+  loadDebuggerModules();
+
+
   // Initialize the Arrow Debugger
   debugLog("Initializing Arrow Debugger for directional movement debugging");
   try {
     // Import the Arrow Debugger tool
-    import('./tools/diagnostics/ArrowDebugger.js')
-      .then(module => {
-        debugLog("Arrow Debugger module loaded successfully");
-        arrowDebugger = new module.ArrowDebugger(scene);
+    // This is now handled by loadDebuggerModules
+    //import('./tools/diagnostics/ArrowDebugger.js')
+    //  .then(module => {
+    //    debugLog("Arrow Debugger module loaded successfully");
+    //    arrowDebugger = new module.ArrowDebugger(scene);
+        
+    //    // Make it globally available for debugging with a clear name
+    //    window.arrowDebugger = arrowDebugger;
 
-        // Make it globally available for debugging with a clear name
-        window.arrowDebugger = arrowDebugger;
-
-        // If beast already exists, connect it to the debugger
-        if (fireBeast) {
-          debugLog("Connecting existing Fire Beast to Arrow Debugger");
-          arrowDebugger.setBeast(fireBeast);
-        }
-      })
-      .catch(err => {
-        console.error("Failed to load Arrow Debugger:", err);
-      });
+    //    // If beast already exists, connect it to the debugger
+    //    if (fireBeast) {
+    //      debugLog("Connecting existing Fire Beast to Arrow Debugger");
+    //      arrowDebugger.setBeast(fireBeast);
+    //    }
+    //  })
+    //  .catch(err => {
+    //    console.error("Failed to load Arrow Debugger:", err);
+    //  });
   } catch (error) {
     console.error("Failed to initialize Arrow Debugger:", error);
   }

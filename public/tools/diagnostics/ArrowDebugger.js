@@ -1,12 +1,12 @@
+
 /**
- * ArrowDebugger - Debug tool for visualizing Beast movement directions
+ * ArrowDebugger.js - Debugging tool for Beast movement arrows
  * 
- * This tool provides visualization and debugging capabilities for the directional
- * movement arrows attached to Beasts in the game.
+ * This script creates a debugger interface for visualizing and testing
+ * directional movement arrows in the Beast Tactics game.
  */
 
-import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js";
-
+// Use export class instead of plain class to properly expose as ES module
 export class ArrowDebugger {
   /**
    * Create a new ArrowDebugger instance
@@ -15,10 +15,19 @@ export class ArrowDebugger {
   constructor(scene) {
     console.log("[ARROW-DEBUG] Initializing arrow debugger tool");
 
+    // Store reference to scene
     this.scene = scene;
+    
+    // Track the current beast being debugged
     this.beast = null;
+    
+    // Track which arrow is selected for highlighting
     this.selectedArrowId = null;
+    
+    // Reference to the highlight mesh
     this.highlightMesh = null;
+    
+    // Debug panel UI element
     this.debugPanel = null;
 
     // Create debug UI
@@ -214,36 +223,41 @@ export class ArrowDebugger {
   _createHighlight(arrowMesh) {
     if (!arrowMesh) return;
 
-    // Create a box geometry slightly larger than the arrow
-    const boundingBox = new THREE.Box3().setFromObject(arrowMesh);
-    const size = new THREE.Vector3();
-    boundingBox.getSize(size);
-
-    // Add some padding
-    size.x += 0.1;
-    size.y += 0.1;
-    size.z += 0.1;
-
-    // Create highlight mesh
-    const highlightGeometry = new THREE.BoxGeometry(size.x, size.y, size.z);
-    const highlightMaterial = new THREE.MeshBasicMaterial({
-      color: this.settings.highlightColor,
-      wireframe: true,
-      transparent: true,
-      opacity: 0.8
+    // We need THREE.js for this function
+    import("https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js").then(THREE => {
+      // Create a box geometry slightly larger than the arrow
+      const boundingBox = new THREE.Box3().setFromObject(arrowMesh);
+      const size = new THREE.Vector3();
+      boundingBox.getSize(size);
+  
+      // Add some padding
+      size.x += 0.1;
+      size.y += 0.1;
+      size.z += 0.1;
+  
+      // Create highlight mesh
+      const highlightGeometry = new THREE.BoxGeometry(size.x, size.y, size.z);
+      const highlightMaterial = new THREE.MeshBasicMaterial({
+        color: this.settings.highlightColor,
+        wireframe: true,
+        transparent: true,
+        opacity: 0.8
+      });
+  
+      this.highlightMesh = new THREE.Mesh(highlightGeometry, highlightMaterial);
+  
+      // Position highlight to match arrow
+      this.highlightMesh.position.copy(arrowMesh.position);
+      this.highlightMesh.rotation.copy(arrowMesh.rotation);
+  
+      // Add to scene
+      this.scene.add(this.highlightMesh);
+  
+      // Pulse animation
+      this._animateHighlight();
+    }).catch(err => {
+      console.error("[ARROW-DEBUG] Failed to import THREE.js for highlight creation:", err);
     });
-
-    this.highlightMesh = new THREE.Mesh(highlightGeometry, highlightMaterial);
-
-    // Position highlight to match arrow
-    this.highlightMesh.position.copy(arrowMesh.position);
-    this.highlightMesh.rotation.copy(arrowMesh.rotation);
-
-    // Add to scene
-    this.scene.add(this.highlightMesh);
-
-    // Pulse animation
-    this._animateHighlight();
   }
 
   /**
@@ -367,13 +381,3 @@ export class ArrowDebugger {
     }
   }
 }
-
-// If we're loaded after the game is already running, try to connect to existing beast
-window.addEventListener('load', () => {
-  setTimeout(() => {
-    console.log("[ARROW-DEBUG] Checking for existing beast to connect to");
-    if (window.arrowDebugger && window.fireBeast) {
-      window.arrowDebugger.setBeast(window.fireBeast);
-    }
-  }, 1000);
-});
