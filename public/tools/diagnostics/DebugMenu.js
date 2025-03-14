@@ -1,57 +1,46 @@
-
 /**
- * DebugMenu.js - Unified debugging system for Beast Tactics
+ * DebugMenu.js - Unified debug menu for Beast Tactics
  * 
- * Centralizes all debugging tools to avoid duplicate declarations and conflicts
+ * This system provides a visual debug interface that can be toggled on/off
+ * during development and testing.
  */
-import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js";
 
-// Debug namespace to avoid global pollution
-const BeastTactics = window.BeastTactics || {};
-window.BeastTactics = BeastTactics;
-
-// Create debug namespace if it doesn't exist
-BeastTactics.debug = BeastTactics.debug || {};
-
-/**
- * Main Debug Menu class for coordinating all debugging tools
- */
+// Only export one version of the class
 export class DebugMenu {
   constructor() {
     console.log("[DEBUG-MENU] Initializing unified debug menu");
-    
+
     // Track initialization state
     this.initialized = false;
-    
+
     // Store references to game objects
     this.gameObjects = {
       camera: null,
       scene: null,
       beasts: []
     };
-    
+
     // Create menu UI
     this._createUI();
-    
+
     // Initialize tools only when created (lazy loading)
     this.tools = {
-      arrow: null,
       gif: null,
       performance: null
     };
-    
+
     // Mark as initialized
     this.initialized = true;
     console.log("[DEBUG-MENU] Debug menu initialized successfully");
   }
-  
+
   /**
    * Create the debug menu UI
    * @private
    */
   _createUI() {
     console.log("[DEBUG-MENU] Creating UI elements");
-    
+
     // Create container
     this.container = document.createElement('div');
     this.container.id = 'debug-menu';
@@ -72,7 +61,7 @@ export class DebugMenu {
       gap: 5px;
       min-width: 200px;
     `;
-    
+
     // Create header
     const header = document.createElement('div');
     header.textContent = 'BEAST TACTICS DEBUG';
@@ -83,11 +72,11 @@ export class DebugMenu {
       border-bottom: 1px solid #555;
     `;
     this.container.appendChild(header);
-    
+
     // Create sections container
     this.sectionsContainer = document.createElement('div');
     this.container.appendChild(this.sectionsContainer);
-    
+
     // Add toggle button
     this.toggleButton = document.createElement('button');
     this.toggleButton.textContent = 'Hide Debug Menu';
@@ -100,7 +89,7 @@ export class DebugMenu {
       cursor: pointer;
       border-radius: 3px;
     `;
-    
+
     this.toggleButton.addEventListener('click', () => {
       if (this.sectionsContainer.style.display === 'none') {
         this.sectionsContainer.style.display = 'block';
@@ -110,15 +99,15 @@ export class DebugMenu {
         this.toggleButton.textContent = 'Show Debug Menu';
       }
     });
-    
+
     this.container.appendChild(this.toggleButton);
-    
+
     // Add to document
     document.body.appendChild(this.container);
-    
+
     console.log("[DEBUG-MENU] UI elements created");
   }
-  
+
   /**
    * Create a new section in the debug menu
    * @param {string} title - Section title
@@ -126,7 +115,7 @@ export class DebugMenu {
    */
   createSection(title) {
     console.log(`[DEBUG-MENU] Creating section: ${title}`);
-    
+
     const section = document.createElement('div');
     section.className = 'debug-section';
     section.style.cssText = `
@@ -135,7 +124,7 @@ export class DebugMenu {
       background: rgba(80, 80, 80, 0.3);
       border-radius: 3px;
     `;
-    
+
     const sectionTitle = document.createElement('div');
     sectionTitle.textContent = title;
     sectionTitle.style.cssText = `
@@ -144,16 +133,16 @@ export class DebugMenu {
       color: #aaddff;
     `;
     section.appendChild(sectionTitle);
-    
+
     const sectionContent = document.createElement('div');
     sectionContent.className = 'section-content';
     section.appendChild(sectionContent);
-    
+
     this.sectionsContainer.appendChild(section);
-    
+
     return sectionContent;
   }
-  
+
   /**
    * Create a button with specified label and click handler
    * @param {string} label - Button text
@@ -175,12 +164,12 @@ export class DebugMenu {
       font-family: monospace;
       font-size: 12px;
     `;
-    
+
     button.addEventListener('click', onClick);
-    
+
     return button;
   }
-  
+
   /**
    * Set the camera manager reference
    * @param {CameraManager} cameraManager - The camera manager instance
@@ -188,33 +177,33 @@ export class DebugMenu {
   setCameraManager(cameraManager) {
     console.log("[DEBUG-MENU] Setting camera manager reference");
     this.gameObjects.camera = cameraManager;
-    
+
     // Initialize camera debugging if needed
     this._initializeCameraDebugger();
   }
-  
+
   /**
    * Initialize camera debugging tools
    * @private
    */
   _initializeCameraDebugger() {
     if (!this.gameObjects.camera) return;
-    
+
     console.log("[DEBUG-MENU] Initializing camera debugger");
-    
+
     const cameraSection = this.createSection('Camera');
-    
+
     // Reset camera button
     const resetButton = this.createButton('Reset Camera', () => {
       this.gameObjects.camera.resetCamera();
     }, '#3498db');
     cameraSection.appendChild(resetButton);
-    
+
     // Toggle constraints button
     const constraintsButton = this.createButton('Toggle Strict Constraints', () => {
       const constraints = this.gameObjects.camera.settings.constraints;
       const isStrict = constraints.maxPolarAngle < Math.PI * 0.4;
-      
+
       if (isStrict) {
         // Make constraints more relaxed
         this.gameObjects.camera.updateConstraints({
@@ -231,44 +220,22 @@ export class DebugMenu {
     }, '#9b59b6');
     cameraSection.appendChild(constraintsButton);
   }
-  
-  /**
-   * Set up arrow debugger for beast directional indicators
-   * @param {Beast} beast - The beast instance to debug
-   */
-  initArrowDebugger(beast) {
-    console.log("[DEBUG-MENU] Initializing arrow debugger for beast");
-    
-    // Create arrow debugger if it doesn't exist
-    if (!this.tools.arrow) {
-      console.log("[DEBUG-MENU] Creating new arrow debugger instance");
-      this.tools.arrow = new ArrowDebugger(this);
-    }
-    
-    // Set the beast reference
-    this.tools.arrow.setBeast(beast);
-    
-    // Update beasts array
-    if (beast && !this.gameObjects.beasts.includes(beast)) {
-      this.gameObjects.beasts.push(beast);
-    }
-  }
-  
+
   /**
    * Initialize GIF debugging tools
    */
   initGIFDebugger() {
     console.log("[DEBUG-MENU] Initializing GIF debugger");
-    
+
     // Create GIF debugger if it doesn't exist
     if (!this.tools.gif) {
       console.log("[DEBUG-MENU] Creating new GIF debugger instance");
-      this.tools.gif = new GIFDebugger(this);
+      // We'll import GIFDebugger on demand instead of initializing it here
     }
-    
+
     return this.tools.gif;
   }
-  
+
   /**
    * Toggle visibility of the debug menu
    * @param {boolean} visible - Whether the menu should be visible
@@ -283,7 +250,7 @@ export class DebugMenu {
       this.container.style.display = visible ? 'flex' : 'none';
     }
   }
-  
+
   /**
    * Log debug messages to console and optionally to UI
    * @param {string} source - Source of the message
@@ -297,160 +264,18 @@ export class DebugMenu {
     } else {
       console.log(`${sourceTag} ${message}`);
     }
-    
+
     // TODO: Add UI logging if needed
   }
 }
 
-/**
- * ArrowDebugger class for debugging beast directional arrows
- */
-export class ArrowDebugger {
-  constructor(debugMenu) {
-    console.log("[ARROW-DEBUG] Initializing arrow debugger tool");
-    
-    this.debugMenu = debugMenu;
-    this.beast = null;
-    this.selectedArrowId = null;
-    
-    // Create UI section
-    this._createUI();
-    
-    console.log("[ARROW-DEBUG] Arrow debugger initialized with default settings");
-  }
-  
-  /**
-   * Create arrow debugger UI
-   * @private
-   */
-  _createUI() {
-    console.log("[ARROW-DEBUG] Creating arrow debug panel");
-    
-    // Create a section in the debug menu
-    this.section = this.debugMenu.createSection('Direction Arrows');
-    
-    // Create UI container for arrows
-    this.arrowsContainer = document.createElement('div');
-    this.arrowsContainer.style.cssText = `
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 3px;
-      margin-top: 5px;
-    `;
-    this.section.appendChild(this.arrowsContainer);
-    
-    // Create message display
-    this.messageDisplay = document.createElement('div');
-    this.messageDisplay.style.cssText = `
-      margin-top: 5px;
-      font-size: 12px;
-      color: #aaa;
-    `;
-    this.messageDisplay.textContent = 'No beast connected. Use `window.gameDebugMenu.initArrowDebugger(beast)` to connect';
-    this.section.appendChild(this.messageDisplay);
-    
-    // Add toggle visibility button
-    const toggleButton = this.debugMenu.createButton('Toggle Arrows', () => {
-      if (this.beast && this.beast.toggleDebugVisualization) {
-        this.arrowsVisible = !this.arrowsVisible;
-        this.beast.toggleDebugVisualization(this.arrowsVisible);
-        toggleButton.textContent = this.arrowsVisible ? 'Hide Arrows' : 'Show Arrows';
-      }
-    }, '#2ecc71');
-    this.section.appendChild(toggleButton);
-    
-    // Track visibility state
-    this.arrowsVisible = true;
-    
-    console.log("[ARROW-DEBUG] Arrow debug panel ready");
-  }
-  
-  /**
-   * Set the beast to debug
-   * @param {Beast} beast - The beast instance
-   */
-  setBeast(beast) {
-    console.log("[ARROW-DEBUG] Checking for existing beast to connect to");
-    
-    // Skip if no change
-    if (this.beast === beast) return;
-    
-    this.beast = beast;
-    
-    // Clear existing arrow buttons
-    this.arrowsContainer.innerHTML = '';
-    
-    if (!beast) {
-      this.messageDisplay.textContent = 'No beast connected';
-      return;
-    }
-    
-    // Get arrow information from beast
-    const arrows = beast.directionalArrows || [];
-    
-    if (arrows.length === 0) {
-      this.messageDisplay.textContent = 'Beast has no directional arrows';
-      return;
-    }
-    
-    // Create debug buttons for each arrow
-    arrows.forEach(arrow => {
-      const button = this.debugMenu.createButton(arrow.directionId.toString(), () => {
-        this.highlightArrow(arrow.directionId);
-      }, '#f39c12');
-      
-      this.arrowsContainer.appendChild(button);
-    });
-    
-    this.messageDisplay.textContent = `Connected to ${beast.type} Beast with ${arrows.length} arrows`;
-    
-    // Make debug visualization visible by default
-    if (beast.toggleDebugVisualization) {
-      beast.toggleDebugVisualization(true);
-    }
-  }
-  
-  /**
-   * Highlight a specific arrow by ID
-   * @param {number} arrowId - The ID of the arrow to highlight
-   */
-  highlightArrow(arrowId) {
-    if (!this.beast || !this.beast.directionalArrows) return;
-    
-    // Reset any previously highlighted arrow
-    if (this.selectedArrowId) {
-      const oldArrow = this.beast.directionalArrows.find(a => a.directionId === this.selectedArrowId);
-      if (oldArrow && oldArrow.mesh && oldArrow.mesh.material) {
-        oldArrow.mesh.material.emissive.setHex(0x996600);
-      }
-    }
-    
-    // Find and highlight the new arrow
-    const arrow = this.beast.directionalArrows.find(a => a.directionId === arrowId);
-    if (arrow && arrow.mesh && arrow.mesh.material) {
-      // Highlight by changing emissive color
-      arrow.mesh.material.emissive.setHex(0xff0000);
-      this.selectedArrowId = arrowId;
-      
-      // Log arrow details
-      console.log(`[ARROW-DEBUG] Arrow ${arrowId} selected:`, {
-        direction: arrow.direction,
-        coordinates: arrow.coordinates,
-        position: arrow.targetPosition
-      });
-      
-      this.messageDisplay.textContent = `Selected: Arrow ${arrowId} (${arrow.direction})`;
-    }
-  }
-}
+// Export an instance for direct use
+export const debugMenu = new DebugMenu();
 
 /**
- * GIF Debugger for tracking and debugging animated GIFs
- */
-export /**
  * GIFDebugger class for debugging animated GIF textures
  */
-class GIFDebuggerComponent {
+export class GIFDebuggerComponent {
   constructor(debugMenu) {
     console.log("[GIF-DEBUG] Initializing GIF debugger");
     
@@ -501,7 +326,7 @@ class GIFDebuggerComponent {
       });
       this._updateTextureList();
     }, '#e74c3c');
-    this.section.appendChild(toggleButton);
+    this.section.appendChild(toggleAllButton);
   }
   
   /**
@@ -582,10 +407,9 @@ class GIFDebuggerComponent {
 // Create the global instance
 if (!window.gameDebugMenu) {
   console.log("[DEBUG] Initializing global debug menu");
-  window.gameDebugMenu = new DebugMenu();
+  window.gameDebugMenu = debugMenu;
   console.log("[DEBUG] Debug menu initialized successfully");
 }
 
-// Export debugger classes and the global instance
-export { ArrowDebugger, GIFDebugger };
-export default window.gameDebugMenu;
+//Export GIFDebuggerComponent
+export { GIFDebuggerComponent };

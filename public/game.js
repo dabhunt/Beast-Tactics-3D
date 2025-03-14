@@ -661,64 +661,9 @@ try {
 
   // Add Beast to scene after grid generation
   let fireBeast = null;
-  let arrowDebugger = null;
 
 
-  // Import the debugger tools with dynamic imports to handle module loading properly
-  let ArrowDebugger;
-  let GifDebugger;
-
-  // Dynamically load debugger modules
-  async function loadDebuggerModules() {
-    try {
-      console.log("[GAME] Loading debugger modules...");
-
-      // Import the debugger modules
-      const arrowModule = await import('./tools/diagnostics/ArrowDebugger.js');
-      const gifModule = await import('./tools/diagnostics/GifDebugger.js');
-
-      // Store the imported classes
-      ArrowDebugger = arrowModule.ArrowDebugger;
-      GifDebugger = gifModule.GifDebugger;
-
-      console.log("[GAME] Debugger modules loaded successfully:", {
-        arrowDebugger: !!ArrowDebugger,
-        gifDebugger: !!GifDebugger
-      });
-    } catch (err) {
-      console.error("[GAME] Error loading debugger modules:", err);
-    }
-  }
-
-  // Start loading debugger modules
-  loadDebuggerModules();
-
-
-  // Initialize the Arrow Debugger
-  debugLog("Initializing Arrow Debugger for directional movement debugging");
-  try {
-    // Import the Arrow Debugger tool
-    // This is now handled by loadDebuggerModules
-    //import('./tools/diagnostics/ArrowDebugger.js')
-    //  .then(module => {
-    //    debugLog("Arrow Debugger module loaded successfully");
-    //    arrowDebugger = new module.ArrowDebugger(scene);
-        
-    //    // Make it globally available for debugging with a clear name
-    //    window.arrowDebugger = arrowDebugger;
-
-    //    // If beast already exists, connect it to the debugger
-    //    if (fireBeast) {
-    //      debugLog("Connecting existing Fire Beast to Arrow Debugger");
-    //      arrowDebugger.setBeast(fireBeast);
-    //    }
-    //  })
-    //  .catch(err => {
-    //    console.error("Failed to load Arrow Debugger:", err);
-    //  });
-  } catch (error) {
-    console.error("Failed to initialize Arrow Debugger:", error);
-  }
+  // Remove ArrowDebugger related code
 
   // Function to spawn a Fire Beast on a random Fire tile
   function spawnFireBeast() {
@@ -762,44 +707,8 @@ try {
       fireBeast.currentAxialPos = { q: hex.userData.q, r: hex.userData.r };
       console.log("[BEAST] Initial hex position set:", fireBeast.currentAxialPos);
 
-      // Connect beast to arrow debugger if available
-      if (arrowDebugger) {
-        debugLog("Connecting Fire Beast to Arrow Debugger");
-        arrowDebugger.setBeast(fireBeast);
-      } else {
-        debugLog("Arrow Debugger not yet available, will connect when loaded");
 
-        // Try again after a short delay
-        setTimeout(() => {
-          if (window.arrowDebugger && fireBeast) {
-            debugLog("Connecting Fire Beast to Arrow Debugger (delayed)");
-            window.arrowDebugger.setBeast(fireBeast);
-          }
-        }, 2000);
-      }
-
-      // Connect beast to arrow debugger in debug menu if it exists
-      if (window.gameDebugMenu) {
-        debugLog("Connecting Fire Beast to Debug Menu Arrow Debugger");
-        window.gameDebugMenu.initArrowDebugger(fireBeast);
-      } else {
-        // Check if we need to look for a debug menu in parent scope
-        debugLog("Global gameDebugMenu not found, checking for alternatives");
-
-        // Try to find any existing debug menu instance
-        const existingMenus = document.querySelectorAll('#debug-menu');
-        if (existingMenus.length > 0) {
-          debugLog("Found existing debug menu in DOM, but no global reference");
-        }
-
-        // Log diagnostic information to help track down the issue
-        console.log("[BEAST] Debug state:", {
-          globalDebugMenu: !!window.gameDebugMenu,
-          arrowDebugger: !!arrowDebugger,
-          beastObject: !!fireBeast,
-          beastType: fireBeast ? fireBeast.type : 'undefined'
-        });
-      }
+      // Remove ArrowDebugger related code
 
       // Log the hex where the beast spawned
       debugLog(`Fire Beast spawned on hex`, {
