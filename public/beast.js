@@ -116,7 +116,7 @@ export class Beast {
       (error) => {
         console.error(`Failed to load texture for ${this.type} Beast:`, error);
         this._createFallbackSprite();
-      }
+      },
     );
   }
 
@@ -129,18 +129,18 @@ export class Beast {
 
     // Element color mapping
     const elementColors = {
-      'Fire': 0xff4500,
-      'Water': 0x3498db,
-      'Earth': 0x964b00,
-      'Wind': 0xc6e2ff,
-      'Electric': 0xffff00,
-      'Plant': 0x2ecc71,
-      'Metal': 0xc0c0c0,
-      'Light': 0xffffff,
-      'Dark': 0x581845,
-      'Combat': 0xff5733,
-      'Spirit': 0xd8bfd8,
-      'Corrosion': 0x7cfc00
+      Fire: 0xff4500,
+      Water: 0x3498db,
+      Earth: 0x964b00,
+      Wind: 0xc6e2ff,
+      Electric: 0xffff00,
+      Plant: 0x2ecc71,
+      Metal: 0xc0c0c0,
+      Light: 0xffffff,
+      Dark: 0x581845,
+      Combat: 0xff5733,
+      Spirit: 0xd8bfd8,
+      Corrosion: 0x7cfc00,
     };
 
     // Get appropriate color or default to fire color
@@ -149,7 +149,7 @@ export class Beast {
     // Create fallback colored sprite
     const fallbackMaterial = new THREE.SpriteMaterial({
       color: color,
-      transparent: true
+      transparent: true,
     });
 
     this.sprite = new THREE.Sprite(fallbackMaterial);
@@ -157,7 +157,9 @@ export class Beast {
     this.group.add(this.sprite);
     this.isLoaded = true;
 
-    debugLog(`Created colored fallback sprite for ${this.type} Beast`, { color: color.toString(16) });
+    debugLog(`Created colored fallback sprite for ${this.type} Beast`, {
+      color: color.toString(16),
+    });
   }
 
   /**
@@ -174,7 +176,7 @@ export class Beast {
       { id: 3, name: "SouthEast", q: 1, r: 0 },
       { id: 4, name: "South", q: 0, r: 1 },
       { id: 5, name: "SouthWest", q: -1, r: 1 },
-      { id: 6, name: "NorthWest", q: -1, r: 0 }
+      { id: 6, name: "NorthWest", q: -1, r: 0 },
     ];
 
     // Hex grid configuration
@@ -183,7 +185,7 @@ export class Beast {
     const horizontalSpacing = 1.5; // Horizontal spacing between hexes
     const verticalFactor = 1.0; // Vertical spacing factor
     const arrowDistance = 0.7; // Controls how far along the vector the arrow is placed
-    const arrowHeight = 0.7; // Height of arrows above the hex plane
+    const arrowHeight = 0.25; // Height of arrows above the hex plane
 
     // Create geometry for arrow
     const arrowGeometry = new THREE.ConeGeometry(0.15, 0.4, 4);
@@ -194,7 +196,7 @@ export class Beast {
       transparent: true,
       opacity: 0.9,
       emissive: 0x996600,
-      specular: 0xffffff
+      specular: 0xffffff,
     });
 
     // Create an array to store arrow references
@@ -204,25 +206,31 @@ export class Beast {
     const calculateHexPosition = (q, r) => {
       // For perfect fit in axial coordinate system
       const x = hexRadius * horizontalSpacing * q;
-      const z = hexRadius * Math.sqrt(3) * verticalFactor * (r + q/2);
+      const z = hexRadius * Math.sqrt(3) * verticalFactor * (r + q / 2);
       const y = hexHeight / 2; // Half height of hex
 
       return new THREE.Vector3(x, y, z);
     };
 
     // Create arrows for each direction
-    this.hexDirections.forEach(direction => {
+    this.hexDirections.forEach((direction) => {
       // Calculate target hex position in world space
       const targetHexPos = calculateHexPosition(direction.q, direction.r);
 
       // Calculate direction vector from beast to target hex
-      const directionVector = new THREE.Vector3().subVectors(targetHexPos, new THREE.Vector3(0, 0, 0));
+      const directionVector = new THREE.Vector3().subVectors(
+        targetHexPos,
+        new THREE.Vector3(0, 0, 0),
+      );
 
       // Normalize the direction vector
       const normalizedDirection = directionVector.clone().normalize();
 
       // Calculate arrow position at fraction of distance to hex
-      const arrowPos = new THREE.Vector3().addScaledVector(normalizedDirection, hexRadius * arrowDistance);
+      const arrowPos = new THREE.Vector3().addScaledVector(
+        normalizedDirection,
+        hexRadius * arrowDistance,
+      );
       arrowPos.y = arrowHeight; // Set fixed height above ground
 
       // Create arrow mesh
@@ -241,12 +249,12 @@ export class Beast {
       arrow.rotateX(Math.PI / 2);
 
       // Make arrow interactive
-      arrow.userData = { 
-        direction: direction.name, 
+      arrow.userData = {
+        direction: direction.name,
         directionId: direction.id,
         moveOffset: { q: direction.q, r: direction.r },
         isMovementArrow: true,
-        targetHexPos: targetHexPos.clone()
+        targetHexPos: targetHexPos.clone(),
       };
 
       // Add to the group
@@ -257,8 +265,8 @@ export class Beast {
         mesh: arrow,
         direction: direction.name,
         directionId: direction.id,
-        coordinates: {q: direction.q, r: direction.r},
-        targetPosition: targetHexPos.clone()
+        coordinates: { q: direction.q, r: direction.r },
+        targetPosition: targetHexPos.clone(),
       });
     });
   }
@@ -281,7 +289,7 @@ export class Beast {
     this._updateCurrentHexPosition();
 
     // Set up click listener
-    window.addEventListener('click', this._handleClick.bind(this));
+    window.addEventListener("click", this._handleClick.bind(this));
 
     debugLog(`Click handling set up for ${this.type} Beast`);
   }
@@ -303,7 +311,7 @@ export class Beast {
     this.raycaster.setFromCamera(mouse, this.camera);
 
     // Find intersections with directional arrows
-    const arrowMeshes = this.directionalArrows.map(arrow => arrow.mesh);
+    const arrowMeshes = this.directionalArrows.map((arrow) => arrow.mesh);
     const intersects = this.raycaster.intersectObjects(arrowMeshes, false);
 
     // If an arrow was clicked
@@ -322,7 +330,7 @@ export class Beast {
         this.moveTo({
           x: targetHex.position.x,
           y: targetHex.position.y + 0.7, // Offset above the hex
-          z: targetHex.position.z
+          z: targetHex.position.z,
         });
 
         // Update current axial position
@@ -330,15 +338,17 @@ export class Beast {
 
         // Log the move for debugging
         console.log(`[BEAST] Moving to new hex:`, {
-          from: { q: this.currentAxialPos.q - clickedArrow.userData.moveOffset.q, 
-                 r: this.currentAxialPos.r - clickedArrow.userData.moveOffset.r },
+          from: {
+            q: this.currentAxialPos.q - clickedArrow.userData.moveOffset.q,
+            r: this.currentAxialPos.r - clickedArrow.userData.moveOffset.r,
+          },
           to: { q: newQ, r: newR },
           hexPosition: {
             x: targetHex.position.x.toFixed(2),
             y: targetHex.position.y.toFixed(2),
-            z: targetHex.position.z.toFixed(2)
+            z: targetHex.position.z.toFixed(2),
           },
-          hexElement: targetHex.userData.element
+          hexElement: targetHex.userData.element,
         });
       } else {
         console.warn(`[BEAST] No hex found at q=${newQ}, r=${newR}`);
@@ -357,10 +367,10 @@ export class Beast {
     let closestHex = null;
     let closestDistance = Infinity;
 
-    this.hexagons.forEach(hex => {
+    this.hexagons.forEach((hex) => {
       const distance = Math.sqrt(
         Math.pow(hex.position.x - this.group.position.x, 2) +
-        Math.pow(hex.position.z - this.group.position.z, 2)
+          Math.pow(hex.position.z - this.group.position.z, 2),
       );
 
       if (distance < closestDistance) {
@@ -370,8 +380,13 @@ export class Beast {
     });
 
     if (closestHex) {
-      this.currentAxialPos = { q: closestHex.userData.q, r: closestHex.userData.r };
-      debugLog(`Beast is on hex at q=${this.currentAxialPos.q}, r=${this.currentAxialPos.r}`);
+      this.currentAxialPos = {
+        q: closestHex.userData.q,
+        r: closestHex.userData.r,
+      };
+      debugLog(
+        `Beast is on hex at q=${this.currentAxialPos.q}, r=${this.currentAxialPos.r}`,
+      );
     }
   }
 
@@ -385,8 +400,8 @@ export class Beast {
   _findHexAtAxialPosition(q, r) {
     if (!this.hexagons) return null;
 
-    return this.hexagons.find(hex => 
-      hex.userData.q === q && hex.userData.r === r
+    return this.hexagons.find(
+      (hex) => hex.userData.q === q && hex.userData.r === r,
     );
   }
 
@@ -418,7 +433,7 @@ export class Beast {
     this.position = {
       x: newPosition.x,
       y: this.position.y, // Keep the same y
-      z: newPosition.z
+      z: newPosition.z,
     };
 
     // Animate the movement
