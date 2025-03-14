@@ -2,13 +2,7 @@
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js";
 import { CameraManager } from "./camera.js";
 import { DebugMenu } from "./tools/diagnostics/DebugMenu.js";
-import { Beast } from './beast.js';
-
-// Debug log to verify Beast import was successful
-console.log("[GAME] Imported Beast class successfully:", { 
-  beastClassAvailable: typeof Beast === 'function',
-  staticMethodsAvailable: typeof Beast.findRandomHexOfElement === 'function'
-});
+import { Beast, findRandomHexOfElement } from "./beast.js";
 // Logging setup
 console.log("Beast Tactics script loaded and starting...");
 
@@ -449,10 +443,10 @@ try {
 
   // Initialize the debug menu after all components are created
   debugLog("Initializing debug menu...");
-
+  
   // Define debugMenu in outer scope so it's accessible throughout the file
   let debugMenu = null;
-
+  
   try {
     debugMenu = new DebugMenu(
       scene,
@@ -468,7 +462,7 @@ try {
 
     // Connect grid generator to debug menu
     debugMenu.setGridGenerator(generateHexagonGrid);
-
+    
     // Make debug menu globally accessible immediately
     window.gameDebugMenu = debugMenu;
 
@@ -604,10 +598,10 @@ try {
 
   // Add variable to store current FPS
   let currentFps = 0;
-
+  
   // Animation debugger for GIF animations
   let animationDebugger = null;
-
+  
   // Import and initialize the animation debugger
   console.log("[DEBUG] Loading Animation Debugger module...");
   import('./tools/diagnostics/AnimationDebugger.js')
@@ -615,18 +609,18 @@ try {
       console.log("[DEBUG] Successfully imported AnimationDebugger module");
       // Create new instance
       animationDebugger = new module.AnimationDebugger();
-
+      
       // Make it globally available for debugging with a clear name
       window.animationDebugger = animationDebugger;
-
+      
       // Also make available under an alternate name for better discovery
       window.gifDebugger = animationDebugger;
-
+      
       console.log("[DEBUG] Animation Debugger initialized and made globally available");
-
+      
       // Force an immediate animation update to ensure beast animations start
       animationDebugger.update();
-
+      
       // If fire beast already exists, register it with the animation debugger
       if (fireBeast && fireBeast.beastTexture) {
         console.log("[DEBUG] Registering existing Fire Beast with animation debugger");
@@ -647,7 +641,7 @@ try {
     loadingElement.classList.add("hidden");
     debugLog("Loading screen hidden");
   }
-
+  
   // Load additional GIF debugging tools
   console.log("[DEBUG] Loading additional GIF debugging tools");
   import('./tools/diagnostics/GifDebugger.js')
@@ -661,9 +655,32 @@ try {
 
   // Add Beast to scene after grid generation
   let fireBeast = null;
+  let arrowDebugger = null;
 
-
-  // Remove ArrowDebugger related code
+  // Initialize the Arrow Debugger
+  debugLog("Initializing Arrow Debugger for directional movement debugging");
+  try {
+    // Import the Arrow Debugger tool
+    import('./tools/diagnostics/ArrowDebugger.js')
+      .then(module => {
+        debugLog("Arrow Debugger module loaded successfully");
+        arrowDebugger = new module.ArrowDebugger(scene);
+        
+        // Make it globally available for debugging with a clear name
+        window.arrowDebugger = arrowDebugger;
+        
+        // If beast already exists, connect it to the debugger
+        if (fireBeast) {
+          debugLog("Connecting existing Fire Beast to Arrow Debugger");
+          arrowDebugger.setBeast(fireBeast);
+        }
+      })
+      .catch(err => {
+        console.error("Failed to load Arrow Debugger:", err);
+      });
+  } catch (error) {
+    console.error("Failed to initialize Arrow Debugger:", error);
+  }
 
   // Function to spawn a Fire Beast on a random Fire tile
   function spawnFireBeast() {
@@ -674,9 +691,8 @@ try {
       return null;
     }
 
-    // Find a random Fire hex using the Beast class static method
-    console.log("[GAME] Searching for Fire hex using Beast.findRandomHexOfElement");
-    const fireHex = Beast.findRandomHexOfElement(hexagons, "Fire");
+    // Find a random Fire hex
+    const fireHex = findRandomHexOfElement(hexagons, "Fire");
 
     if (!fireHex) {
       console.warn("No Fire hexagons found, using first available hex instead");
@@ -707,8 +723,44 @@ try {
       fireBeast.currentAxialPos = { q: hex.userData.q, r: hex.userData.r };
       console.log("[BEAST] Initial hex position set:", fireBeast.currentAxialPos);
 
+      // Connect beast to arrow debugger if available
+      if (arrowDebugger) {
+        debugLog("Connecting Fire Beast to Arrow Debugger");
+        arrowDebugger.setBeast(fireBeast);
+      } else {
+        debugLog("Arrow Debugger not yet available, will connect when loaded");
+        
+        // Try again after a short delay
+        setTimeout(() => {
+          if (window.arrowDebugger && fireBeast) {
+            debugLog("Connecting Fire Beast to Arrow Debugger (delayed)");
+            window.arrowDebugger.setBeast(fireBeast);
+          }
+        }, 2000);
+      }
 
-      // Remove ArrowDebugger related code
+      // Connect beast to arrow debugger in debug menu if it exists
+      if (window.gameDebugMenu) {
+        debugLog("Connecting Fire Beast to Debug Menu Arrow Debugger");
+        window.gameDebugMenu.initArrowDebugger(fireBeast);
+      } else {
+        // Check if we need to look for a debug menu in parent scope
+        debugLog("Global gameDebugMenu not found, checking for alternatives");
+        
+        // Try to find any existing debug menu instance
+        const existingMenus = document.querySelectorAll('#debug-menu');
+        if (existingMenus.length > 0) {
+          debugLog("Found existing debug menu in DOM, but no global reference");
+        }
+        
+        // Log diagnostic information to help track down the issue
+        console.log("[BEAST] Debug state:", {
+          globalDebugMenu: !!window.gameDebugMenu,
+          arrowDebugger: !!arrowDebugger,
+          beastObject: !!fireBeast,
+          beastType: fireBeast ? fireBeast.type : 'undefined'
+        });
+      }
 
       // Log the hex where the beast spawned
       debugLog(`Fire Beast spawned on hex`, {
@@ -731,7 +783,7 @@ try {
     if (fireBeast) {
       fireBeast.update();
     }
-
+    
     // Update animation debugger if available
     if (animationDebugger) {
       animationDebugger.update();

@@ -6,7 +6,6 @@
  * This module encapsulates all camera-related functionality to keep game.js cleaner
  */
 
-// Import THREE.js with consistent CDN path
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js";
 
 // Debug flag for verbose logging
