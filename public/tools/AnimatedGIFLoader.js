@@ -1,19 +1,21 @@
-
 /**
- * AnimatedGIFLoader.js - Enhanced GIF loader for THREE.js
+ * AnimatedGIFLoader.js - Simplified loader for animated GIFs in THREE.js
  * 
- * A utility for loading animated GIFs as textures in THREE.js
- * using gifuct-js for GIF parsing.
+ * A wrapper around SimpleGIFAnimator for loading animated GIFs as textures
  */
-
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js";
+import { SimpleGIFAnimator } from './SimpleGIFAnimator.js';
+
+// Debug flag for verbose logging
+const DEBUG = true;
 
 /**
- * Debug log function to track GIF loading and animation
- * @param {string} message - Log message 
+ * Enhanced logging function that only logs in debug mode
+ * @param {string} message - Log message
  * @param {Object} data - Optional data to log
  */
 function debugLog(message, data = null) {
+  if (!DEBUG) return;
   if (data) {
     console.log(`[GIF-LOADER] ${message}`, data);
   } else {
@@ -21,231 +23,171 @@ function debugLog(message, data = null) {
   }
 }
 
-// Store animations references to prevent garbage collection
-const animationStore = {
-  textures: [],
-  canvases: [],
-  callbacks: {},
-  fps: 10, // Default FPS
-  
-  // Register a new animation
-  register(texture, canvas, callback) {
-    const id = this.textures.length;
-    this.textures.push(texture);
-    this.canvases.push(canvas);
-    if (callback) {
-      this.callbacks[id] = callback;
-    }
-    return id;
-  },
-  
-  // Remove an animation
-  remove(id) {
-    if (id >= 0 && id < this.textures.length) {
-      this.textures[id] = null;
-      this.canvases[id] = null;
-      delete this.callbacks[id];
-    }
-  },
-  
-  // Set global FPS
-  setFPS(fps) {
-    this.fps = fps;
-    debugLog(`Animation FPS set to ${fps}`);
-  }
-};
-
 /**
- * Load and parse a GIF, returning an animated texture
- * @param {string} url - URL of the GIF file
- * @param {function} onLoad - Callback when loaded successfully
- * @param {function} onError - Callback when error occurs
+ * GIF loader for handling animated textures in THREE.js
  */
-const loadGIF = function(url, onLoad, onError) {
-  debugLog(`Loading GIF from: ${url}`);
-  
-  // Load the GIF file
-  fetch(url)
-    .then(response => {
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+class AnimatedGIFLoader {
+  constructor() {
+    debugLog('Initializing AnimatedGIFLoader');
+
+    // Store references to active animators
+    this.animators = new Map();
+
+    // Animation settings
+    this.settings = {
+      fps: 10, // Default frame rate
+      scale: 1,
+      loop: 0  // 0 = infinite loop
+    };
+  }
+
+  /**
+   * Set the FPS for animations
+   * @param {number} fps - Frames per second
+   */
+  setFPS(fps) {
+    this.settings.fps = Math.max(1, Math.min(60, fps));
+    debugLog(`Set animation FPS to ${this.settings.fps}`);
+  }
+
+  /**
+   * Load a GIF file and return a texture
+   * @param {string} url - URL of the GIF file
+   * @param {Function} onLoad - Callback when the texture is loaded
+   * @param {Function} onError - Callback if there's an error
+   * @param {THREE.Scene} scene - Scene to add the sprite to (optional, can be provided in onLoad)
+   * @returns {THREE.Texture} Placeholder texture that will be updated
+   */
+  load(url, onLoad, onError, scene = null) {
+    debugLog(`Loading GIF from: ${url}`);
+
+    // Generate a placeholder texture first
+    const canvas = document.createElement('canvas');
+    canvas.width = 64;
+    canvas.height = 64;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = 'rgba(200, 200, 200, 0.5)';
+    ctx.fillRect(0, 0, 64, 64);
+    ctx.fillStyle = '#333';
+    ctx.fillText('Loading...', 5, 32);
+
+    // Create placeholder texture
+    const texture = new THREE.Texture(canvas);
+    texture.needsUpdate = true;
+
+    // Store loading state on the texture
+    texture.isLoading = true;
+    texture.isAnimated = true;
+    texture.sourceUrl = url;
+
+    // Use SimpleGIFAnimator to create actual GIF sprite
+    if (!scene) {
+      // We need a scene for SimpleGIFAnimator to work
+      debugLog(`No scene provided, returning placeholder texture`);
+      return texture;
+    }
+
+    // Create animator for this texture
+    debugLog(`Creating SimpleGIFAnimator for ${url}`);
+    const animator = new SimpleGIFAnimator(
+      url,
+      scene,
+      { x: 0, y: 0, z: 0 }, // Default position
+      this.settings.scale,
+      // onLoadComplete
+      (animator) => {
+        debugLog(`GIF loaded successfully: ${url}`);
+
+        // Update the placeholder texture with the actual texture
+        texture.image = animator.canvas;
+        texture.needsUpdate = true;
+        texture.isLoading = false;
+
+        // Store additional animation data on the texture
+        texture.frameCount = animator.frames.length;
+        texture.setFrame = (frameIndex) => animator.setFrame(frameIndex);
+        texture.play = () => animator.play();
+        texture.pause = () => animator.pause();
+
+        // Keep reference to the animator
+        this.animators.set(texture, animator);
+
+        // Call onLoad callback with the updated texture
+        if (onLoad) {
+          onLoad(texture);
+        }
+      },
+      // onError
+      (error) => {
+        debugLog(`Error loading GIF: ${url}`, error);
+
+        // Mark texture as failed
+        texture.isLoading = false;
+        texture.loadError = error;
+
+        // Display error on texture
+        ctx.fillStyle = 'rgba(255, 200, 200, 0.8)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#FF0000';
+        ctx.fillText('Error loading GIF', 5, 32);
+        ctx.fillText(error.message.substring(0, 20), 5, 48);
+        texture.needsUpdate = true;
+
+        // Call error callback
+        if (onError) {
+          onError(error);
+        }
       }
-      return response.arrayBuffer();
-    })
-    .then(buffer => {
-      // Import gifuct-js dynamically
-      import('https://cdn.jsdelivr.net/npm/gifuct-js@2.1.2/dist/gifuct-js.js')
-        .then(module => {
-          try {
-            const gifuct = module.default || module;
-            
-            // Parse the GIF
-            const gif = gifuct.parseGIF(new Uint8Array(buffer));
-            debugLog(`GIF parsed, frames: ${gif.frames.length}`);
-            
-            // Decompress frames
-            const frames = gifuct.decompressFrames(gif, true);
-            
-            if (frames.length === 0) {
-              throw new Error('No frames found in GIF');
-            }
-            
-            // Create canvas for drawing frames
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            
-            // Set canvas size to GIF dimensions
-            canvas.width = gif.lsd.width;
-            canvas.height = gif.lsd.height;
-            
-            debugLog(`Canvas created: ${canvas.width}x${canvas.height}`);
-            
-            // Create texture from canvas
-            const texture = new THREE.CanvasTexture(canvas);
-            texture.magFilter = THREE.NearestFilter;
-            texture.minFilter = THREE.NearestFilter;
-            
-            // Animation state
-            let frameIndex = 0;
-            let lastFrameTime = Date.now();
-            
-            // Store animation data
-            texture.animationData = {
-              frames: frames,
-              frameIndex: 0,
-              lastFrameTime: Date.now(),
-              isPlaying: true,
-              canvas: canvas,
-              ctx: ctx
-            };
-            
-            // Function to update canvas with current frame
-            const updateFrame = () => {
-              if (!texture.animationData.isPlaying) return;
-              
-              const frame = frames[texture.animationData.frameIndex];
-              
-              // Create ImageData from patch
-              const imageData = new ImageData(
-                new Uint8ClampedArray(frame.patch),
-                frame.dims.width,
-                frame.dims.height
-              );
-              
-              // Clear canvas (optional depending on disposal method)
-              ctx.clearRect(0, 0, canvas.width, canvas.height);
-              
-              // Draw patch to canvas
-              ctx.putImageData(
-                imageData,
-                frame.dims.left,
-                frame.dims.top
-              );
-              
-              // Mark texture for update
-              texture.needsUpdate = true;
-            };
-            
-            // Initial frame draw
-            updateFrame();
-            
-            // Register animation update function
-            const animationId = animationStore.register(texture, canvas, updateFrame);
-            texture.animationId = animationId;
-            
-            // Animation control functions
-            texture.play = function() {
-              this.animationData.isPlaying = true;
-              debugLog(`Playing animation ${animationId}`);
-            };
-            
-            texture.pause = function() {
-              this.animationData.isPlaying = false;
-              debugLog(`Paused animation ${animationId}`);
-            };
-            
-            texture.dispose = function() {
-              animationStore.remove(this.animationId);
-              THREE.Texture.prototype.dispose.call(this);
-              debugLog(`Disposed animation ${animationId}`);
-            };
-            
-            // Call success callback
-            if (onLoad) {
-              onLoad(texture);
-            }
-            
-            debugLog(`GIF loaded successfully: ${frames.length} frames`);
-          } catch (error) {
-            console.error(`Error parsing GIF:`, error);
-            if (onError) {
-              onError(error);
-            }
-          }
-        })
-        .catch(error => {
-          console.error(`Failed to load gifuct-js:`, error);
-          if (onError) {
-            onError(error);
-          }
-        });
-    })
-    .catch(error => {
-      console.error(`Failed to fetch GIF:`, error);
-      if (onError) {
-        onError(error);
-      }
+    );
+
+    // Store animator reference
+    this.animators.set(texture, animator);
+
+    return texture;
+  }
+
+  /**
+   * Update all animated textures
+   * Called in the animation loop
+   */
+  update() {
+    this.animators.forEach((animator) => {
+      animator.update();
     });
-};
-
-// Animation loop function
-const animate = () => {
-  requestAnimationFrame(animate);
-  
-  const now = Date.now();
-  const frameTime = 1000 / animationStore.fps;
-  
-  // Update all registered animations
-  animationStore.textures.forEach((texture, id) => {
-    if (!texture || !texture.animationData || !texture.animationData.isPlaying) return;
-    
-    const elapsed = now - texture.animationData.lastFrameTime;
-    
-    if (elapsed > frameTime) {
-      // Get current frame
-      const frames = texture.animationData.frames;
-      
-      // Advance to next frame
-      texture.animationData.frameIndex = 
-        (texture.animationData.frameIndex + 1) % frames.length;
-      
-      // Update frame
-      if (animationStore.callbacks[id]) {
-        animationStore.callbacks[id]();
-      }
-      
-      // Update last frame time
-      texture.animationData.lastFrameTime = now;
-    }
-  });
-  
-  // Report animation status for debugging
-  if (Math.random() < 0.01) { // Only log occasionally to avoid spam
-    const activeCount = animationStore.textures.filter(t => t && t.animationData && t.animationData.isPlaying).length;
-    console.log(`[ANIM-DEBUG] Animation cycle check - active: ${activeCount > 0}, textures: ${activeCount}`);
   }
-};
 
-// Start animation loop
-animate();
+  /**
+   * Dispose of a texture and its resources
+   * @param {THREE.Texture} texture - The texture to dispose
+   */
+  dispose(texture) {
+    debugLog(`Disposing texture: ${texture.sourceUrl}`);
 
-// Export the GIF loader
-export const gifLoader = {
-  load: loadGIF,
-  setFPS: (fps) => animationStore.setFPS(fps),
-  dispose: (texture) => {
-    if (texture && texture.dispose) {
-      texture.dispose();
+    // Get the animator for this texture
+    const animator = this.animators.get(texture);
+    if (animator) {
+      animator.dispose();
+      this.animators.delete(texture);
     }
+
+    // Dispose the texture
+    texture.dispose();
   }
-};
+
+  /**
+   * Dispose all textures and resources
+   */
+  disposeAll() {
+    debugLog(`Disposing all textures`);
+
+    this.animators.forEach((animator) => {
+      animator.dispose();
+    });
+
+    this.animators.clear();
+  }
+}
+
+// Create and export the loader
+export const gifLoader = new AnimatedGIFLoader();
+export default gifLoader;
