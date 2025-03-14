@@ -274,130 +274,273 @@ export class Beast {
 
   /**
    * Create directional arrows pointing to adjacent hexes
+   * Using vector-based positioning for more accurate alignment
    * @private
    */
   _createDirectionalIndicators() {
-    console.log("[BEAST] Creating directional movement arrows");
+    console.log("[BEAST] Creating directional movement arrows using vector-based orientation");
 
-    // Define hex directions if not already set
-    this.hexDirections = this.hexDirections || [
-      { name: "North", q: 0, r: -1, angle: 0 },
-      { name: "NorthEast", q: 1, r: -1, angle: 60 },
-      { name: "SouthEast", q: 1, r: 0, angle: 120 },
-      { name: "South", q: 0, r: 1, angle: 180 },
-      { name: "SouthWest", q: -1, r: 1, angle: 240 },
-      { name: "NorthWest", q: -1, r: 0, angle: 300 }
+    // Define hex directions with numerical labels for debugging
+    this.hexDirections = [
+      { id: 1, name: "North", q: 0, r: -1 },
+      { id: 2, name: "NorthEast", q: 1, r: -1 },
+      { id: 3, name: "SouthEast", q: 1, r: 0 },
+      { id: 4, name: "South", q: 0, r: 1 },
+      { id: 5, name: "SouthWest", q: -1, r: 1 },
+      { id: 6, name: "NorthWest", q: -1, r: 0 }
     ];
 
-    const hexDirections = this.hexDirections; // Use the defined directions
-    const arrowDistance = 1.2;
-    const hexRadius = 1.0; // Adjust based on your hex tile size
+    // Hex grid configuration
+    const hexRadius = 1.0; // Radius of a hex
+    const hexHeight = 0.2; // Height of hex tile
+    const horizontalSpacing = 1.5; // Horizontal spacing between hexes
+    const verticalFactor = 1.0; // Vertical spacing factor
+    const arrowDistance = 0.7; // Controls how far along the vector the arrow is placed (0-1)
+    const arrowHeight = 0.7; // Height of arrows above the hex plane
 
-    // Create triangle geometry for arrow
-    const arrowGeometry = new THREE.ConeGeometry(0.2, 0.5, 3);
-
-    // Material for arrows
+    // Create geometry for arrow
+    const arrowGeometry = new THREE.ConeGeometry(0.15, 0.4, 4); // Slightly smaller arrows
+    
+    // Material for arrows - using distinct colors for better visibility
     const arrowMaterial = new THREE.MeshPhongMaterial({
       color: 0xffcc00,
       transparent: true,
-      opacity: 0.8,
+      opacity: 0.9,
       emissive: 0x996600,
       specular: 0xffffff
     });
 
-    // Set arrow distance
-    
+    // Font for debug labels
+    let font = null;
+    // Try to load font for labels asynchronously
+    const fontLoader = new THREE.FontLoader();
+    fontLoader.load('/assets/fonts/helvetiker_regular.typeface.json', loadedFont => {
+      font = loadedFont;
+      this._createDebugLabels();
+      console.log("[BEAST] Loaded font for debug labels");
+    }, undefined, error => {
+      console.warn("[BEAST] Failed to load font:", error);
+    });
+
+    // Store references to debug objects
+    this.debugObjects = {
+      directionLabels: [],
+      targetHexLabels: [],
+      directionVectors: []
+    };
 
     // Create an array to store arrow references for debugging
     this.directionalArrows = [];
 
-    // Create an arrow for each direction
-    hexDirections.forEach(direction => {
-      // Calculate position from center
-      const x = arrowDistance * Math.cos(direction.angle * Math.PI / 180);
-      const z = arrowDistance * Math.sin(direction.angle * Math.PI / 180);
+    // Create text sprite function (for better text rendering than geometry)
+    const createTextSprite = (text, color = 0xffffff, size = 0.3) => {
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d');
+      canvas.width = 128;
+      canvas.height = 128;
+      
+      // Draw background
+      context.fillStyle = 'rgba(0, 0, 0, 0.7)';
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      
+      // Draw text
+      context.font = '64px Arial';
+      context.fillStyle = `#${color.toString(16).padStart(6, '0')}`;
+      context.textAlign = 'center';
+      context.textBaseline = 'middle';
+      context.fillText(text, canvas.width/2, canvas.height/2);
+      
+      // Create texture and sprite
+      const texture = new THREE.CanvasTexture(canvas);
+      const material = new THREE.SpriteMaterial({ map: texture });
+      const sprite = new THREE.Sprite(material);
+      sprite.scale.set(size, size, 1);
+      
+      return sprite;
+    };
 
+    // Function to calculate 3D hex position from axial coordinates
+    const calculateHexPosition = (q, r) => {
+      // For perfect fit in axial coordinate system
+      const x = hexRadius * horizontalSpacing * q;
+      const z = hexRadius * Math.sqrt(3) * verticalFactor * (r + q/2);
+      const y = hexHeight / 2; // Half height of hex
+      
+      return new THREE.Vector3(x, y, z);
+    };
+
+    // Create arrows for each direction
+    this.hexDirections.forEach(direction => {
+      // Calculate target hex position in world space
+      const targetHexPos = calculateHexPosition(direction.q, direction.r);
+      
+      // Calculate direction vector from beast to target hex
+      const directionVector = new THREE.Vector3().subVectors(targetHexPos, new THREE.Vector3(0, 0, 0));
+      
+      // Normalize the direction vector
+      const normalizedDirection = directionVector.clone().normalize();
+      
+      // Calculate arrow position at fraction of distance to hex
+      const arrowPos = new THREE.Vector3().addScaledVector(normalizedDirection, hexRadius * arrowDistance);
+      arrowPos.y = arrowHeight; // Set fixed height above ground
+      
       // Create arrow mesh
-      const arrow = new THREE.Mesh(arrowGeometry, arrowMaterial);
-      arrow.position.set(
-        x,
-        0.7, // Height above ground
-        z,
+      const arrow = new THREE.Mesh(arrowGeometry, arrowMaterial.clone());
+      
+      // Position arrow
+      arrow.position.copy(arrowPos);
+      
+      // Debug: Create a line showing the vector
+      const debugLine = new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(0, arrowHeight, 0),
+          new THREE.Vector3().copy(targetHexPos).setY(arrowHeight)
+        ]),
+        new THREE.LineBasicMaterial({ color: 0xff0000, transparent: true, opacity: 0.5 })
       );
-
-      // DEBUGGING: Create a small colored sphere to visualize the direction
+      this.group.add(debugLine);
+      this.debugObjects.directionVectors.push(debugLine);
+      
+      // Store original target for lookAt
+      const targetPoint = new THREE.Vector3().copy(targetHexPos);
+      targetPoint.y = arrowHeight; // Keep on same plane for correct orientation
+      
+      // Point arrow toward target
+      // We need to apply a -90 degree X rotation to account for cone's default orientation
+      arrow.lookAt(targetPoint);
+      arrow.rotateX(Math.PI / 2);
+      
+      // Create debug number label for the arrow
+      const arrowLabel = createTextSprite(direction.id.toString(), 0xffcc00);
+      arrowLabel.position.set(
+        arrowPos.x, 
+        arrowPos.y + 0.3, // Slightly above the arrow
+        arrowPos.z
+      );
+      this.group.add(arrowLabel);
+      this.debugObjects.directionLabels.push(arrowLabel);
+      
+      // Create debug sphere to mark target hex position
       const debugSphere = new THREE.Mesh(
         new THREE.SphereGeometry(0.1),
-        new THREE.MeshBasicMaterial({ color: 0x00ff00 })
+        new THREE.MeshBasicMaterial({ color: 0x00ffff })
       );
-      debugSphere.position.set(x + 0.3 * Math.cos(direction.angle * Math.PI / 180), 0.7, z + 0.3 * Math.sin(direction.angle * Math.PI / 180));
+      debugSphere.position.copy(targetHexPos);
+      debugSphere.position.y = hexHeight + 0.05; // Just above hex
       this.group.add(debugSphere);
-
-      // Rotation: Use quaternion for more precise control
-      // We need to:
-      // 1. First rotate 90 degrees around X to make cone point horizontally
-      // 2. Then rotate around Y by the direction angle
-
-      // Create rotation quaternion
-      const quaternion = new THREE.Quaternion();
-
-      // Set up rotation axes
-      const xAxis = new THREE.Vector3(1, 0, 0);
-      const yAxis = new THREE.Vector3(0, 1, 0);
-
-      // Apply X rotation first (90 degrees to make horizontal)
-      quaternion.setFromAxisAngle(xAxis, Math.PI / 2);
-
-      // Create temporary quaternion for Y rotation
-      const yRotation = new THREE.Quaternion();
-      yRotation.setFromAxisAngle(yAxis, direction.angle * Math.PI / 180);
-
-      // Combine rotations (order matters!)
-      quaternion.premultiply(yRotation);
-
-      // Apply the combined rotation
-      arrow.setRotationFromQuaternion(quaternion);
-
-      // Add extensive debug logs for arrow positioning and rotation
-      console.log(`[BEAST] Positioned ${direction.name} arrow at:`, {
-        x: x.toFixed(2),
-        y: 0.7,
-        z: z.toFixed(2),
-        angle: (direction.angle * 180 / Math.PI).toFixed(1) + '°',
-        direction: {
-          x: Math.cos(direction.angle * Math.PI / 180).toFixed(2),
-          z: Math.sin(direction.angle * Math.PI / 180).toFixed(2)
+      
+      // Create matching target hex label
+      const hexLabel = createTextSprite(direction.id.toString(), 0x00ffff);
+      hexLabel.position.set(
+        targetHexPos.x,
+        targetHexPos.y + 0.3, // Above the hex
+        targetHexPos.z
+      );
+      this.group.add(hexLabel);
+      this.debugObjects.targetHexLabels.push(hexLabel);
+      
+      // Log detailed positioning information
+      console.log(`[BEAST] Created arrow #${direction.id} (${direction.name}):`, {
+        q: direction.q,
+        r: direction.r,
+        targetHexPos: {
+          x: targetHexPos.x.toFixed(2),
+          y: targetHexPos.y.toFixed(2),
+          z: targetHexPos.z.toFixed(2)
         },
-        pointingDirection: direction.name,
-        quaternion: {
-          x: quaternion.x.toFixed(3),
-          y: quaternion.y.toFixed(3),
-          z: quaternion.z.toFixed(3),
-          w: quaternion.w.toFixed(3)
+        arrowPos: {
+          x: arrowPos.x.toFixed(2),
+          y: arrowPos.y.toFixed(2),
+          z: arrowPos.z.toFixed(2)
+        },
+        directionVector: {
+          x: directionVector.x.toFixed(2),
+          y: directionVector.y.toFixed(2),
+          z: directionVector.z.toFixed(2),
+          length: directionVector.length().toFixed(2)
         }
       });
-
+      
       // Make arrow interactive
       arrow.userData = { 
         direction: direction.name, 
+        directionId: direction.id,
         moveOffset: { q: direction.q, r: direction.r },
-        isMovementArrow: true
+        isMovementArrow: true,
+        targetHexPos: targetHexPos.clone()
       };
-
+      
       // Add to the group
       this.group.add(arrow);
-
+      
       // Store arrow reference for debugging
       this.directionalArrows.push({
         mesh: arrow,
         direction: direction.name,
+        directionId: direction.id,
         coordinates: {q: direction.q, r: direction.r},
-        angle: direction.angle
+        targetPosition: targetHexPos.clone()
       });
     });
-
+    
+    // Add a debug helper to toggle visualization
+    this.toggleDebugVisualization = (visible = true) => {
+      Object.values(this.debugObjects).forEach(group => {
+        group.forEach(obj => {
+          obj.visible = visible;
+        });
+      });
+      console.log(`[BEAST] Debug visualization ${visible ? 'enabled' : 'disabled'}`);
+    };
+    
+    // Make debug helper available globally for console access
+    if (window.beastDebugHelpers === undefined) {
+      window.beastDebugHelpers = {};
+    }
+    window.beastDebugHelpers.toggleArrowDebug = this.toggleDebugVisualization;
+    console.log("[BEAST] Debug helper added to window.beastDebugHelpers.toggleArrowDebug()");
+    
     // Connect to arrow debugger if available
     this._connectToArrowDebugger();
+  }
+  
+  /**
+   * Create debug text labels using Three.js TextGeometry
+   * Called after font is loaded
+   * @private
+   */
+  _createDebugLabels() {
+    if (!this.directionalArrows || !this.directionalArrows.length) return;
+    
+    // Don't create labels if already created with sprites
+    if (this.debugObjects.directionLabels.length > 0) return;
+    
+    console.log("[BEAST] Creating 3D text debug labels");
+    
+    this.directionalArrows.forEach(arrow => {
+      try {
+        const textGeometry = new THREE.TextGeometry(arrow.directionId.toString(), {
+          font: font,
+          size: 0.2,
+          height: 0.05
+        });
+        
+        const textMaterial = new THREE.MeshBasicMaterial({ color: 0xffcc00 });
+        const textMesh = new THREE.Mesh(textGeometry, textMaterial);
+        
+        // Position near the arrow
+        textMesh.position.copy(arrow.mesh.position);
+        textMesh.position.y += 0.3;
+        
+        // Rotate to face camera
+        textMesh.lookAt(this.camera.position);
+        
+        this.group.add(textMesh);
+        this.debugObjects.directionLabels.push(textMesh);
+      } catch (err) {
+        console.warn("[BEAST] Failed to create 3D text label:", err);
+      }
+    });
   }
 
   /**
@@ -473,10 +616,21 @@ export class Beast {
     if (intersects.length > 0) {
       const clickedArrow = intersects[0].object;
 
+      // Highlight arrow in debugger if available
+      if (window.arrowDebugger) {
+        window.arrowDebugger.highlightArrow(clickedArrow.userData.directionId);
+      }
+
       // Log click info for debugging
       console.log(`[BEAST] Arrow clicked:`, {
         direction: clickedArrow.userData.direction,
-        offset: clickedArrow.userData.moveOffset
+        directionId: clickedArrow.userData.directionId,
+        offset: clickedArrow.userData.moveOffset,
+        currentPosition: { ...this.currentAxialPos },
+        targetPosition: {
+          q: this.currentAxialPos.q + clickedArrow.userData.moveOffset.q,
+          r: this.currentAxialPos.r + clickedArrow.userData.moveOffset.r
+        }
       });
 
       // Calculate the new axial position
@@ -497,9 +651,28 @@ export class Beast {
         // Update current axial position
         this.currentAxialPos = { q: newQ, r: newR };
 
-        debugLog(`Moving to new hex at q=${newQ}, r=${newR}`);
+        // Log the move for debugging
+        console.log(`[BEAST] Moving to new hex:`, {
+          from: { q: this.currentAxialPos.q - clickedArrow.userData.moveOffset.q, 
+                 r: this.currentAxialPos.r - clickedArrow.userData.moveOffset.r },
+          to: { q: newQ, r: newR },
+          hexPosition: {
+            x: targetHex.position.x.toFixed(2),
+            y: targetHex.position.y.toFixed(2),
+            z: targetHex.position.z.toFixed(2)
+          },
+          hexElement: targetHex.userData.element
+        });
       } else {
         console.warn(`[BEAST] No hex found at q=${newQ}, r=${newR}`);
+        
+        // Additional debug info when target hex is not found
+        console.log(`[BEAST] Available hexagons:`, {
+          count: this.hexagons.length,
+          nearby: this.hexagons
+            .filter(h => Math.abs(h.userData.q - newQ) <= 1 && Math.abs(h.userData.r - newR) <= 1)
+            .map(h => ({ q: h.userData.q, r: h.userData.r }))
+        });
       }
     }
   }

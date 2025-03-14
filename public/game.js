@@ -655,6 +655,32 @@ try {
 
   // Add Beast to scene after grid generation
   let fireBeast = null;
+  let arrowDebugger = null;
+
+  // Initialize the Arrow Debugger
+  debugLog("Initializing Arrow Debugger for directional movement debugging");
+  try {
+    // Import the Arrow Debugger tool
+    import('./tools/diagnostics/ArrowDebugger.js')
+      .then(module => {
+        debugLog("Arrow Debugger module loaded successfully");
+        arrowDebugger = new module.ArrowDebugger(scene);
+        
+        // Make it globally available for debugging with a clear name
+        window.arrowDebugger = arrowDebugger;
+        
+        // If beast already exists, connect it to the debugger
+        if (fireBeast) {
+          debugLog("Connecting existing Fire Beast to Arrow Debugger");
+          arrowDebugger.setBeast(fireBeast);
+        }
+      })
+      .catch(err => {
+        console.error("Failed to load Arrow Debugger:", err);
+      });
+  } catch (error) {
+    console.error("Failed to initialize Arrow Debugger:", error);
+  }
 
   // Function to spawn a Fire Beast on a random Fire tile
   function spawnFireBeast() {
@@ -693,9 +719,29 @@ try {
       // Set up click handling for beast movement
       fireBeast.setupClickHandling(hexagons);
 
-      // Connect beast to arrow debugger if debug menu exists
-      if (window.gameDebugMenu) {
+      // Update the current hex position with additional logging
+      fireBeast.currentAxialPos = { q: hex.userData.q, r: hex.userData.r };
+      console.log("[BEAST] Initial hex position set:", fireBeast.currentAxialPos);
+
+      // Connect beast to arrow debugger if available
+      if (arrowDebugger) {
         debugLog("Connecting Fire Beast to Arrow Debugger");
+        arrowDebugger.setBeast(fireBeast);
+      } else {
+        debugLog("Arrow Debugger not yet available, will connect when loaded");
+        
+        // Try again after a short delay
+        setTimeout(() => {
+          if (window.arrowDebugger && fireBeast) {
+            debugLog("Connecting Fire Beast to Arrow Debugger (delayed)");
+            window.arrowDebugger.setBeast(fireBeast);
+          }
+        }, 2000);
+      }
+
+      // Connect beast to arrow debugger in debug menu if it exists
+      if (window.gameDebugMenu) {
+        debugLog("Connecting Fire Beast to Debug Menu Arrow Debugger");
         window.gameDebugMenu.initArrowDebugger(fireBeast);
       } else {
         // Check if we need to look for a debug menu in parent scope
@@ -710,6 +756,7 @@ try {
         // Log diagnostic information to help track down the issue
         console.log("[BEAST] Debug state:", {
           globalDebugMenu: !!window.gameDebugMenu,
+          arrowDebugger: !!arrowDebugger,
           beastObject: !!fireBeast,
           beastType: fireBeast ? fireBeast.type : 'undefined'
         });

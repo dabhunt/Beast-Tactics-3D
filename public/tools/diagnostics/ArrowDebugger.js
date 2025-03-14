@@ -463,3 +463,273 @@ const arrowHeight = ${this.settings.height.toFixed(2)};
     console.log("[ARROW-DEBUG] Beast reference updated", beast);
   }
 }
+/**
+ * ArrowDebugger.js - Debug utility for Beast movement arrows
+ * 
+ * Provides visualization tools and UI controls for debugging
+ * the directional movement arrows used by Beasts to navigate the hex grid.
+ */
+
+import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js";
+
+// Debug flag for verbose logging
+const DEBUG = true;
+
+/**
+ * Enhanced logging function that only logs in debug mode
+ * @param {string} message - Log message
+ * @param {Object} data - Optional data to log
+ */
+function debugLog(message, data = null) {
+  if (!DEBUG) return;
+  if (data) {
+    console.log(`[ARROW-DEBUG] ${message}`, data);
+  } else {
+    console.log(`[ARROW-DEBUG] ${message}`);
+  }
+}
+
+/**
+ * ArrowDebugger class for visualization and testing of directional arrows
+ */
+export class ArrowDebugger {
+  /**
+   * Create a new ArrowDebugger instance
+   * @param {THREE.Scene} scene - The THREE.js scene
+   */
+  constructor(scene) {
+    debugLog("Initializing ArrowDebugger");
+    this.scene = scene;
+    this.currentBeast = null;
+    this.enabled = true;
+    this.showVectors = true;
+    this.showLabels = true;
+    this.showTargetPoints = true;
+    
+    // Create UI panel for controlling debugging options
+    this._createDebugUI();
+  }
+  
+  /**
+   * Connect a Beast instance to the debugger
+   * @param {Beast} beast - The Beast instance to debug
+   */
+  setBeast(beast) {
+    debugLog("Setting Beast for debugging:", {
+      type: beast?.type,
+      arrows: beast?.directionalArrows?.length || 0
+    });
+    
+    this.currentBeast = beast;
+    this._updateUI();
+  }
+  
+  /**
+   * Toggle visibility of debug visualization
+   * @param {boolean} visible - Whether debug elements should be visible
+   */
+  toggleVisibility(visible) {
+    if (!this.currentBeast || !this.currentBeast.debugObjects) {
+      debugLog("No Beast or debug objects available");
+      return;
+    }
+    
+    debugLog(`Setting debug visibility to ${visible}`);
+    
+    // Toggle direction vectors
+    if (this.currentBeast.debugObjects.directionVectors) {
+      this.currentBeast.debugObjects.directionVectors.forEach(line => {
+        line.visible = visible && this.showVectors;
+      });
+    }
+    
+    // Toggle labels
+    if (this.currentBeast.debugObjects.directionLabels) {
+      this.currentBeast.debugObjects.directionLabels.forEach(label => {
+        label.visible = visible && this.showLabels;
+      });
+    }
+    
+    // Toggle target hex labels
+    if (this.currentBeast.debugObjects.targetHexLabels) {
+      this.currentBeast.debugObjects.targetHexLabels.forEach(label => {
+        label.visible = visible && this.showTargetPoints;
+      });
+    }
+  }
+  
+  /**
+   * Toggle the visibility of direction vectors
+   * @param {boolean} visible - Whether vectors should be visible
+   */
+  toggleVectors(visible) {
+    this.showVectors = visible;
+    debugLog(`Vector visibility set to ${visible}`);
+    this.toggleVisibility(this.enabled);
+  }
+  
+  /**
+   * Toggle the visibility of direction labels
+   * @param {boolean} visible - Whether labels should be visible
+   */
+  toggleLabels(visible) {
+    this.showLabels = visible;
+    debugLog(`Label visibility set to ${visible}`);
+    this.toggleVisibility(this.enabled);
+  }
+  
+  /**
+   * Toggle the visibility of target points
+   * @param {boolean} visible - Whether target points should be visible
+   */
+  toggleTargetPoints(visible) {
+    this.showTargetPoints = visible;
+    debugLog(`Target point visibility set to ${visible}`);
+    this.toggleVisibility(this.enabled);
+  }
+  
+  /**
+   * Create UI controls for the debugger
+   * @private
+   */
+  _createDebugUI() {
+    // Create container for UI
+    const container = document.createElement('div');
+    container.id = 'arrow-debugger-ui';
+    container.style.position = 'absolute';
+    container.style.bottom = '10px';
+    container.style.right = '10px';
+    container.style.backgroundColor = 'rgba(0,0,0,0.7)';
+    container.style.color = 'white';
+    container.style.padding = '10px';
+    container.style.fontFamily = 'monospace';
+    container.style.fontSize = '12px';
+    container.style.borderRadius = '5px';
+    container.style.zIndex = '1000';
+    container.style.maxWidth = '300px';
+    container.innerHTML = `
+      <h3>Arrow Debugger</h3>
+      <div id="beast-info">No beast connected</div>
+      <div class="control">
+        <label><input type="checkbox" id="toggle-debug" checked> Enable Debug Visualization</label>
+      </div>
+      <div class="control">
+        <label><input type="checkbox" id="toggle-vectors" checked> Show Direction Vectors</label>
+      </div>
+      <div class="control">
+        <label><input type="checkbox" id="toggle-labels" checked> Show Arrow Labels</label>
+      </div>
+      <div class="control">
+        <label><input type="checkbox" id="toggle-targets" checked> Show Target Points</label>
+      </div>
+      <div id="arrow-details">
+        <h4>Arrow Details</h4>
+        <div id="arrow-info">Select an arrow to see details</div>
+      </div>
+    `;
+    
+    document.body.appendChild(container);
+    
+    // Add event listeners to controls
+    document.getElementById('toggle-debug').addEventListener('change', e => {
+      this.enabled = e.target.checked;
+      this.toggleVisibility(this.enabled);
+    });
+    
+    document.getElementById('toggle-vectors').addEventListener('change', e => {
+      this.toggleVectors(e.target.checked);
+    });
+    
+    document.getElementById('toggle-labels').addEventListener('change', e => {
+      this.toggleLabels(e.target.checked);
+    });
+    
+    document.getElementById('toggle-targets').addEventListener('change', e => {
+      this.toggleTargetPoints(e.target.checked);
+    });
+    
+    debugLog("Debug UI created");
+  }
+  
+  /**
+   * Update UI with current Beast information
+   * @private
+   */
+  _updateUI() {
+    const infoElement = document.getElementById('beast-info');
+    if (!infoElement) return;
+    
+    if (!this.currentBeast) {
+      infoElement.textContent = "No beast connected";
+      return;
+    }
+    
+    infoElement.innerHTML = `
+      <strong>Beast:</strong> ${this.currentBeast.type}<br>
+      <strong>Arrows:</strong> ${this.currentBeast.directionalArrows?.length || 0}<br>
+      <strong>Position:</strong> (${this.currentBeast.group.position.x.toFixed(1)}, 
+                             ${this.currentBeast.group.position.y.toFixed(1)}, 
+                             ${this.currentBeast.group.position.z.toFixed(1)})
+    `;
+    
+    // Create arrow details table
+    const arrowInfoElem = document.getElementById('arrow-info');
+    if (arrowInfoElem && this.currentBeast.directionalArrows) {
+      let html = `<table style="font-size: 10px; width: 100%;">
+        <tr>
+          <th>ID</th>
+          <th>Dir</th>
+          <th>q,r</th>
+          <th>Pos (x,z)</th>
+        </tr>`;
+      
+      this.currentBeast.directionalArrows.forEach(arrow => {
+        html += `<tr>
+          <td>${arrow.directionId}</td>
+          <td>${arrow.direction.substring(0,1)}</td>
+          <td>${arrow.coordinates.q},${arrow.coordinates.r}</td>
+          <td>${arrow.targetPosition.x.toFixed(1)},${arrow.targetPosition.z.toFixed(1)}</td>
+        </tr>`;
+      });
+      
+      html += `</table>`;
+      arrowInfoElem.innerHTML = html;
+    }
+    
+    debugLog("UI updated with Beast information");
+  }
+  
+  /**
+   * Highlight a specific arrow for debugging
+   * @param {number} arrowId - The ID of the arrow to highlight
+   */
+  highlightArrow(arrowId) {
+    if (!this.currentBeast || !this.currentBeast.directionalArrows) return;
+    
+    this.currentBeast.directionalArrows.forEach(arrow => {
+      // Reset all arrows to default color
+      arrow.mesh.material.color.set(0xffcc00);
+      arrow.mesh.material.emissive.set(0x996600);
+      
+      // Highlight the selected arrow
+      if (arrow.directionId === arrowId) {
+        arrow.mesh.material.color.set(0xff0000);
+        arrow.mesh.material.emissive.set(0xff0000);
+        
+        // Log details about this arrow
+        debugLog(`Highlighted arrow #${arrowId}:`, {
+          direction: arrow.direction,
+          coordinates: arrow.coordinates,
+          target: {
+            x: arrow.targetPosition.x.toFixed(2),
+            y: arrow.targetPosition.y.toFixed(2),
+            z: arrow.targetPosition.z.toFixed(2)
+          }
+        });
+      }
+    });
+  }
+}
+
+// Make ArrowDebugger globally available for console debugging
+window.ArrowDebugger = ArrowDebugger;
