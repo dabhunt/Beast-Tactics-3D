@@ -6,7 +6,7 @@
  */
 
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js";
-import { parseGIF, decompressFrames } from './gifuct-loader.js';
+//import { parseGIF, decompressFrames } from './gifuct-loader.js';
 
 // Debug flag
 const DEBUG = true;
@@ -50,6 +50,7 @@ export class AnimatedGIFTexture {
     this.isLoaded = false;
     this.loop = true;
     this.playbackSpeed = 1.0;
+    this.gifParserAvailable = false;
 
     // Animation canvas
     this.canvas = document.createElement('canvas');
@@ -83,53 +84,177 @@ export class AnimatedGIFTexture {
 
     try {
       // Fetch the GIF data
+      console.log(`[ANIM-GIF] Fetching GIF file from ${this.url}`);
       const response = await fetch(this.url);
-
       if (!response.ok) {
-        throw new Error(`HTTP error! Status: ${response.status}`);
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
 
+      console.log(`[ANIM-GIF] GIF file fetched successfully`);
+
+      // Get as array buffer for parsing
       const arrayBuffer = await response.arrayBuffer();
-      debugLog(`GIF data fetched, size: ${arrayBuffer.byteLength} bytes`);
+      console.log(`[ANIM-GIF] Got array buffer of size ${arrayBuffer.byteLength} bytes`);
 
-      // Parse the GIF using the imported functions
-      const gif = await parseGIF(arrayBuffer);
-
-      // Extract frames
-      const frames = await decompressFrames(gif, true);
-
-      // Set up canvas with dimensions from first frame
-      if (frames.length > 0) {
-        this.canvas.width = frames[0].dims.width;
-        this.canvas.height = frames[0].dims.height;
-        debugLog(`Canvas dimensions set to: ${this.canvas.width}x${this.canvas.height}`);
+      // Check if we have GIF parser loaded
+      if (!this.gifParserAvailable) {
+        console.log(`[ANIM-GIF] GIF parser not yet loaded, initializing...`);
+        await this._initGifuctParser();
       }
 
-      // Store frames and mark as loaded
-      this.frames = frames;
+      // We should now have the parsing functions stored in this instance
+      if (!this.parseGIF || !this.decompressFrames) {
+        throw new Error('GIF parser functions not available after initialization');
+      }
+
+      // Parse the GIF
+      console.log(`[ANIM-GIF] Parsing GIF...`);
+      const gif = await this.parseGIF(arrayBuffer);
+      if (!gif) {
+        throw new Error('Failed to parse GIF - parser returned null/undefined');
+      }
+
+      console.log(`[ANIM-GIF] GIF parsed successfully, decompressing frames...`);
+      const frames = await this.decompressFrames(gif, true);
+
+      if (!frames || frames.length === 0) {
+        throw new Error('Failed to decompress frames - no frames returned');
+      }
+
+      console.log(`[ANIM-GIF] Successfully decompressed ${frames.length} frames`);
+
+      // Set up frame data
+      this._setupFrames(frames);
       this.isLoaded = true;
 
-      // Calculate load time
-      this.stats.loadTime = performance.now() - this.stats.loadStartTime;
-
-      debugLog(`GIF loaded successfully: ${frames.length} frames, load time: ${this.stats.loadTime.toFixed(2)}ms`);
-
-      // Draw the first frame
-      this._drawFrame(0);
-
-      // Auto-start playback
-      this.play();
-
-      // Call the onLoad callback if provided
-      if (this.onLoadCallback) {
-        this.onLoadCallback(this);
-      }
-
+      console.log(`[ANIM-GIF] GIF fully loaded and ready with ${frames.length} frames`);
     } catch (error) {
-      console.error(`Error loading or parsing GIF: ${error.message}`, error);
-      if (this.onErrorCallback) {
-        this.onErrorCallback(error);
+      console.error("Error loading or parsing GIF:", error);
+      this._onError(error);
+    }
+  }
+
+  /**
+   * Set up frames after successful loading
+   * @param {Array} frames - Array of parsed GIF frames
+   * @private
+   */
+  _setupFrames(frames) {
+    // Set up canvas with dimensions from first frame
+    if (frames.length > 0) {
+      this.canvas.width = frames[0].dims.width;
+      this.canvas.height = frames[0].dims.height;
+      debugLog(`Canvas dimensions set to: ${this.canvas.width}x${this.canvas.height}`);
+    }
+
+    // Store frames and mark as loaded
+    this.frames = frames;
+    this.isLoaded = true;
+
+    // Calculate load time
+    this.stats.loadTime = performance.now() - this.stats.loadStartTime;
+
+    debugLog(`GIF loaded successfully: ${frames.length} frames, load time: ${this.stats.loadTime.toFixed(2)}ms`);
+
+    // Draw the first frame
+    this._drawFrame(0);
+
+    // Auto-start playback
+    this.play();
+
+    // Call the onLoad callback if provided
+    if (this.onLoadCallback) {
+      this.onLoadCallback(this);
+    }
+  }
+
+
+  /**
+   * Initialize the GIF parser library
+   * @private
+   */
+  async _initGifuctParser() {
+    const maxRetries = 2;
+    let retryCount = 0;
+    let lastError = null;
+
+    console.log("[ANIM-GIF] Initializing GIF parser");
+
+    // Retry main loader first
+    while (retryCount < maxRetries) {
+      try {
+        // Log waiting message
+        console.log("[ANIM-GIF] Waiting for GIF parser to initialize...");
+
+        // Wait for the GIF parser to be loaded
+        const gifuct = await window.gifuctLoaded;
+
+        // Validate that we have the required functions
+        if (!gifuct) {
+          throw new Error("GIF parser loaded but returned null/undefined");
+        }
+
+        if (!gifuct.parseGIF || !gifuct.decompressFrames) {
+          console.error("[ANIM-GIF] Missing expected functions in loaded GIF parser:", gifuct);
+          throw new Error("GIF parser missing required functions");
+        }
+
+        console.log("[ANIM-GIF] GIF parser initialized successfully", {
+          functions: Object.keys(gifuct)
+        });
+
+        // Store the parsing functions
+        this.parseGIF = gifuct.parseGIF;
+        this.decompressFrames = gifuct.decompressFrames;
+        this.gifParserAvailable = true;
+        return;
+      } catch (error) {
+        lastError = error;
+        retryCount++;
+
+        if (retryCount < maxRetries) {
+          console.warn(`[ANIM-GIF] GIF parser initialization attempt ${retryCount} failed, retrying...`, error);
+
+          // Wait a bit before retrying (exponential backoff)
+          await new Promise(resolve => setTimeout(resolve, 500 * Math.pow(2, retryCount)));
+        }
       }
+    }
+
+    // If main loader failed, try the direct fallback approach
+    console.warn("[ANIM-GIF] Primary GIF parser failed, trying direct CDN fallback");
+
+    try {
+      // Import the direct fallback
+      const { parseGIF, decompressFrames } = await import('./gifuct-direct.js');
+
+      // Test the functions
+      if (typeof parseGIF !== 'function' || typeof decompressFrames !== 'function') {
+        throw new Error("Fallback GIF parser missing required functions");
+      }
+
+      console.log("[ANIM-GIF] Successfully initialized fallback GIF parser");
+
+      // Store the parsing functions
+      this.parseGIF = parseGIF;
+      this.decompressFrames = decompressFrames;
+      this.gifParserAvailable = true;
+      return;
+    } catch (fallbackError) {
+      console.error("[ANIM-GIF] Fallback GIF parser also failed:", fallbackError);
+      throw new Error("All GIF parser initialization methods failed: " + (lastError?.message || "Unknown error"));
+    }
+  }
+
+  /**
+   * Handle errors during GIF loading
+   * @param {Error} error - The error that occurred
+   * @private
+   */
+  _onError(error) {
+    console.error("Error loading or parsing GIF:", error);
+    if (this.onErrorCallback) {
+      this.onErrorCallback(error);
     }
   }
 
