@@ -939,10 +939,8 @@ try {
     // Find intersections with hexagons
     const intersects = hexRaycaster.intersectObjects(hexagons);
     
-    // Reset previously hovered hex if it's different
-    if (hoveredHex && intersects.length > 0 && hoveredHex !== intersects[0].object) {
-      resetHoveredHex();
-    } else if (hoveredHex && intersects.length === 0) {
+    // Reset previously hovered hex if it's different or if no intersections
+    if (hoveredHex && (intersects.length === 0 || hoveredHex !== intersects[0].object)) {
       resetHoveredHex();
     }
     
@@ -1045,9 +1043,20 @@ try {
       // Animate the hex moving downward
       hoveredHex.position.y = defaultHexHeight + (hexHoverHeight * (1 - easeProgress));
       
-      // If animation completed, reset the hoveredHex
+      // If animation completed, clear the hoveredHex and make sure it's at exactly the default height
       if (progress >= 1) {
+        if (hoveredHex) {
+          // Set exact default height to avoid floating point errors
+          hoveredHex.position.y = defaultHexHeight;
+          
+          // Also reset highlight mesh if it exists
+          if (hoveredHex.userData.highlightMesh) {
+            scene.remove(hoveredHex.userData.highlightMesh);
+            hoveredHex.userData.highlightMesh = null;
+          }
+        }
         hoveredHex = null;
+        console.log("[HEX] Hover animation completed, hex reset to default height");
       }
     }
   }
