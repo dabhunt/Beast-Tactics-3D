@@ -52,7 +52,9 @@ export class Beast {
     scene.add(this.group);
 
     // Load textures and create sprite
-    this._loadTextures();
+    this.beastTexture = null;
+    this.animator = null;  // Will hold our GIF animator instance
+    this.loadBeastTexture();
 
     // Create directional indicators
     this._createDirectionalIndicators();
@@ -300,7 +302,7 @@ export class Beast {
 
     // Create geometry for arrow
     const arrowGeometry = new THREE.ConeGeometry(0.15, 0.4, 4); // Slightly smaller arrows
-    
+
     // Material for arrows - using distinct colors for better visibility
     const arrowMaterial = new THREE.MeshPhongMaterial({
       color: 0xffcc00,
@@ -338,24 +340,24 @@ export class Beast {
       const context = canvas.getContext('2d');
       canvas.width = 128;
       canvas.height = 128;
-      
+
       // Draw background
       context.fillStyle = 'rgba(0, 0, 0, 0.7)';
       context.fillRect(0, 0, canvas.width, canvas.height);
-      
+
       // Draw text
       context.font = '64px Arial';
       context.fillStyle = `#${color.toString(16).padStart(6, '0')}`;
       context.textAlign = 'center';
       context.textBaseline = 'middle';
       context.fillText(text, canvas.width/2, canvas.height/2);
-      
+
       // Create texture and sprite
       const texture = new THREE.CanvasTexture(canvas);
       const material = new THREE.SpriteMaterial({ map: texture });
       const sprite = new THREE.Sprite(material);
       sprite.scale.set(size, size, 1);
-      
+
       return sprite;
     };
 
@@ -365,7 +367,7 @@ export class Beast {
       const x = hexRadius * horizontalSpacing * q;
       const z = hexRadius * Math.sqrt(3) * verticalFactor * (r + q/2);
       const y = hexHeight / 2; // Half height of hex
-      
+
       return new THREE.Vector3(x, y, z);
     };
 
@@ -373,23 +375,23 @@ export class Beast {
     this.hexDirections.forEach(direction => {
       // Calculate target hex position in world space
       const targetHexPos = calculateHexPosition(direction.q, direction.r);
-      
+
       // Calculate direction vector from beast to target hex
       const directionVector = new THREE.Vector3().subVectors(targetHexPos, new THREE.Vector3(0, 0, 0));
-      
+
       // Normalize the direction vector
       const normalizedDirection = directionVector.clone().normalize();
-      
+
       // Calculate arrow position at fraction of distance to hex
       const arrowPos = new THREE.Vector3().addScaledVector(normalizedDirection, hexRadius * arrowDistance);
       arrowPos.y = arrowHeight; // Set fixed height above ground
-      
+
       // Create arrow mesh
       const arrow = new THREE.Mesh(arrowGeometry, arrowMaterial.clone());
-      
+
       // Position arrow
       arrow.position.copy(arrowPos);
-      
+
       // Debug: Create a line showing the vector
       const debugLine = new THREE.Line(
         new THREE.BufferGeometry().setFromPoints([
@@ -400,16 +402,16 @@ export class Beast {
       );
       this.group.add(debugLine);
       this.debugObjects.directionVectors.push(debugLine);
-      
+
       // Store original target for lookAt
       const targetPoint = new THREE.Vector3().copy(targetHexPos);
       targetPoint.y = arrowHeight; // Keep on same plane for correct orientation
-      
+
       // Point arrow toward target
       // We need to apply a -90 degree X rotation to account for cone's default orientation
       arrow.lookAt(targetPoint);
       arrow.rotateX(Math.PI / 2);
-      
+
       // Create debug number label for the arrow
       const arrowLabel = createTextSprite(direction.id.toString(), 0xffcc00);
       arrowLabel.position.set(
@@ -419,7 +421,7 @@ export class Beast {
       );
       this.group.add(arrowLabel);
       this.debugObjects.directionLabels.push(arrowLabel);
-      
+
       // Create debug sphere to mark target hex position
       const debugSphere = new THREE.Mesh(
         new THREE.SphereGeometry(0.1),
@@ -428,7 +430,7 @@ export class Beast {
       debugSphere.position.copy(targetHexPos);
       debugSphere.position.y = hexHeight + 0.05; // Just above hex
       this.group.add(debugSphere);
-      
+
       // Create matching target hex label
       const hexLabel = createTextSprite(direction.id.toString(), 0x00ffff);
       hexLabel.position.set(
@@ -438,7 +440,7 @@ export class Beast {
       );
       this.group.add(hexLabel);
       this.debugObjects.targetHexLabels.push(hexLabel);
-      
+
       // Log detailed positioning information
       console.log(`[BEAST] Created arrow #${direction.id} (${direction.name}):`, {
         q: direction.q,
@@ -460,7 +462,7 @@ export class Beast {
           length: directionVector.length().toFixed(2)
         }
       });
-      
+
       // Make arrow interactive
       arrow.userData = { 
         direction: direction.name, 
@@ -469,10 +471,10 @@ export class Beast {
         isMovementArrow: true,
         targetHexPos: targetHexPos.clone()
       };
-      
+
       // Add to the group
       this.group.add(arrow);
-      
+
       // Store arrow reference for debugging
       this.directionalArrows.push({
         mesh: arrow,
@@ -482,7 +484,7 @@ export class Beast {
         targetPosition: targetHexPos.clone()
       });
     });
-    
+
     // Add a debug helper to toggle visualization
     this.toggleDebugVisualization = (visible = true) => {
       Object.values(this.debugObjects).forEach(group => {
@@ -492,18 +494,18 @@ export class Beast {
       });
       console.log(`[BEAST] Debug visualization ${visible ? 'enabled' : 'disabled'}`);
     };
-    
+
     // Make debug helper available globally for console access
     if (window.beastDebugHelpers === undefined) {
       window.beastDebugHelpers = {};
     }
     window.beastDebugHelpers.toggleArrowDebug = this.toggleDebugVisualization;
     console.log("[BEAST] Debug helper added to window.beastDebugHelpers.toggleArrowDebug()");
-    
+
     // Connect to arrow debugger if available
     this._connectToArrowDebugger();
   }
-  
+
   /**
    * Create debug text labels using Three.js TextGeometry
    * Called after font is loaded
@@ -511,12 +513,12 @@ export class Beast {
    */
   _createDebugLabels() {
     if (!this.directionalArrows || !this.directionalArrows.length) return;
-    
+
     // Don't create labels if already created with sprites
     if (this.debugObjects.directionLabels.length > 0) return;
-    
+
     console.log("[BEAST] Creating 3D text debug labels");
-    
+
     this.directionalArrows.forEach(arrow => {
       try {
         const textGeometry = new THREE.TextGeometry(arrow.directionId.toString(), {
@@ -524,17 +526,17 @@ export class Beast {
           size: 0.2,
           height: 0.05
         });
-        
+
         const textMaterial = new THREE.MeshBasicMaterial({ color: 0xffcc00 });
         const textMesh = new THREE.Mesh(textGeometry, textMaterial);
-        
+
         // Position near the arrow
         textMesh.position.copy(arrow.mesh.position);
         textMesh.position.y += 0.3;
-        
+
         // Rotate to face camera
         textMesh.lookAt(this.camera.position);
-        
+
         this.group.add(textMesh);
         this.debugObjects.directionLabels.push(textMesh);
       } catch (err) {
@@ -665,7 +667,7 @@ export class Beast {
         });
       } else {
         console.warn(`[BEAST] No hex found at q=${newQ}, r=${newR}`);
-        
+
         // Additional debug info when target hex is not found
         console.log(`[BEAST] Available hexagons:`, {
           count: this.hexagons.length,
@@ -743,6 +745,20 @@ export class Beast {
         arrow.mesh.material.opacity = 0.4 + pulseFactor * 0.6; // 0.4 to 1.0
       });
     }
+
+    // Update GIF animation if available
+    if (this.animator) {
+      this.animator.update();
+
+      // Update animator position to follow beast
+      if (this.beastGroup) {
+        this.animator.setPosition({
+          x: this.beastGroup.position.x,
+          y: this.beastGroup.position.y + 0.7, // Keep elevated
+          z: this.beastGroup.position.z
+        });
+      }
+    }
   }
 
   /**
@@ -752,8 +768,26 @@ export class Beast {
   moveTo(newPosition) {
     debugLog(`Moving ${this.type} Beast to new position`, newPosition);
 
-    // Update internal position
-    this.position = newPosition;
+    // Update current position
+    this.position = {
+      x: newPosition.x,
+      y: this.position.y, // Keep the same y
+      z: newPosition.z
+    };
+
+    // Update animator position if available
+    if (this.animator) {
+      this.animator.setPosition({
+        x: newPosition.x,
+        y: this.position.y + 0.7, // Keep elevated
+        z: newPosition.z
+      });
+      console.log(`[BEAST] Updated animator position:`, {
+        x: newPosition.x,
+        y: this.position.y + 0.7,
+        z: newPosition.z
+      });
+    }
 
     // Animate the movement
     const duration = 1000; // ms
@@ -851,36 +885,186 @@ export class Beast {
 
     debugLog(`${this.type} Beast disposed`);
   }
-}
 
-/**
- * Find a random hex of specified element type from an array of hexagons
- * @param {Array} hexagons - Array of hex objects
- * @param {string} elementType - The element type to look for
- * @returns {Object|null} The found hex or null
- */
-export function findRandomHexOfElement(hexagons, elementType) {
-  debugLog(
-    `Finding random ${elementType} hex from ${hexagons.length} hexagons`,
-  );
+  /**
+   * Load the beast texture
+   */
+  loadBeastTexture() {
+    const textureUrl = `/assets/Beasts/${this.type}.gif`;
+    console.log(`[BEAST] Loading beast texture as animated GIF from: ${textureUrl}`);
 
-  // Filter hexagons by element type
-  const matchingHexes = hexagons.filter(
-    (hex) => hex.userData && hex.userData.element === elementType,
-  );
+    // Import the SimpleGIFAnimator if not already available
+    import('./tools/SimpleGIFAnimator.js')
+      .then(module => {
+        const SimpleGIFAnimator = module.SimpleGIFAnimator;
 
-  if (matchingHexes.length === 0) {
-    console.warn(`No hexes found with element type: ${elementType}`);
-    return null;
+        // Create animator instance
+        console.log(`[BEAST] Creating GIF animator for ${this.type} Beast`);
+
+        // Calculate position (slightly elevated from beast position)
+        const animPosition = {
+          x: this.position.x,
+          y: this.position.y + 0.7, // Elevate above beast
+          z: this.position.z
+        };
+
+        // Create the animator
+        this.animator = new SimpleGIFAnimator(
+          textureUrl,
+          this.scene,
+          animPosition,
+          1.5, // Scale
+          // Success callback
+          (animator) => {
+            console.log(`[BEAST] Successfully loaded ${this.type} Beast GIF animation`, {
+              frames: animator.frames.length,
+              size: `${animator.canvas.width}x${animator.canvas.height}`
+            });
+
+            // Store reference to the sprite for manipulation
+            this.beastSprite = this.animator.sprite;
+          },
+          // Error callback
+          (error) => {
+            console.error(`[BEAST] Failed to load animated GIF for ${this.type} Beast:`, error);
+            this.loadStaticTextureFallback();
+          }
+        );
+      })
+      .catch(error => {
+        console.error(`[BEAST] Error importing SimpleGIFAnimator:`, error);
+        this.loadStaticTextureFallback();
+      });
   }
 
-  // Select random hex from matching hexes
-  const randomIndex = Math.floor(Math.random() * matchingHexes.length);
-  const selectedHex = matchingHexes[randomIndex];
+  /**
+   * Load static texture as fallback
+   */
+  loadStaticTextureFallback() {
+    const textureUrl = `/assets/Beasts/${this.type}.png`;
+    console.log(`[BEAST] Loading beast texture as static PNG from: ${textureUrl}`);
 
-  debugLog(
-    `Found ${matchingHexes.length} ${elementType} hexes, selected index ${randomIndex}`,
-  );
+    const textureLoader = new THREE.TextureLoader();
+    textureLoader.load(
+      textureUrl,
+      (texture) => {
+        console.log(`[BEAST] Successfully loaded ${this.type} Beast PNG texture`);
+        this.beastTexture = texture;
+        this.createSprite();
+      },
+      undefined,
+      (error) => {
+        console.error(`[BEAST] Failed to load static texture for ${this.type} Beast:`, error);
+        this.createFallbackSprite();
+      }
+    );
+  }
 
-  return selectedHex;
+  /**
+   * Create sprite from loaded texture
+   */
+  createSprite() {
+    if (!this.beastTexture) {
+      console.warn(`[BEAST] No texture loaded yet for ${this.type} Beast`);
+      return;
+    }
+
+    // Configure texture for crisp pixel art rendering
+    this.beastTexture.magFilter = THREE.NearestFilter;
+    this.beastTexture.minFilter = THREE.NearestFilter;
+    this.beastTexture.generateMipmaps = false;
+
+    // Create material with the texture
+    const material = new THREE.SpriteMaterial({
+      map: this.beastTexture,
+      transparent: true,
+      alphaTest: 0.1,
+    });
+
+    // Create sprite
+    this.sprite = new THREE.Sprite(material);
+
+    // Scale sprite
+    this.sprite.scale.set(this.scale, this.scale, 1);
+
+    // Add sprite to group
+    this.group.add(this.sprite);
+
+    // Mark as loaded
+    this.isLoaded = true;
+
+    debugLog(`${this.type} Beast sprite created`);
+  }
+
+  /**
+   * Create fallback sprite if all texture loading fails
+   */
+  createFallbackSprite() {
+    debugLog(`Creating colored fallback sprite for ${this.type} Beast`);
+
+    // Element color mapping
+    const elementColors = {
+      'Fire': 0xff4500,
+      'Water': 0x3498db,
+      'Earth': 0x964b00,
+      'Wind': 0xc6e2ff,
+      'Electric': 0xffff00,
+      'Plant': 0x2ecc71,
+      'Metal': 0xc0c0c0,
+      'Light': 0xffffff,
+      'Dark': 0x581845,
+      'Combat': 0xff5733,
+      'Spirit': 0xd8bfd8,
+      'Corrosion': 0x7cfc00
+    };
+
+    // Get appropriate color or default to fire color
+    const color = elementColors[this.type] || 0xff4500;
+
+    // Create fallback colored sprite
+    const fallbackMaterial = new THREE.SpriteMaterial({
+      color: color,
+      transparent: true
+    });
+
+    this.sprite = new THREE.Sprite(fallbackMaterial);
+    this.sprite.scale.set(this.scale, this.scale, 1);
+    this.group.add(this.sprite);
+    this.isLoaded = true;
+
+    debugLog(`Created colored fallback sprite for ${this.type} Beast`, { color: color.toString(16) });
+  }
+
+
+  /**
+   * Find a random hex of specified element type from an array of hexagons
+   * @param {Array} hexagons - Array of hex objects
+   * @param {string} elementType - The element type to look for
+   * @returns {Object|null} The found hex or null
+   */
+  static findRandomHexOfElement(hexagons, elementType) {
+    debugLog(
+      `Finding random ${elementType} hex from ${hexagons.length} hexagons`,
+    );
+
+    // Filter hexagons by element type
+    const matchingHexes = hexagons.filter(
+      (hex) => hex.userData && hex.userData.element === elementType,
+    );
+
+    if (matchingHexes.length === 0) {
+      console.warn(`No hexes found with element type: ${elementType}`);
+      return null;
+    }
+
+    // Select random hex from matching hexes
+    const randomIndex = Math.floor(Math.random() * matchingHexes.length);
+    const selectedHex = matchingHexes[randomIndex];
+
+    debugLog(
+      `Found ${matchingHexes.length} ${elementType} hexes, selected index ${randomIndex}`,
+    );
+
+    return selectedHex;
+  }
 }
