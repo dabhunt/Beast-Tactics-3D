@@ -647,14 +647,21 @@ class GIFTester {
 }
 
 // Create global instance
-const gifTester = new GIFTester();
-
-// Add to window for console access
-window.gifTester = gifTester;
-
-console.log("[GIF-TESTER] GIF animation tester initialized and available as window.gifTester");
-console.log("[GIF-TESTER] Use window.gifTester.show() to open the tester");
-
-// Export the tester
-export { gifTester };
-export default gifTester;
+// Only create if not already defined
+if (!window.gifTester) {
+  const localGifTester = new GIFTester();
+  
+  // Add to window for console access
+  window.gifTester = localGifTester;
+  
+  console.log("[GIF-TESTER] GIF animation tester initialized and available as window.gifTester");
+  console.log("[GIF-TESTER] Use window.gifTester.show() to open the tester");
+  
+  // Export the tester
+  export { localGifTester as gifTester };
+  export default localGifTester;
+} else {
+  console.log("[GIF-TESTER] GIF tester already initialized, using existing instance");
+  export { window.gifTester as gifTester };
+  export default window.gifTester;
+}

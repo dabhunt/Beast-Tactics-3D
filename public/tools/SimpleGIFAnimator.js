@@ -21,7 +21,23 @@ function debugLog(message, data = null) {
 /**
  * Class to handle animated GIF sprites in THREE.js scenes
  */
-export class SimpleGIFAnimator {
+export /**
+ * Helper function for debug logging
+ * @param {string} message - Log message
+ * @param {Object} data - Optional data to log
+ */
+function debugLog(message, data = null) {
+  if (data) {
+    console.log(`[SIMPLE-GIF] ${message}`, data);
+  } else {
+    console.log(`[SIMPLE-GIF] ${message}`);
+  }
+}
+
+/**
+ * SimpleGIFAnimator class for handling GIF animations in THREE.js
+ */
+class SimpleGIFAnimator {
   /**
    * @param {string} url - URL of the GIF to load
    * @param {THREE.Scene} scene - The THREE.js scene

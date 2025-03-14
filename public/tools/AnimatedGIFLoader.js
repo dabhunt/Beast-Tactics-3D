@@ -26,6 +26,24 @@ function debugLog(message, data = null) {
 /**
  * GIF loader for handling animated textures in THREE.js
  */
+import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js";
+
+/**
+ * Helper function for debug logging
+ * @param {string} message - Log message
+ * @param {Object} data - Optional data to log
+ */
+function debugLog(message, data = null) {
+  if (data) {
+    console.log(`[GIF-LOADER] ${message}`, data);
+  } else {
+    console.log(`[GIF-LOADER] ${message}`);
+  }
+}
+
+/**
+ * Animated GIF loader for THREE.js
+ */
 class AnimatedGIFLoader {
   constructor() {
     debugLog('Initializing AnimatedGIFLoader');

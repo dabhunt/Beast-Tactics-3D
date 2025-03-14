@@ -1,71 +1,110 @@
 
 /**
- * debugLoader.js - Single entry point for loading all debug tools
+ * debugLoader.js - Centralized loader for all debug tools
  * 
- * This script coordinates loading all debug tools in the correct order
- * to avoid duplicate declarations and initialization problems.
+ * This module handles loading all debug-related tools in the correct order
+ * with proper dependency management to avoid conflicts.
  */
+
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js";
 
-console.log("[DEBUG-LOADER] Starting debug tools initialization");
-
-// Track loading state
-const loadingState = {
-  debugMenu: false,
-  gifTools: false,
-  arrowDebugger: false,
-  completed: false
-};
+// Debug flag
+const DEBUG = true;
 
 /**
- * Load the specified debug modules in sequence
+ * Debug logging helper
  */
-async function loadDebugTools() {
-  try {
-    // 1. First load the central debug menu
-    console.log("[DEBUG-LOADER] Loading DebugMenu...");
-    const debugMenuModule = await import('./DebugMenu.js');
-    window.gameDebugMenu = debugMenuModule.default;
-    loadingState.debugMenu = true;
-    console.log("[DEBUG-LOADER] DebugMenu loaded successfully");
-    
-    // 2. Load GIF tools
-    console.log("[DEBUG-LOADER] Loading GIF tools...");
-    try {
-      const gifLoaderModule = await import('../AnimatedGIFLoader.js');
-      window.gifLoader = gifLoaderModule.default;
-      loadingState.gifTools = true;
-      console.log("[DEBUG-LOADER] GIF tools loaded successfully");
-    } catch (err) {
-      console.error("[DEBUG-LOADER] Failed to load GIF tools:", err);
-    }
-    
-    // 3. Initialize GIF tester
-    console.log("[DEBUG-LOADER] Loading GIF tester...");
-    try {
-      const gifTesterModule = await import('./initGifTester.js');
-      loadingState.gifTester = true;
-      console.log("[DEBUG-LOADER] GIF tester loaded successfully");
-    } catch (err) {
-      console.error("[DEBUG-LOADER] Failed to load GIF tester:", err);
-    }
-    
-    // Mark loading as complete
-    loadingState.completed = true;
-    console.log("[DEBUG-LOADER] All debug tools loaded successfully");
-    
-    // Fire an event to notify other scripts
-    const event = new CustomEvent('debug-tools-loaded', { detail: loadingState });
-    window.dispatchEvent(event);
-    
-  } catch (err) {
-    console.error("[DEBUG-LOADER] Error loading debug tools:", err);
+function debugLog(message, data = null) {
+  if (!DEBUG) return;
+  
+  if (data) {
+    console.log(`[DEBUG-LOADER] ${message}`, data);
+  } else {
+    console.log(`[DEBUG-LOADER] ${message}`);
   }
 }
 
-// Start loading
-loadDebugTools();
+/**
+ * Load all debug tools in the proper order
+ */
+export async function loadDebugTools() {
+  try {
+    debugLog('Starting debug tools initialization');
+    
+    // Load dependencies first
+    debugLog('Loading DebugMenu...');
+    const DebugMenuModule = await import('./DebugMenu.js');
+    const DebugMenu = DebugMenuModule.DebugMenu;
+    
+    // Create debug menu instance if not already created
+    if (!window.gameDebugMenu) {
+      window.gameDebugMenu = new DebugMenu();
+      debugLog('Debug menu created');
+    } else {
+      debugLog('Using existing debug menu');
+    }
+    
+    // GIF animation tools (load before other GIF-dependent tools)
+    debugLog('Loading GIF animation tools...');
+    await import('./initGIFTools.js')
+      .catch(err => {
+        console.error('[DEBUG-LOADER] Failed to load GIF tools:', err);
+      });
+    
+    // Arrow debugger
+    debugLog('Loading arrow debugger...');
+    const ArrowDebuggerModule = await import('./ArrowDebugger.js')
+      .catch(err => {
+        console.error('[DEBUG-LOADER] Failed to load arrow debugger:', err);
+        return { ArrowDebugger: null };
+      });
+    
+    if (ArrowDebuggerModule.ArrowDebugger) {
+      // Initialize arrow debugger and attach to debug menu
+      const arrowDebugger = new ArrowDebuggerModule.ArrowDebugger(window.gameDebugMenu);
+      window.arrowDebugger = arrowDebugger;
+      
+      // Add arrow debugger initialization function to debug menu
+      window.gameDebugMenu.initArrowDebugger = function(beast) {
+        if (window.arrowDebugger) {
+          window.arrowDebugger.setBeast(beast);
+          debugLog('Arrow debugger connected to beast');
+        }
+      };
+      
+      // Add arrow debugger to camera
+      window.gameDebugMenu.setCameraManager = function(camera) {
+        if (window.arrowDebugger) {
+          window.arrowDebugger.setCamera(camera);
+          debugLog('Arrow debugger connected to camera');
+        }
+      };
+      
+      debugLog('Arrow debugger initialized');
+    }
+    
+    // GIF tester (after GIF tools are loaded)
+    debugLog('Loading GIF animation tester...');
+    await import('./initGifTester.js')
+      .catch(err => {
+        console.error('[DEBUG-LOADER] Failed to load GIF tester:', err);
+      });
+    
+    debugLog('All debug tools loaded successfully');
+    
+    return window.gameDebugMenu;
+  } catch (err) {
+    console.error('[DEBUG-LOADER] Error loading debug tools:', err);
+    throw err;
+  }
+}
 
-// Export loading state for other modules to check
-export const debugLoadingState = loadingState;
-export default loadingState;
+// Auto-initialize when imported if in debug mode
+if (DEBUG) {
+  loadDebugTools().catch(err => {
+    console.error('[DEBUG-LOADER] Failed to auto-initialize debug tools:', err);
+  });
+}
+
+// Make available globally
+window.loadDebugTools = loadDebugTools;

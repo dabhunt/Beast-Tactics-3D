@@ -447,7 +447,10 @@ export class ArrowDebugger {
 /**
  * GIF Debugger for tracking and debugging animated GIFs
  */
-export class GIFDebugger {
+export /**
+ * GIFDebugger class for debugging animated GIF textures
+ */
+class GIFDebuggerComponent {
   constructor(debugMenu) {
     console.log("[GIF-DEBUG] Initializing GIF debugger");
     
@@ -498,7 +501,7 @@ export class GIFDebugger {
       });
       this._updateTextureList();
     }, '#e74c3c');
-    this.section.appendChild(toggleAllButton);
+    this.section.appendChild(toggleButton);
   }
   
   /**

@@ -12,28 +12,24 @@ console.log("[GIF-TOOLS] Initializing GIF animation tools");
 let initialized = false;
 
 /**
- * Load a script from URL with error handling
- * @param {string} url - Script URL to load
- * @returns {Promise} - Promise resolving when script is loaded
+ * Load a script dynamically
+ * @param {string} url - URL of the script to load
+ * @returns {Promise} - Promise that resolves when the script is loaded
  */
-async function loadScript(url) {
+const loadGifToolsScript = function(url) {
   console.log(`[GIF-TOOLS] Loading script: ${url}`);
 
   return new Promise((resolve, reject) => {
     const script = document.createElement('script');
     script.src = url;
-    script.async = true;
-
     script.onload = () => {
       console.log(`[GIF-TOOLS] Script loaded: ${url}`);
       resolve();
     };
-
-    script.onerror = (err) => {
-      console.error(`[GIF-TOOLS] Failed to load script: ${url}`, err);
-      reject(err);
+    script.onerror = (error) => {
+      console.error(`[GIF-TOOLS] Failed to load script: ${url}`, error);
+      reject(error);
     };
-
     document.head.appendChild(script);
   });
 }
@@ -51,7 +47,7 @@ async function initializeGIFTools() {
     console.log("[GIF-TOOLS] Initialization script loaded");
 
     // Load additional dependencies
-    await loadScript("https://cdn.jsdelivr.net/npm/omggif@1.0.10/omggif.min.js");
+    await loadGifToolsScript("https://cdn.jsdelivr.net/npm/omggif@1.0.10/omggif.min.js");
     console.log("[GIF-TOOLS] omggif loaded from CDN");
 
     // Import GifDebugger module
