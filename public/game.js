@@ -650,6 +650,8 @@ try {
 
   // Load additional GIF debugging tools
   console.log("[DEBUG] Loading additional GIF debugging tools");
+  
+  // Load existing GIF debugging tools
   import('./tools/diagnostics/GifDebugger.js')
     .then(module => {
       console.log("[DEBUG] GIF debugging tools loaded successfully");
@@ -657,6 +659,38 @@ try {
     })
     .catch(err => {
       console.error("[DEBUG] Failed to load GIF debugging tools:", err);
+    });
+    
+  // Load new GIF animation test tool
+  import('./tools/diagnostics/GifAnimationTest.js')
+    .then(module => {
+      console.log("[DEBUG] GIF Animation Test Tool loaded successfully");
+      
+      // Create an instance and make globally available
+      window.gifAnimationTest = new module.GifAnimationTest();
+      
+      // Add a button to the debug info panel to show the test tool
+      const debugInfo = document.querySelector("div[style*='position: absolute'][style*='top: 10px'][style*='right: 10px']");
+      if (debugInfo) {
+        const testButton = document.createElement('button');
+        testButton.textContent = 'Test GIF Animations';
+        testButton.style.marginTop = '10px';
+        testButton.style.padding = '5px';
+        testButton.style.cursor = 'pointer';
+        testButton.addEventListener('click', () => {
+          if (window.gifAnimationTest) {
+            window.gifAnimationTest.show();
+          }
+        });
+        
+        debugInfo.appendChild(testButton);
+        console.log("[DEBUG] GIF Animation Test button added to debug panel");
+      } else {
+        console.log("[DEBUG] Debug panel not found for adding GIF Animation Test button");
+      }
+    })
+    .catch(err => {
+      console.error("[DEBUG] Failed to load GIF Animation Test Tool:", err);
     });
 
   // Add Beast to scene after grid generation
