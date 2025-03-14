@@ -53,8 +53,7 @@ export class Beast {
 
     // Load textures and create sprite
     this.beastTexture = null;
-    this.animator = null;  // Will hold our GIF animator instance
-    this.loadBeastTexture();
+    this.loadStaticTexture();
 
     // Create directional indicators
     this._createDirectionalIndicators();
@@ -63,126 +62,22 @@ export class Beast {
   }
 
   /**
-   * Load beast textures and create sprite
-   * @private
+   * Load the static texture for the beast
    */
-  _loadTextures() {
-    debugLog(`Loading textures for ${this.type} Beast`);
-
-    try {
-      // Import the animated GIF loader on-demand
-      import('./tools/AnimatedGIFLoader.js')
-        .then(module => {
-          const { gifLoader } = module;
-
-          // Load beast texture as animated GIF
-          const beastUrl = `/assets/Beasts/${this.type}.gif`;
-          debugLog(`Loading beast texture as animated GIF from: ${beastUrl}`);
-
-          // Set animation speed (higher for more fluid animation)
-          gifLoader.setFPS(15);
-
-          // Use GIF loader to handle animation
-          gifLoader.load(
-            // URL
-            beastUrl,
-
-            // onComplete callback
-            (texture) => {
-              debugLog(`Successfully loaded ${this.type} Beast texture as animated GIF`);
-
-              // Store reference to texture for later cleanup
-              this.beastTexture = texture;
-
-              // Create material with the animated texture
-              const material = new THREE.SpriteMaterial({
-                map: texture,
-                transparent: true,
-                alphaTest: 0.1, // Reduce alpha test for better edges
-              });
-
-              // Create sprite
-              this.sprite = new THREE.Sprite(material);
-
-              // Scale sprite for pixel art
-              this.sprite.scale.set(this.scale, this.scale, 1);
-
-              // Log animation setup
-              console.log(
-                `[BEAST] Applied animated GIF setup for ${this.type} Beast`,
-                { 
-                  animated: true,
-                  url: beastUrl
-                }
-              );
-
-              // Register with animation debugger if available
-              if (window.animationDebugger) {
-                console.log(`[BEAST] Registering ${this.type} Beast with animation debugger`);
-                this.animationDebuggerIndex = window.animationDebugger.registerTexture(
-                  texture, 
-                  `${this.type}Beast`
-                );
-              } else {
-                console.log(`[BEAST] Animation debugger not available, animation may not work correctly`);
-              }
-
-              // Add sprite to group
-              this.group.add(this.sprite);
-
-              // Mark as loaded
-              this.isLoaded = true;
-
-              debugLog(`${this.type} Beast animated sprite created`);
-            },
-
-            // onError callback
-            (error) => {
-              console.error(
-                `Failed to load animated GIF for ${this.type} Beast:`,
-                error
-              );
-
-              // Fall back to static texture loader
-              debugLog(`Falling back to static texture loader`);
-              this._loadStaticTexture(beastUrl);
-            }
-          );
-        })
-        .catch(err => {
-          console.error(`Failed to import AnimatedGIFLoader:`, err);
-
-          // Fall back to regular texture loading if module import fails
-          const beastUrl = `/assets/Beasts/${this.type}.gif`;
-          this._loadStaticTexture(beastUrl);
-        });
-    } catch (err) {
-      console.error(`Error in texture loading for ${this.type} Beast:`, err);
-      debugLog(`Beast creation failed with error: ${err.message}`);
-
-      // Create emergency fallback with colored sprite
-      this._createFallbackSprite();
-    }
-  }
-
-  /**
-   * Load a static texture as fallback when animation fails
-   * @param {string} url - URL to load texture from
-   * @private
-   */
-  _loadStaticTexture(url) {
-    debugLog(`Loading static texture fallback from: ${url}`);
+  loadStaticTexture() {
+    const textureUrl = `/assets/Beasts/${this.type}.gif`;
+    debugLog(`Loading static texture from: ${textureUrl}`);
 
     // Create texture loader with error handling
     const textureLoader = new THREE.TextureLoader();
 
     textureLoader.load(
       // URL
-      url,
+      textureUrl,
 
       // onLoad callback
       (texture) => {
-        debugLog(`Successfully loaded ${this.type} Beast static texture`);
+        debugLog(`Successfully loaded ${this.type} Beast texture`);
 
         // Store reference to texture
         this.beastTexture = texture;
@@ -205,22 +100,13 @@ export class Beast {
         // Scale sprite
         this.sprite.scale.set(this.scale, this.scale, 1);
 
-        // Log fallback
-        console.log(
-          `[BEAST] Applied static texture fallback for ${this.type} Beast`,
-          { 
-            animated: false, 
-            url: url
-          }
-        );
-
         // Add sprite to group
         this.group.add(this.sprite);
 
         // Mark as loaded
         this.isLoaded = true;
 
-        debugLog(`${this.type} Beast static sprite created`);
+        debugLog(`${this.type} Beast sprite created`);
       },
 
       // onProgress callback (not used)
@@ -228,14 +114,14 @@ export class Beast {
 
       // onError callback
       (error) => {
-        console.error(`Failed to load static texture for ${this.type} Beast:`, error);
+        console.error(`Failed to load texture for ${this.type} Beast:`, error);
         this._createFallbackSprite();
       }
     );
   }
 
   /**
-   * Create a colored fallback sprite when all texture loading fails
+   * Create a colored fallback sprite when texture loading fails
    * @private
    */
   _createFallbackSprite() {
@@ -276,13 +162,12 @@ export class Beast {
 
   /**
    * Create directional arrows pointing to adjacent hexes
-   * Using vector-based positioning for more accurate alignment
    * @private
    */
   _createDirectionalIndicators() {
-    console.log("[BEAST] Creating directional movement arrows using vector-based orientation");
+    console.log("[BEAST] Creating directional movement arrows");
 
-    // Define hex directions with numerical labels for debugging
+    // Define hex directions
     this.hexDirections = [
       { id: 1, name: "North", q: 0, r: -1 },
       { id: 2, name: "NorthEast", q: 1, r: -1 },
@@ -297,13 +182,13 @@ export class Beast {
     const hexHeight = 0.2; // Height of hex tile
     const horizontalSpacing = 1.5; // Horizontal spacing between hexes
     const verticalFactor = 1.0; // Vertical spacing factor
-    const arrowDistance = 0.7; // Controls how far along the vector the arrow is placed (0-1)
+    const arrowDistance = 0.7; // Controls how far along the vector the arrow is placed
     const arrowHeight = 0.7; // Height of arrows above the hex plane
 
     // Create geometry for arrow
-    const arrowGeometry = new THREE.ConeGeometry(0.15, 0.4, 4); // Slightly smaller arrows
+    const arrowGeometry = new THREE.ConeGeometry(0.15, 0.4, 4);
 
-    // Material for arrows - using distinct colors for better visibility
+    // Material for arrows
     const arrowMaterial = new THREE.MeshPhongMaterial({
       color: 0xffcc00,
       transparent: true,
@@ -312,68 +197,8 @@ export class Beast {
       specular: 0xffffff
     });
 
-    // Font for debug labels
-    let font = null;
-    // Try to load font for labels asynchronously - using dynamic import for FontLoader
-    try {
-      // Import the FontLoader properly from three.js modules
-      import('https://cdn.jsdelivr.net/npm/three@0.162.0/examples/jsm/loaders/FontLoader.js')
-        .then(module => {
-          const FontLoader = module.FontLoader;
-          const fontLoader = new FontLoader();
-          fontLoader.load('/assets/fonts/helvetiker_regular.typeface.json', loadedFont => {
-            font = loadedFont;
-            this._createDebugLabels();
-            console.log("[BEAST] Loaded font for debug labels using proper module import");
-          }, undefined, error => {
-            console.warn("[BEAST] Failed to load font:", error);
-          });
-        })
-        .catch(error => {
-          console.error("[BEAST] Error loading FontLoader module:", error);
-          console.log("[BEAST] Using text sprites instead of 3D text for debug labels");
-        });
-    } catch (error) {
-      console.error("[BEAST] FontLoader import error:", error);
-      console.log("[BEAST] Using text sprites for labels (fallback)");
-    }
-
-    // Store references to debug objects
-    this.debugObjects = {
-      directionLabels: [],
-      targetHexLabels: [],
-      directionVectors: []
-    };
-
-    // Create an array to store arrow references for debugging
+    // Create an array to store arrow references
     this.directionalArrows = [];
-
-    // Create text sprite function (for better text rendering than geometry)
-    const createTextSprite = (text, color = 0xffffff, size = 0.3) => {
-      const canvas = document.createElement('canvas');
-      const context = canvas.getContext('2d');
-      canvas.width = 128;
-      canvas.height = 128;
-
-      // Draw background
-      context.fillStyle = 'rgba(0, 0, 0, 0.7)';
-      context.fillRect(0, 0, canvas.width, canvas.height);
-
-      // Draw text
-      context.font = '64px Arial';
-      context.fillStyle = `#${color.toString(16).padStart(6, '0')}`;
-      context.textAlign = 'center';
-      context.textBaseline = 'middle';
-      context.fillText(text, canvas.width/2, canvas.height/2);
-
-      // Create texture and sprite
-      const texture = new THREE.CanvasTexture(canvas);
-      const material = new THREE.SpriteMaterial({ map: texture });
-      const sprite = new THREE.Sprite(material);
-      sprite.scale.set(size, size, 1);
-
-      return sprite;
-    };
 
     // Function to calculate 3D hex position from axial coordinates
     const calculateHexPosition = (q, r) => {
@@ -406,17 +231,6 @@ export class Beast {
       // Position arrow
       arrow.position.copy(arrowPos);
 
-      // Debug: Create a line showing the vector
-      const debugLine = new THREE.Line(
-        new THREE.BufferGeometry().setFromPoints([
-          new THREE.Vector3(0, arrowHeight, 0),
-          new THREE.Vector3().copy(targetHexPos).setY(arrowHeight)
-        ]),
-        new THREE.LineBasicMaterial({ color: 0xff0000, transparent: true, opacity: 0.5 })
-      );
-      this.group.add(debugLine);
-      this.debugObjects.directionVectors.push(debugLine);
-
       // Store original target for lookAt
       const targetPoint = new THREE.Vector3().copy(targetHexPos);
       targetPoint.y = arrowHeight; // Keep on same plane for correct orientation
@@ -425,57 +239,6 @@ export class Beast {
       // We need to apply a -90 degree X rotation to account for cone's default orientation
       arrow.lookAt(targetPoint);
       arrow.rotateX(Math.PI / 2);
-
-      // Create debug number label for the arrow
-      const arrowLabel = createTextSprite(direction.id.toString(), 0xffcc00);
-      arrowLabel.position.set(
-        arrowPos.x, 
-        arrowPos.y + 0.3, // Slightly above the arrow
-        arrowPos.z
-      );
-      this.group.add(arrowLabel);
-      this.debugObjects.directionLabels.push(arrowLabel);
-
-      // Create debug sphere to mark target hex position
-      const debugSphere = new THREE.Mesh(
-        new THREE.SphereGeometry(0.1),
-        new THREE.MeshBasicMaterial({ color: 0x00ffff })
-      );
-      debugSphere.position.copy(targetHexPos);
-      debugSphere.position.y = hexHeight + 0.05; // Just above hex
-      this.group.add(debugSphere);
-
-      // Create matching target hex label
-      const hexLabel = createTextSprite(direction.id.toString(), 0x00ffff);
-      hexLabel.position.set(
-        targetHexPos.x,
-        targetHexPos.y + 0.3, // Above the hex
-        targetHexPos.z
-      );
-      this.group.add(hexLabel);
-      this.debugObjects.targetHexLabels.push(hexLabel);
-
-      // Log detailed positioning information
-      console.log(`[BEAST] Created arrow #${direction.id} (${direction.name}):`, {
-        q: direction.q,
-        r: direction.r,
-        targetHexPos: {
-          x: targetHexPos.x.toFixed(2),
-          y: targetHexPos.y.toFixed(2),
-          z: targetHexPos.z.toFixed(2)
-        },
-        arrowPos: {
-          x: arrowPos.x.toFixed(2),
-          y: arrowPos.y.toFixed(2),
-          z: arrowPos.z.toFixed(2)
-        },
-        directionVector: {
-          x: directionVector.x.toFixed(2),
-          y: directionVector.y.toFixed(2),
-          z: directionVector.z.toFixed(2),
-          length: directionVector.length().toFixed(2)
-        }
-      });
 
       // Make arrow interactive
       arrow.userData = { 
@@ -489,7 +252,7 @@ export class Beast {
       // Add to the group
       this.group.add(arrow);
 
-      // Store arrow reference for debugging
+      // Store arrow reference
       this.directionalArrows.push({
         mesh: arrow,
         direction: direction.name,
@@ -498,91 +261,6 @@ export class Beast {
         targetPosition: targetHexPos.clone()
       });
     });
-
-    // Add a debug helper to toggle visualization
-    this.toggleDebugVisualization = (visible = true) => {
-      Object.values(this.debugObjects).forEach(group => {
-        group.forEach(obj => {
-          obj.visible = visible;
-        });
-      });
-      console.log(`[BEAST] Debug visualization ${visible ? 'enabled' : 'disabled'}`);
-    };
-
-    // Make debug helper available globally for console access
-    if (window.beastDebugHelpers === undefined) {
-      window.beastDebugHelpers = {};
-    }
-    window.beastDebugHelpers.toggleArrowDebug = this.toggleDebugVisualization;
-    console.log("[BEAST] Debug helper added to window.beastDebugHelpers.toggleArrowDebug()");
-
-    // Connect to arrow debugger if available
-    this._connectToArrowDebugger();
-  }
-
-  /**
-   * Create debug text labels using Three.js TextGeometry
-   * Called after font is loaded
-   * @private
-   */
-  _createDebugLabels() {
-    if (!this.directionalArrows || !this.directionalArrows.length) return;
-
-    // Don't create labels if already created with sprites
-    if (this.debugObjects.directionLabels.length > 0) return;
-
-    console.log("[BEAST] Creating 3D text debug labels");
-
-    this.directionalArrows.forEach(arrow => {
-      try {
-        const textGeometry = new THREE.TextGeometry(arrow.directionId.toString(), {
-          font: font,
-          size: 0.2,
-          height: 0.05
-        });
-
-        const textMaterial = new THREE.MeshBasicMaterial({ color: 0xffcc00 });
-        const textMesh = new THREE.Mesh(textGeometry, textMaterial);
-
-        // Position near the arrow
-        textMesh.position.copy(arrow.mesh.position);
-        textMesh.position.y += 0.3;
-
-        // Rotate to face camera
-        textMesh.lookAt(this.camera.position);
-
-        this.group.add(textMesh);
-        this.debugObjects.directionLabels.push(textMesh);
-      } catch (err) {
-        console.warn("[BEAST] Failed to create 3D text label:", err);
-      }
-    });
-  }
-
-  /**
-   * Connect this beast to the arrow debugger
-   * @private
-   */
-  _connectToArrowDebugger() {
-    console.log("[BEAST] Attempting to connect to arrow debugger");
-
-    // Check if debug menu is available globally
-    if (window.gameDebugMenu) {
-      console.log("[BEAST] Debug menu found, connecting to arrow debugger");
-      window.gameDebugMenu.updateArrowDebuggerBeast(this);
-    } else {
-      console.log("[BEAST] Debug menu not available yet, will retry in 1 second");
-
-      // Retry after a short delay to allow debug menu to initialize
-      setTimeout(() => {
-        if (window.gameDebugMenu) {
-          console.log("[BEAST] Debug menu now available, connecting to arrow debugger");
-          window.gameDebugMenu.updateArrowDebuggerBeast(this);
-        } else {
-          console.log("[BEAST] Debug menu still not available, arrow debugging disabled");
-        }
-      }, 1000);
-    }
   }
 
   /**
@@ -632,23 +310,6 @@ export class Beast {
     if (intersects.length > 0) {
       const clickedArrow = intersects[0].object;
 
-      // Highlight arrow in debugger if available
-      if (window.arrowDebugger) {
-        window.arrowDebugger.highlightArrow(clickedArrow.userData.directionId);
-      }
-
-      // Log click info for debugging
-      console.log(`[BEAST] Arrow clicked:`, {
-        direction: clickedArrow.userData.direction,
-        directionId: clickedArrow.userData.directionId,
-        offset: clickedArrow.userData.moveOffset,
-        currentPosition: { ...this.currentAxialPos },
-        targetPosition: {
-          q: this.currentAxialPos.q + clickedArrow.userData.moveOffset.q,
-          r: this.currentAxialPos.r + clickedArrow.userData.moveOffset.r
-        }
-      });
-
       // Calculate the new axial position
       const newQ = this.currentAxialPos.q + clickedArrow.userData.moveOffset.q;
       const newR = this.currentAxialPos.r + clickedArrow.userData.moveOffset.r;
@@ -681,14 +342,6 @@ export class Beast {
         });
       } else {
         console.warn(`[BEAST] No hex found at q=${newQ}, r=${newR}`);
-
-        // Additional debug info when target hex is not found
-        console.log(`[BEAST] Available hexagons:`, {
-          count: this.hexagons.length,
-          nearby: this.hexagons
-            .filter(h => Math.abs(h.userData.q - newQ) <= 1 && Math.abs(h.userData.r - newR) <= 1)
-            .map(h => ({ q: h.userData.q, r: h.userData.r }))
-        });
       }
     }
   }
@@ -738,19 +391,12 @@ export class Beast {
   }
 
   /**
-   * Update the beast to face the camera (billboarding)
-   * This should be called in the animation loop
+   * Update the beast (called in animation loop)
    */
   update() {
     if (!this.isLoaded) return;
 
-    // Make the beast face the camera (billboard effect)
-    if (this.sprite) {
-      // Sprites automatically face the camera in THREE.js
-      // No additional rotation needed
-    }
-
-    // Animate the directional arrows (optional)
+    // Animate the directional arrows
     if (this.directionalArrows) {
       // Pulse the arrows by adjusting opacity
       const pulseFactor = (Math.sin(Date.now() * 0.005) + 1) / 2; // 0 to 1
@@ -758,20 +404,6 @@ export class Beast {
       this.directionalArrows.forEach((arrow) => {
         arrow.mesh.material.opacity = 0.4 + pulseFactor * 0.6; // 0.4 to 1.0
       });
-    }
-
-    // Update GIF animation if available
-    if (this.animator) {
-      this.animator.update();
-
-      // Update animator position to follow beast
-      if (this.beastGroup) {
-        this.animator.setPosition({
-          x: this.beastGroup.position.x,
-          y: this.beastGroup.position.y + 0.7, // Keep elevated
-          z: this.beastGroup.position.z
-        });
-      }
     }
   }
 
@@ -788,20 +420,6 @@ export class Beast {
       y: this.position.y, // Keep the same y
       z: newPosition.z
     };
-
-    // Update animator position if available
-    if (this.animator) {
-      this.animator.setPosition({
-        x: newPosition.x,
-        y: this.position.y + 0.7, // Keep elevated
-        z: newPosition.z
-      });
-      console.log(`[BEAST] Updated animator position:`, {
-        x: newPosition.x,
-        y: this.position.y + 0.7,
-        z: newPosition.z
-      });
-    }
 
     // Animate the movement
     const duration = 1000; // ms
@@ -846,27 +464,9 @@ export class Beast {
   dispose() {
     debugLog(`Disposing ${this.type} Beast`);
 
-    // Dispose animated texture if exists
+    // Dispose texture if exists
     if (this.beastTexture) {
-      // Try to use GIF loader's dispose method if available
-      import('./tools/AnimatedGIFLoader.js')
-        .then(module => {
-          const { gifLoader } = module;
-          try {
-            gifLoader.dispose(this.beastTexture);
-            debugLog(`Disposed animated texture for ${this.type} Beast`);
-          } catch (err) {
-            console.warn(`Could not dispose animated texture:`, err);
-            this.beastTexture.dispose();
-          }
-        })
-        .catch(() => {
-          // Fallback to regular dispose
-          if (this.beastTexture.dispose) {
-            this.beastTexture.dispose();
-          }
-        });
-
+      this.beastTexture.dispose();
       this.beastTexture = null;
     }
 
@@ -899,156 +499,6 @@ export class Beast {
 
     debugLog(`${this.type} Beast disposed`);
   }
-
-  /**
-   * Load the beast texture
-   */
-  loadBeastTexture() {
-    const textureUrl = `/assets/Beasts/${this.type}.gif`;
-    console.log(`[BEAST] Loading beast texture as animated GIF from: ${textureUrl}`);
-
-    // Import the SimpleGIFAnimator if not already available
-    import('./tools/SimpleGIFAnimator.js')
-      .then(module => {
-        const SimpleGIFAnimator = module.SimpleGIFAnimator;
-
-        // Create animator instance
-        console.log(`[BEAST] Creating GIF animator for ${this.type} Beast`);
-
-        // Calculate position (slightly elevated from beast position)
-        const animPosition = {
-          x: this.position.x,
-          y: this.position.y + 0.7, // Elevate above beast
-          z: this.position.z
-        };
-
-        // Create the animator
-        this.animator = new SimpleGIFAnimator(
-          textureUrl,
-          this.scene,
-          animPosition,
-          1.5, // Scale
-          // Success callback
-          (animator) => {
-            console.log(`[BEAST] Successfully loaded ${this.type} Beast GIF animation`, {
-              frames: animator.frames.length,
-              size: `${animator.canvas.width}x${animator.canvas.height}`
-            });
-
-            // Store reference to the sprite for manipulation
-            this.beastSprite = this.animator.sprite;
-          },
-          // Error callback
-          (error) => {
-            console.error(`[BEAST] Failed to load animated GIF for ${this.type} Beast:`, error);
-            this.loadStaticTextureFallback();
-          }
-        );
-      })
-      .catch(error => {
-        console.error(`[BEAST] Error importing SimpleGIFAnimator:`, error);
-        this.loadStaticTextureFallback();
-      });
-  }
-
-  /**
-   * Load static texture as fallback
-   */
-  loadStaticTextureFallback() {
-    const textureUrl = `/assets/Beasts/${this.type}.png`;
-    console.log(`[BEAST] Loading beast texture as static PNG from: ${textureUrl}`);
-
-    const textureLoader = new THREE.TextureLoader();
-    textureLoader.load(
-      textureUrl,
-      (texture) => {
-        console.log(`[BEAST] Successfully loaded ${this.type} Beast PNG texture`);
-        this.beastTexture = texture;
-        this.createSprite();
-      },
-      undefined,
-      (error) => {
-        console.error(`[BEAST] Failed to load static texture for ${this.type} Beast:`, error);
-        this.createFallbackSprite();
-      }
-    );
-  }
-
-  /**
-   * Create sprite from loaded texture
-   */
-  createSprite() {
-    if (!this.beastTexture) {
-      console.warn(`[BEAST] No texture loaded yet for ${this.type} Beast`);
-      return;
-    }
-
-    // Configure texture for crisp pixel art rendering
-    this.beastTexture.magFilter = THREE.NearestFilter;
-    this.beastTexture.minFilter = THREE.NearestFilter;
-    this.beastTexture.generateMipmaps = false;
-
-    // Create material with the texture
-    const material = new THREE.SpriteMaterial({
-      map: this.beastTexture,
-      transparent: true,
-      alphaTest: 0.1,
-    });
-
-    // Create sprite
-    this.sprite = new THREE.Sprite(material);
-
-    // Scale sprite
-    this.sprite.scale.set(this.scale, this.scale, 1);
-
-    // Add sprite to group
-    this.group.add(this.sprite);
-
-    // Mark as loaded
-    this.isLoaded = true;
-
-    debugLog(`${this.type} Beast sprite created`);
-  }
-
-  /**
-   * Create fallback sprite if all texture loading fails
-   */
-  createFallbackSprite() {
-    debugLog(`Creating colored fallback sprite for ${this.type} Beast`);
-
-    // Element color mapping
-    const elementColors = {
-      'Fire': 0xff4500,
-      'Water': 0x3498db,
-      'Earth': 0x964b00,
-      'Wind': 0xc6e2ff,
-      'Electric': 0xffff00,
-      'Plant': 0x2ecc71,
-      'Metal': 0xc0c0c0,
-      'Light': 0xffffff,
-      'Dark': 0x581845,
-      'Combat': 0xff5733,
-      'Spirit': 0xd8bfd8,
-      'Corrosion': 0x7cfc00
-    };
-
-    // Get appropriate color or default to fire color
-    const color = elementColors[this.type] || 0xff4500;
-
-    // Create fallback colored sprite
-    const fallbackMaterial = new THREE.SpriteMaterial({
-      color: color,
-      transparent: true
-    });
-
-    this.sprite = new THREE.Sprite(fallbackMaterial);
-    this.sprite.scale.set(this.scale, this.scale, 1);
-    this.group.add(this.sprite);
-    this.isLoaded = true;
-
-    debugLog(`Created colored fallback sprite for ${this.type} Beast`, { color: color.toString(16) });
-  }
-
 
   /**
    * Find a random hex of specified element type from an array of hexagons
