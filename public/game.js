@@ -506,13 +506,8 @@ try {
         lastTime = currentTime;
       }
 
-      // Add some movement to make it clear rendering is working
-      hexagons.forEach((hex, index) => {
-        // Make hexagons gently bob up and down
-        if (index % 3 === 0) {
-          hex.position.y = Math.sin(currentTime * 0.001 + index * 0.1) * 0.2;
-        }
-      });
+      // No longer need the constant bobbing animation
+      // Instead we'll handle hover effects on hexagons
 
       // Render the scene
       renderer.render(scene, camera);
@@ -892,6 +887,9 @@ try {
     if (fireBeast) {
       fireBeast.update();
     }
+    
+    // Update hex hover animation
+    updateHexHoverAnimation();
 
     // Update animation debugger if available
     if (animationDebugger) {
@@ -902,6 +900,161 @@ try {
   // Replace the animate function with our enhanced version
   animate = enhancedAnimate;
 
+  // Set up hex hover effects
+  debugLog("Setting up hex hover effects");
+  
+  // Create raycaster for hex hover detection
+  const hexRaycaster = new THREE.Raycaster();
+  
+  // Track the currently hovered hex
+  let hoveredHex = null;
+  let defaultHexHeight = 0; // Will store the original height
+  const hexHoverHeight = 0.3; // How much to elevate hex on hover
+  const hexHoverDuration = 200; // Duration of hover animation in ms
+  let hexHoverAnimationStart = 0; // When the animation started
+  let hexHoverDirection = 'up'; // 'up' or 'down'
+  
+  // Material for highlighted hex edges
+  const hexHighlightMaterial = new THREE.MeshBasicMaterial({
+    color: 0xffffff,
+    wireframe: true,
+    transparent: true,
+    opacity: 0.5,
+    depthTest: true,
+  });
+  
+  // Store original materials to restore on mouse out
+  const originalHexMaterials = new WeakMap();
+  
+  // Function to handle hex hovering
+  function handleHexHover(event) {
+    // Calculate mouse position in normalized device coordinates
+    const mouse = new THREE.Vector2();
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+    
+    // Update the picking ray
+    hexRaycaster.setFromCamera(mouse, camera);
+    
+    // Find intersections with hexagons
+    const intersects = hexRaycaster.intersectObjects(hexagons);
+    
+    // Reset previously hovered hex if it's different
+    if (hoveredHex && intersects.length > 0 && hoveredHex !== intersects[0].object) {
+      resetHoveredHex();
+    } else if (hoveredHex && intersects.length === 0) {
+      resetHoveredHex();
+    }
+    
+    // Handle newly hovered hex
+    if (intersects.length > 0) {
+      const newHoveredHex = intersects[0].object;
+      
+      // If different from current hovered hex
+      if (hoveredHex !== newHoveredHex) {
+        // Store reference to newly hovered hex
+        hoveredHex = newHoveredHex;
+        
+        // Store original position if not already stored
+        if (defaultHexHeight === 0) {
+          defaultHexHeight = hoveredHex.position.y;
+        }
+        
+        // Store original materials if not already stored
+        if (!originalHexMaterials.has(hoveredHex)) {
+          originalHexMaterials.set(hoveredHex, hoveredHex.material);
+          
+          // Create a highlights copy for the hex edges
+          const highlightMesh = new THREE.Mesh(
+            hoveredHex.geometry,
+            hexHighlightMaterial
+          );
+          
+          // Position the highlight mesh just slightly above the original to prevent z-fighting
+          highlightMesh.position.copy(hoveredHex.position);
+          highlightMesh.position.y += 0.01;
+          highlightMesh.rotation.copy(hoveredHex.rotation);
+          highlightMesh.scale.copy(hoveredHex.scale);
+          
+          // Store the highlight mesh reference
+          hoveredHex.userData.highlightMesh = highlightMesh;
+          scene.add(highlightMesh);
+        }
+        
+        // Start the hover animation
+        hexHoverAnimationStart = performance.now();
+        hexHoverDirection = 'up';
+        
+        // Update debug info
+        if (DEBUG) {
+          const hexInfo = document.getElementById("debug-hovered");
+          if (hexInfo) {
+            hexInfo.textContent = `Hovered: Hex (${hoveredHex.userData.q}, ${hoveredHex.userData.r}) - ${hoveredHex.userData.element}`;
+          }
+        }
+      }
+    }
+  }
+  
+  // Function to reset the currently hovered hex
+  function resetHoveredHex() {
+    if (!hoveredHex) return;
+    
+    // Start the down animation
+    hexHoverDirection = 'down';
+    hexHoverAnimationStart = performance.now();
+    
+    // Remove highlight mesh
+    if (hoveredHex.userData.highlightMesh) {
+      scene.remove(hoveredHex.userData.highlightMesh);
+      hoveredHex.userData.highlightMesh = null;
+    }
+    
+    // Reset debug info
+    if (DEBUG) {
+      const hexInfo = document.getElementById("debug-hovered");
+      if (hexInfo) {
+        hexInfo.textContent = "Hovered: None";
+      }
+    }
+  }
+  
+  // Update the hover animation in the animation loop
+  function updateHexHoverAnimation() {
+    if (!hoveredHex) return;
+    
+    const currentTime = performance.now();
+    const elapsedTime = currentTime - hexHoverAnimationStart;
+    const progress = Math.min(1, elapsedTime / hexHoverDuration);
+    
+    if (hexHoverDirection === 'up') {
+      // Ease-in-out curve for smoother animation
+      const easeProgress = progress < 0.5 ? 2 * progress * progress : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+      
+      // Animate the hex moving upward
+      hoveredHex.position.y = defaultHexHeight + (hexHoverHeight * easeProgress);
+      
+      // Also move the highlight mesh if it exists
+      if (hoveredHex.userData.highlightMesh) {
+        hoveredHex.userData.highlightMesh.position.y = hoveredHex.position.y + 0.01;
+      }
+    } else if (hexHoverDirection === 'down') {
+      // Ease-in-out curve for smoother animation
+      const easeProgress = progress < 0.5 ? 2 * progress * progress : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+      
+      // Animate the hex moving downward
+      hoveredHex.position.y = defaultHexHeight + (hexHoverHeight * (1 - easeProgress));
+      
+      // If animation completed, reset the hoveredHex
+      if (progress >= 1) {
+        hoveredHex = null;
+      }
+    }
+  }
+  
+  // Add mousemove listener for hex hover detection
+  window.addEventListener("mousemove", handleHexHover);
+  
   // Trigger beast spawn after grid is generated
   debugLog("Setting up Fire Beast spawn after grid generation");
 
