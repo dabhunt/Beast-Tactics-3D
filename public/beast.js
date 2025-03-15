@@ -62,76 +62,11 @@ export class Beast {
   }
 
   /**
-   * Load the animated texture for the beast
+   * Load the static texture for the beast
    */
   loadStaticTexture() {
     const textureUrl = `/assets/Beasts/${this.type}.gif`;
-    debugLog(`Loading animated texture from: ${textureUrl}`);
-
-    // Import the AnimatedGIFTexture class
-    import('./tools/AnimatedGIFTexture.js')
-      .then(module => {
-        const AnimatedGIFTexture = module.AnimatedGIFTexture;
-
-        // Create the animated texture
-        this.animatedTexture = new AnimatedGIFTexture(
-          // URL
-          textureUrl,
-
-          // Success callback
-          (animator) => {
-            debugLog(`Successfully loaded ${this.type} Beast animated texture`, {
-              dimensions: `${animator.canvas.width}x${animator.canvas.height}`,
-              frames: animator.frames.length
-            });
-
-            // Store reference to texture
-            this.beastTexture = animator.getTexture();
-
-            // Create material with the animated texture
-            const material = new THREE.SpriteMaterial({
-              map: this.beastTexture,
-              transparent: true,
-              alphaTest: 0.1,
-            });
-
-            // Create sprite
-            this.sprite = new THREE.Sprite(material);
-
-            // Scale sprite
-            this.sprite.scale.set(this.scale, this.scale, 1);
-
-            // Add sprite to group
-            this.group.add(this.sprite);
-
-            // Mark as loaded
-            this.isLoaded = true;
-
-            debugLog(`${this.type} Beast sprite created with animated texture`);
-          },
-
-          // Error callback
-          (error) => {
-            console.error(`Failed to load animated texture for ${this.type} Beast:`, error);
-            this._createFallbackSprite();
-          }
-        );
-      })
-      .catch(error => {
-        console.error(`Failed to import AnimatedGIFTexture module:`, error);
-
-        // Fallback to static texture loading if module fails to load
-        this._loadStaticTextureWithFallback();
-      });
-  }
-
-  /**
-   * Fallback to static texture loading if animated loading fails
-   * @private
-   */
-  _loadStaticTextureWithFallback() {
-    const textureUrl = `/assets/Beasts/${this.type}.gif`;
-    debugLog(`Falling back to static texture loading for: ${textureUrl}`);
+    debugLog(`Loading static texture from: ${textureUrl}`);
 
     // Create texture loader with error handling
     const textureLoader = new THREE.TextureLoader();
@@ -142,7 +77,7 @@ export class Beast {
 
       // onLoad callback
       (texture) => {
-        debugLog(`Successfully loaded ${this.type} Beast texture (fallback method)`);
+        debugLog(`Successfully loaded ${this.type} Beast texture`);
 
         // Store reference to texture
         this.beastTexture = texture;
@@ -171,7 +106,7 @@ export class Beast {
         // Mark as loaded
         this.isLoaded = true;
 
-        debugLog(`${this.type} Beast sprite created (fallback method)`);
+        debugLog(`${this.type} Beast sprite created`);
       },
 
       // onProgress callback (not used)
@@ -181,7 +116,7 @@ export class Beast {
       (error) => {
         console.error(`Failed to load texture for ${this.type} Beast:`, error);
         this._createFallbackSprite();
-      }
+      },
     );
   }
 
@@ -255,9 +190,6 @@ export class Beast {
     // Create geometry for arrow
     const arrowGeometry = new THREE.ConeGeometry(0.15, 0.4, 4);
 
-    // Create geometry for arrow outline/glow when highlighted
-    const outlineGeometry = new THREE.ConeGeometry(0.165, 0.42, 4); // Slightly larger
-
     // Material for arrows
     const arrowMaterial = new THREE.MeshPhongMaterial({
       color: 0xffcc00,
@@ -265,14 +197,6 @@ export class Beast {
       opacity: 0.9,
       emissive: 0x996600,
       specular: 0xffffff,
-    });
-
-    // Material for highlight outline
-    const outlineMaterial = new THREE.MeshBasicMaterial({
-      color: 0xffffff,
-      transparent: true,
-      opacity: 0.0, // Start hidden
-      side: THREE.BackSide, // Render on the backside for outline effect
     });
 
     // Create an array to store arrow references
@@ -309,48 +233,36 @@ export class Beast {
       );
       arrowPos.y = arrowHeight; // Set fixed height above ground
 
-      // Create arrow group to hold both arrow and its outline
-      const arrowGroup = new THREE.Group();
-      arrowGroup.position.copy(arrowPos);
-
       // Create arrow mesh
       const arrow = new THREE.Mesh(arrowGeometry, arrowMaterial.clone());
 
-      // Create outline mesh for highlight effect
-      const outline = new THREE.Mesh(outlineGeometry, outlineMaterial.clone());
-
-      // Add both meshes to the group
-      arrowGroup.add(arrow);
-      arrowGroup.add(outline);
+      // Position arrow
+      arrow.position.copy(arrowPos);
 
       // Store original target for lookAt
       const targetPoint = new THREE.Vector3().copy(targetHexPos);
       targetPoint.y = arrowHeight; // Keep on same plane for correct orientation
 
-      // Point arrow group toward target
-      arrowGroup.lookAt(targetPoint);
-      arrowGroup.rotateX(Math.PI / 2); // Apply rotation to the whole group
+      // Point arrow toward target
+      // We need to apply a -90 degree X rotation to account for cone's default orientation
+      arrow.lookAt(targetPoint);
+      arrow.rotateX(Math.PI / 2);
 
       // Make arrow interactive
-      arrowGroup.userData = {
+      arrow.userData = {
         direction: direction.name,
         directionId: direction.id,
         moveOffset: { q: direction.q, r: direction.r },
         isMovementArrow: true,
         targetHexPos: targetHexPos.clone(),
-        isHighlighted: false,
-        outline: outline,
-        arrowMesh: arrow
       };
 
       // Add to the group
-      this.group.add(arrowGroup);
+      this.group.add(arrow);
 
       // Store arrow reference
       this.directionalArrows.push({
-        group: arrowGroup,
         mesh: arrow,
-        outline: outline,
         direction: direction.name,
         directionId: direction.id,
         coordinates: { q: direction.q, r: direction.r },
@@ -379,91 +291,7 @@ export class Beast {
     // Set up click listener
     window.addEventListener("click", this._handleClick.bind(this));
 
-    // Set up mousemove listeners for hover effects
-    this._setupMouseEvents();
-
-    debugLog(`Click and hover handling set up for ${this.type} Beast`);
-  }
-
-  /**
-   * Set up additional mouse event listeners for hovering effects
-   */
-  _setupMouseEvents() {
-    // Mouse move handler for hover effects
-    this._mouseMoveHandler = (event) => {
-      // Only process if beast is loaded
-      if (!this.isLoaded) return;
-
-      // Calculate mouse position in normalized device coordinates (-1 to +1)
-      const mouse = new THREE.Vector2();
-      mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-      mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-
-      // Update the picking ray
-      this.raycaster.setFromCamera(mouse, this.camera);
-
-      // Find intersections with directional arrows
-      const arrowGroups = this.directionalArrows.map((arrow) => arrow.group);
-      const intersects = this.raycaster.intersectObjects(arrowGroups, true);
-
-      // Reset all highlights first
-      this.directionalArrows.forEach(arrow => {
-        if (arrow.outline && arrow.outline.material) {
-          arrow.outline.material.opacity = 0.0;
-        }
-        if (arrow.group) {
-          arrow.group.userData.isHighlighted = false;
-        }
-      });
-
-      // If an arrow was hovered
-      if (intersects.length > 0) {
-        // Find the parent group (our arrow group)
-        let hoveredObject = intersects[0].object;
-        let hoveredGroup = null;
-
-        // If we hit the mesh directly, find its parent group
-        if (hoveredObject.parent && hoveredObject.parent.userData && 
-            hoveredObject.parent.userData.isMovementArrow) {
-          hoveredGroup = hoveredObject.parent;
-        } 
-        // If we hit the group directly
-        else if (hoveredObject.userData && hoveredObject.userData.isMovementArrow) {
-          hoveredGroup = hoveredObject;
-        }
-
-        // Apply highlighting if we found a valid arrow group
-        if (hoveredGroup) {
-          // Get the outline object from userData
-          const outline = hoveredGroup.userData.outline;
-          if (outline && outline.material) {
-            // Show white outline
-            outline.material.opacity = 0.7;
-            hoveredGroup.userData.isHighlighted = true;
-
-            // Get the arrow mesh for opacity change
-            const arrowMesh = hoveredGroup.userData.arrowMesh;
-            if (arrowMesh && arrowMesh.material) {
-              // Set arrow to full opacity immediately
-              arrowMesh.material.opacity = 1.0;
-            }
-
-            // Log for debugging
-            if (DEBUG) {
-              // Only log occasionally to avoid console spam
-              if (Math.random() < 0.01) {
-                debugLog(`Highlighting arrow: ${hoveredGroup.userData.direction}`);
-              }
-            }
-          }
-        }
-      }
-    };
-
-    // Add the listener
-    window.addEventListener("mousemove", this._mouseMoveHandler);
-
-    console.log("[BEAST] Mouse event handlers for hover effects set up");
+    debugLog(`Click handling set up for ${this.type} Beast`);
   }
 
   /**
@@ -482,66 +310,48 @@ export class Beast {
     // Update the picking ray
     this.raycaster.setFromCamera(mouse, this.camera);
 
-    // Find intersections with directional arrows - now using groups
-    const arrowGroups = this.directionalArrows.map((arrow) => arrow.group);
-    const intersects = this.raycaster.intersectObjects(arrowGroups, true); // true for recursive check
+    // Find intersections with directional arrows
+    const arrowMeshes = this.directionalArrows.map((arrow) => arrow.mesh);
+    const intersects = this.raycaster.intersectObjects(arrowMeshes, false);
 
     // If an arrow was clicked
     if (intersects.length > 0) {
-      // Find the parent group (our arrow group)
-      let clickedObject = intersects[0].object;
-      let clickedGroup = null;
+      const clickedArrow = intersects[0].object;
 
-      // If we hit the mesh directly, find its parent group
-      if (clickedObject.parent && clickedObject.parent.userData && 
-          clickedObject.parent.userData.isMovementArrow) {
-        clickedGroup = clickedObject.parent;
-      } 
-      // If we hit the group directly
-      else if (clickedObject.userData && clickedObject.userData.isMovementArrow) {
-        clickedGroup = clickedObject;
-      }
+      // Calculate the new axial position
+      const newQ = this.currentAxialPos.q + clickedArrow.userData.moveOffset.q;
+      const newR = this.currentAxialPos.r + clickedArrow.userData.moveOffset.r;
 
-      // Proceed only if we found a valid arrow group
-      if (clickedGroup) {
-        // Get movement data from the group
-        const moveOffset = clickedGroup.userData.moveOffset;
+      // Find the corresponding hex at this position
+      const targetHex = this._findHexAtAxialPosition(newQ, newR);
 
-        // Calculate the new axial position
-        const newQ = this.currentAxialPos.q + moveOffset.q;
-        const newR = this.currentAxialPos.r + moveOffset.r;
+      if (targetHex) {
+        // Move to the new hex position
+        this.moveTo({
+          x: targetHex.position.x,
+          y: targetHex.position.y + 0.7, // Offset above the hex
+          z: targetHex.position.z,
+        });
 
-        // Find the corresponding hex at this position
-        const targetHex = this._findHexAtAxialPosition(newQ, newR);
+        // Update current axial position
+        this.currentAxialPos = { q: newQ, r: newR };
 
-        if (targetHex) {
-          // Move to the new hex position
-          this.moveTo({
-            x: targetHex.position.x,
-            y: targetHex.position.y + 0.7, // Offset above the hex
-            z: targetHex.position.z,
-          });
-
-          // Update current axial position
-          this.currentAxialPos = { q: newQ, r: newR };
-
-          // Log the move for debugging
-          console.log(`[BEAST] Moving to new hex:`, {
-            from: {
-              q: this.currentAxialPos.q - moveOffset.q,
-              r: this.currentAxialPos.r - moveOffset.r,
-            },
-            to: { q: newQ, r: newR },
-            hexPosition: {
-              x: targetHex.position.x.toFixed(2),
-              y: targetHex.position.y.toFixed(2),
-              z: targetHex.position.z.toFixed(2),
-            },
-            hexElement: targetHex.userData.element,
-          });
-        } else {
-          console.warn(`[BEAST] No hex found at q=${newQ}, r=${newR}`);
-        }
+        // Log the move for debugging
+        console.log(`[BEAST] Moving to new hex:`, {
+          from: {
+            q: this.currentAxialPos.q - clickedArrow.userData.moveOffset.q,
+            r: this.currentAxialPos.r - clickedArrow.userData.moveOffset.r,
+          },
+          to: { q: newQ, r: newR },
+          hexPosition: {
+            x: targetHex.position.x.toFixed(2),
+            y: targetHex.position.y.toFixed(2),
+            z: targetHex.position.z.toFixed(2),
+          },
+          hexElement: targetHex.userData.element,
+        });
+      } else {
+        console.warn(`[BEAST] No hex found at q=${newQ}, r=${newR}`);
       }
     }
   }
@@ -601,23 +411,13 @@ export class Beast {
   update() {
     if (!this.isLoaded) return;
 
-    // Update animated texture if it exists
-    if (this.animatedTexture) {
-      this.animatedTexture.update();
-    }
-
     // Animate the directional arrows
     if (this.directionalArrows) {
-      // Pulse the arrows by adjusting opacity, but not for hovered arrows
+      // Pulse the arrows by adjusting opacity
       const pulseFactor = (Math.sin(Date.now() * 0.005) + 1) / 2; // 0 to 1
 
       this.directionalArrows.forEach((arrow) => {
-        // Skip animation for hovered arrows - keep them at full opacity
-        if (arrow.group && arrow.group.userData && arrow.group.userData.isHighlighted) {
-          arrow.mesh.material.opacity = 1.0; // Full opacity for hovered arrows
-        } else {
-          arrow.mesh.material.opacity = 0.4 + pulseFactor * 0.6; // 0.4 to 1.0 for non-hovered
-        }
+        arrow.mesh.material.opacity = 0.4 + pulseFactor * 0.6; // 0.4 to 1.0
       });
     }
   }
@@ -679,19 +479,6 @@ export class Beast {
   dispose() {
     debugLog(`Disposing ${this.type} Beast`);
 
-    // Remove event listeners
-    window.removeEventListener("click", this._handleClick);
-    if (this._mouseMoveHandler) {
-      window.removeEventListener("mousemove", this._mouseMoveHandler);
-      this._mouseMoveHandler = null;
-    }
-
-    // Dispose animated texture if exists
-    if (this.animatedTexture) {
-      this.animatedTexture.dispose();
-      this.animatedTexture = null;
-    }
-
     // Dispose texture if exists
     if (this.beastTexture) {
       this.beastTexture.dispose();
@@ -710,21 +497,10 @@ export class Beast {
     // Remove and dispose directional arrows
     if (this.directionalArrows) {
       this.directionalArrows.forEach((arrow) => {
-        // Remove from group
-        if (arrow.group) {
-          this.group.remove(arrow.group);
-        }
-
-        // Dispose meshes
+        this.group.remove(arrow.mesh);
         if (arrow.mesh) {
           if (arrow.mesh.geometry) arrow.mesh.geometry.dispose();
           if (arrow.mesh.material) arrow.mesh.material.dispose();
-        }
-
-        // Dispose outline
-        if (arrow.outline) {
-          if (arrow.outline.geometry) arrow.outline.geometry.dispose();
-          if (arrow.outline.material) arrow.outline.material.dispose();
         }
       });
       this.directionalArrows = [];
