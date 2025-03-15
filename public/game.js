@@ -177,6 +177,81 @@ try {
   const fallbackMaterials = [
     new THREE.MeshPhongMaterial({
       color: 0xff5733,
+
+// Create raycaster for hover detection
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+
+// Create stroke material for hover effect
+const strokeMaterial = new THREE.LineBasicMaterial({
+  color: 0xffffff,
+  transparent: true,
+  opacity: 0
+});
+
+// Handle mouse move for hex hover
+window.addEventListener('mousemove', (event) => {
+  // Calculate mouse position in normalized device coordinates
+  mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+  // Update the picking ray
+  raycaster.setFromCamera(mouse, camera);
+
+  // Find intersected hexagons
+  const intersects = raycaster.intersectObjects(hexagons);
+
+  // If we were hovering a hex, remove its stroke
+  if (window.hoveredHex) {
+    const strokeMesh = window.hoveredHex.material.userData.strokeMesh;
+    if (strokeMesh) {
+      window.hoveredHex.remove(strokeMesh);
+      window.hoveredHex.material.userData.strokeMesh = null;
+      window.hoveredHex.material.userData.strokeMaterial = null;
+    }
+  }
+
+  // Clear previous hover
+  window.hoveredHex = null;
+
+  // If we found a new hex to hover
+  if (intersects.length > 0) {
+    const hex = intersects[0].object;
+    window.hoveredHex = hex;
+
+    // Create stroke geometry (hexagon outline)
+    const strokeGeometry = new THREE.BufferGeometry();
+    const vertices = [];
+    const hexPoints = 6;
+    const radius = 1.05; // Slightly larger than hex radius for visible outline
+
+    for (let i = 0; i <= hexPoints; i++) {
+      const angle = (i / hexPoints) * Math.PI * 2;
+      vertices.push(
+        radius * Math.cos(angle),
+        0.1, // Slightly above hex surface
+        radius * Math.sin(angle)
+      );
+    }
+
+    strokeGeometry.setAttribute(
+      'position',
+      new THREE.Float32BufferAttribute(vertices, 3)
+    );
+
+    // Create stroke mesh
+    const strokeMesh = new THREE.Line(strokeGeometry, strokeMaterial.clone());
+    strokeMesh.rotation.y = Math.PI / 6; // Match hex rotation
+    
+    // Store references for animation
+    hex.material.userData.strokeMesh = strokeMesh;
+    hex.material.userData.strokeMaterial = strokeMesh.material;
+    
+    // Add stroke to hex
+    hex.add(strokeMesh);
+  }
+});
+
       shininess: 50,
       specular: 0x555555,
     }), // Combat
@@ -506,13 +581,14 @@ try {
         lastTime = currentTime;
       }
 
-      // Add some movement to make it clear rendering is working
-      hexagons.forEach((hex, index) => {
-        // Make hexagons gently bob up and down
-        if (index % 3 === 0) {
-          hex.position.y = Math.sin(currentTime * 0.001 + index * 0.1) * 0.2;
+      // Update any hover animations
+      if (window.hoveredHex) {
+        // Update hover stroke animation
+        const hoverProgress = (Math.sin(currentTime * 0.002) + 1) / 2; // 0 to 1 animation
+        if (window.hoveredHex.material.userData.strokeMaterial) {
+          window.hoveredHex.material.userData.strokeMaterial.opacity = hoverProgress;
         }
-      });
+      }
 
       // Render the scene
       renderer.render(scene, camera);
