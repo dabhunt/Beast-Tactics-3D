@@ -219,15 +219,24 @@ window.addEventListener('mousemove', (event) => {
     y: mousePos.y 
   });
 
+  // Log before raycasting to ensure variables are defined
+  console.log('[RAYCASTER] Preparing to find intersects', {
+    raycasterDefined: !!raycaster,
+    hexagonsDefined: !!hexagons,
+    hexagonsCount: hexagons ? hexagons.length : 0
+  });
+
   // Update raycaster with new mouse position
   raycaster.setFromCamera(mousePos, camera);
 
-  const fallbackMaterials = [
-    new THREE.MeshPhongMaterial({
-      color: 0xff5733,
-
   // Find intersected hexagons
   const intersects = raycaster.intersectObjects(hexagons);
+
+  // Log after raycasting to confirm execution
+  console.log('[RAYCASTER] Intersects found:', {
+    intersectCount: intersects.length,
+    firstIntersect: intersects.length > 0 ? intersects[0].object : null
+  });
 
   // If we were hovering a hex, remove its stroke
   if (window.hoveredHex) {
