@@ -174,11 +174,7 @@ try {
   };
 
   // Default fallback material (used if textures fail to load)
-  const fallbackMaterials = [
-    new THREE.MeshPhongMaterial({
-      color: 0xff5733,
-
-// Create raycaster for hover detection
+  // Create raycaster for hover detection
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 
@@ -191,6 +187,10 @@ const strokeMaterial = new THREE.LineBasicMaterial({
 
 // Handle mouse move for hex hover
 window.addEventListener('mousemove', (event) => {
+
+  const fallbackMaterials = [
+    new THREE.MeshPhongMaterial({
+      color: 0xff5733,
   // Calculate mouse position in normalized device coordinates
   mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
   mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
