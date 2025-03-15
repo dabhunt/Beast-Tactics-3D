@@ -206,8 +206,12 @@ window.addEventListener('mousemove', (event) => {
     new THREE.MeshPhongMaterial({
       color: 0xff5733,
   // Calculate mouse position in normalized device coordinates
-  mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-  mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+  const mousePos = new THREE.Vector2();
+  mousePos.x = (event.clientX / window.innerWidth) * 2 - 1;
+  mousePos.y = -(event.clientY / window.innerHeight) * 2 + 1;
+  
+  // Update raycaster with new mouse position
+  raycaster.setFromCamera(mousePos, camera);
 
   // Update the picking ray
   raycaster.setFromCamera(mouse, camera);
