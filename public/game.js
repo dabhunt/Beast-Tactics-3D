@@ -1,5 +1,19 @@
-// Import Three.js from CDN
-import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js";
+// Import Three.js using dynamic import for better compatibility
+let THREE;
+async function loadModules() {
+  try {
+    console.log("[GAME] Loading THREE.js module...");
+    const module = await import("https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js");
+    THREE = module;
+    console.log("[GAME] THREE.js module loaded successfully");
+    initGame();
+  } catch (err) {
+    console.error("[GAME] Failed to load THREE.js:", err);
+  }
+}
+
+// Start loading modules
+loadModules();
 import { CameraManager } from "./camera.js";
 import { DebugMenu } from "./tools/diagnostics/DebugMenu.js";
 import { Beast } from './beast.js';

@@ -171,3 +171,33 @@ window.debugFixer = {
 runDiagnostics();
 
 console.log("[DEBUG-FIXER] Debug fixer loaded. Use window.debugFixer.applyFixes() to apply fixes.");
+/**
+ * Check for JS syntax compatibility issues
+ */
+function checkJSSyntaxCompatibility() {
+  console.log("[DEBUG-FIXER] Checking JS syntax compatibility");
+  
+  try {
+    // Test import syntax
+    const testImport = "import * as THREE from 'three'";
+    new Function(testImport);
+    console.log("[DEBUG-FIXER] Dynamic import syntax supported");
+  } catch (e) {
+    console.error("[DEBUG-FIXER] Import syntax error:", e);
+  }
+
+  try {
+    // Test optional chaining
+    const testOptionalChaining = "const test = {}.prop?.value";
+    new Function(testOptionalChaining);
+    console.log("[DEBUG-FIXER] Optional chaining supported");
+  } catch (e) {
+    console.error("[DEBUG-FIXER] Optional chaining not supported:", e);
+  }
+}
+
+// Run checks
+window.addEventListener('load', () => {
+  checkJSSyntaxCompatibility();
+  checkDebugMenuConnections();
+});
