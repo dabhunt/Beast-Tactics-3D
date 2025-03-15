@@ -1,7 +1,26 @@
 /**
- * Beast.js - Manages game creatures with directional movement
+ * Beast.js - Manages game creatures with directional movement and animated sprites
+ * 
+ * This module handles Beast entities with animated sprites using SpriteMixer
+ * for frame-based animations from sprite sheets converted from GIFs.
  */
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js";
+import { convertGifToSpriteSheet } from "../tools/gifToSpriteSheet.js";
+
+// Import SpriteMixer as a module
+const SpriteMixer = (function() {
+  // Store the SpriteMixer instance
+  let instance;
+
+  // Create or return the existing instance
+  return function() {
+    if (!instance) {
+      console.log('[BEAST] Creating new SpriteMixer instance');
+      instance = new window.SpriteMixer();
+    }
+    return instance;
+  };
+})();
 
 // Debug flag
 const DEBUG = true;
@@ -43,6 +62,7 @@ export class Beast {
 
     // Track loading state
     this.isLoaded = false;
+    this.loadingProgress = 0;
 
     // Set up object group to contain beast and direction indicators
     this.group = new THREE.Group();
@@ -51,9 +71,38 @@ export class Beast {
     // Add to scene immediately so it's in the hierarchy
     scene.add(this.group);
 
-    // Load textures and create sprite
+    // Animation properties
+    try {
+      console.log('[BEAST] Initializing SpriteMixer...');
+      if (typeof SpriteMixer !== 'function') {
+        console.error('[BEAST] SpriteMixer is not defined! Check if the library is loaded.');
+      }
+      this.spriteMixer = SpriteMixer();
+      console.log('[BEAST] SpriteMixer initialized successfully:', { 
+        mixerAvailable: !!this.spriteMixer,
+        updateMethod: typeof this.spriteMixer.update === 'function' ? 'Available' : 'Missing'
+      });
+    } catch (err) {
+      console.error('[BEAST] Failed to initialize SpriteMixer:', err);
+      this.spriteMixer = null;
+    }
+    
+    this.actionSprite = null;
+    this.animations = {};
+    this.currentAnimation = null;
+    this.animationState = {
+      playing: false,
+      currentName: null,
+      startTime: 0,
+      frameCount: 0
+    };
+    
+    // Texture properties
     this.beastTexture = null;
-    this.loadStaticTexture();
+    this.spriteSheetData = null;
+    
+    // Load animated texture based on beast type
+    this.loadAnimatedTexture();
 
     // Create directional indicators
     this._createDirectionalIndicators();
@@ -62,59 +111,204 @@ export class Beast {
   }
 
   /**
-   * Load the static texture for the beast
+   * Load the animated texture for the beast using GIF frames
    */
-  loadStaticTexture() {
-    const textureUrl = `/assets/Beasts/${this.type}.gif`;
-    debugLog(`Loading static texture from: ${textureUrl}`);
-
-    // Create texture loader with error handling
+  loadAnimatedTexture() {
+    debugLog(`[BEAST] Loading animated texture for ${this.type} Beast`);
+    
+    // Path to the GIF file
+    const gifPath = `/assets/Beasts/${this.type}.gif`;
+    
+    try {
+      console.log(`[BEAST] Starting conversion of ${gifPath} to sprite sheet`);
+      
+      // Convert GIF to sprite sheet format for SpriteMixer
+      convertGifToSpriteSheet(
+        gifPath,
+        (spriteSheetData) => {
+          // Store the sprite sheet data for reference
+          this.spriteSheetData = spriteSheetData;
+          
+          console.log('[BEAST] Sprite sheet created successfully:', {
+            frameCount: spriteSheetData.frameCount,
+            dimensions: `${spriteSheetData.width}x${spriteSheetData.height}`,
+            grid: `${spriteSheetData.tilesHoriz}x${spriteSheetData.tilesVert}`
+          });
+          
+          // Create the ActionSprite using the sprite sheet texture
+          this.actionSprite = this.spriteMixer.ActionSprite(
+            spriteSheetData.texture,
+            spriteSheetData.tilesHoriz,
+            spriteSheetData.tilesVert
+          );
+          
+          // Scale the sprite appropriately
+          this.actionSprite.scale.set(2 * this.scale, 2 * this.scale, 1);
+          
+          // Add the sprite to our group
+          this.group.add(this.actionSprite);
+          
+          // Create animations based on the sprite sheet
+          this._createAnimations(spriteSheetData);
+          
+          // Start the default animation
+          this._playAnimation('idle');
+          
+          this.isLoaded = true;
+          debugLog(`[BEAST] ${this.type} Beast animated sprite created and added to scene`);
+        },
+        (progress) => {
+          // Track loading progress
+          this.loadingProgress = progress.percentage;
+          debugLog(`[BEAST] ${this.type} Beast texture loading: ${progress.percentage}% (Frame ${progress.frame}/${progress.total})`);
+        },
+        (error) => {
+          console.error(`[BEAST] Error creating sprite sheet for ${this.type} Beast:`, error);
+          // Fall back to static texture if GIF conversion fails
+          this._loadStaticTextureFallback();
+        }
+      );
+    } catch (err) {
+      console.error(`[BEAST] Exception during animated texture loading:`, err);
+      // Fall back to static texture if GIF conversion throws an exception
+      this._loadStaticTextureFallback();
+    }
+  }
+  
+  /**
+   * Create animations from the sprite sheet data
+   * @param {Object} spriteSheetData - Data from the sprite sheet conversion
+   * @private
+   */
+  _createAnimations(spriteSheetData) {
+    try {
+      console.log('[BEAST] Creating animations from sprite sheet');
+      
+      // Calculate the average frame duration in milliseconds
+      const frameDuration = Math.max(50, Math.round(spriteSheetData.averageFrameDelay * 10));
+      
+      // Create an 'idle' animation using all frames
+      this.animations.idle = this.spriteMixer.Action(
+        this.actionSprite,
+        0,                              // Start frame index
+        spriteSheetData.frameCount - 1, // End frame index
+        frameDuration                   // Frame duration in ms
+      );
+      
+      // Set animation properties
+      this.animations.idle.clampWhenFinished = false; // Loop indefinitely
+      this.animations.idle.hideWhenFinished = false;  // Keep visible
+      
+      console.log('[BEAST] Created animations:', {
+        idle: {
+          frames: spriteSheetData.frameCount,
+          frameDuration: frameDuration,
+          totalDuration: frameDuration * spriteSheetData.frameCount
+        }
+      });
+      
+      // If we have enough frames, create additional animations
+      if (spriteSheetData.frameCount >= 8) {
+        // Create 'attack' animation using first half of frames
+        const attackFrames = Math.floor(spriteSheetData.frameCount / 2);
+        this.animations.attack = this.spriteMixer.Action(
+          this.actionSprite,
+          0,                  // Start frame
+          attackFrames - 1,   // End frame
+          frameDuration - 10  // Slightly faster
+        );
+        this.animations.attack.clampWhenFinished = true;
+        this.animations.attack.hideWhenFinished = false;
+        
+        // Create 'hurt' animation using second half of frames
+        this.animations.hurt = this.spriteMixer.Action(
+          this.actionSprite,
+          attackFrames,                   // Start frame
+          spriteSheetData.frameCount - 1, // End frame
+          frameDuration + 20              // Slightly slower
+        );
+        this.animations.hurt.clampWhenFinished = true;
+        this.animations.hurt.hideWhenFinished = false;
+        
+        console.log('[BEAST] Created additional animations:', {
+          attack: { frames: attackFrames, frameDuration: frameDuration - 10 },
+          hurt: { frames: spriteSheetData.frameCount - attackFrames, frameDuration: frameDuration + 20 }
+        });
+      }
+    } catch (err) {
+      console.error('[BEAST] Error creating animations:', err);
+    }
+  }
+  
+  /**
+   * Play a specific animation
+   * @param {string} animationName - Name of the animation to play
+   * @private
+   */
+  _playAnimation(animationName) {
+    try {
+      if (!this.animations[animationName]) {
+        console.warn(`[BEAST] Animation '${animationName}' not found, defaulting to 'idle'`);
+        animationName = 'idle';
+      }
+      
+      // Stop current animation if one is playing
+      if (this.currentAnimation) {
+        this.currentAnimation.stop();
+      }
+      
+      // Set and play the new animation
+      this.currentAnimation = this.animations[animationName];
+      
+      if (animationName === 'idle') {
+        this.currentAnimation.playLoop();
+        console.log(`[BEAST] Playing looping animation: ${animationName}`);
+      } else {
+        this.currentAnimation.playOnce();
+        console.log(`[BEAST] Playing one-shot animation: ${animationName}`);
+      }
+    } catch (err) {
+      console.error(`[BEAST] Error playing animation '${animationName}':`, err);
+    }
+  }
+  
+  /**
+   * Load a static texture as fallback when animated texture fails
+   * @private
+   */
+  _loadStaticTextureFallback() {
     const textureLoader = new THREE.TextureLoader();
+    const texturePath = `/assets/Beasts/${this.type}.png`;
+
+    debugLog(`[BEAST] Falling back to static texture for ${this.type} Beast: ${texturePath}`);
 
     textureLoader.load(
-      // URL
-      textureUrl,
-
-      // onLoad callback
+      texturePath,
       (texture) => {
-        debugLog(`Successfully loaded ${this.type} Beast texture`);
+        debugLog(`[BEAST] ${this.type} Beast fallback texture loaded successfully`);
 
-        // Store reference to texture
         this.beastTexture = texture;
 
-        // Configure texture for crisp pixel art rendering
-        texture.magFilter = THREE.NearestFilter;
-        texture.minFilter = THREE.NearestFilter;
-        texture.generateMipmaps = false;
-
-        // Create material with the texture
+        // Create sprite with the loaded texture
         const material = new THREE.SpriteMaterial({
           map: texture,
-          transparent: true,
-          alphaTest: 0.1,
+          color: 0xffffff,
         });
 
-        // Create sprite
         this.sprite = new THREE.Sprite(material);
-
-        // Scale sprite
-        this.sprite.scale.set(this.scale, this.scale, 1);
-
-        // Add sprite to group
+        this.sprite.scale.set(1.5 * this.scale, 1.5 * this.scale, 1);
         this.group.add(this.sprite);
 
-        // Mark as loaded
         this.isLoaded = true;
-
-        debugLog(`${this.type} Beast sprite created`);
+        debugLog(`[BEAST] ${this.type} Beast fallback sprite created and added to scene`);
       },
-
-      // onProgress callback (not used)
-      undefined,
-
-      // onError callback
+      (xhr) => {
+        // Loading progress
+        const progress = (xhr.loaded / xhr.total) * 100;
+        debugLog(`[BEAST] ${this.type} Beast fallback texture loading: ${progress.toFixed(2)}%`);
+      },
       (error) => {
-        console.error(`Failed to load texture for ${this.type} Beast:`, error);
+        console.error(`[BEAST] Error loading ${this.type} Beast fallback texture:`, error);
         this._createFallbackSprite();
       },
     );
@@ -407,18 +601,48 @@ export class Beast {
 
   /**
    * Update the beast (called in animation loop)
+   * @param {number} delta - Time delta since last frame in seconds
    */
-  update() {
-    if (!this.isLoaded) return;
+  update(delta = 0.016) {
+    if (!this.isLoaded) {
+      // If still loading, we can show a loading indicator or similar
+      return;
+    }
+    
+    try {
+      // Update the sprite mixer to advance animations
+      if (this.spriteMixer) {
+        // Log animation state occasionally for debugging
+        this.animationState.frameCount++;
+        if (this.animationState.frameCount % 300 === 0) {
+          console.log('[BEAST] Animation state:', {
+            playing: this.animationState.playing,
+            animation: this.animationState.currentName,
+            elapsedTime: ((Date.now() - this.animationState.startTime) / 1000).toFixed(2) + 's',
+            delta: delta.toFixed(4) + 's'
+          });
+        }
+        
+        // Update the sprite mixer with delta time
+        this.spriteMixer.update(delta);
+      } else {
+        // If SpriteMixer isn't available, log it occasionally
+        if (Math.random() < 0.01) { // Log roughly every 100 frames
+          console.warn('[BEAST] SpriteMixer not available for animation updates');
+        }
+      }
+      
+      // Animate the directional arrows
+      if (this.directionalArrows) {
+        // Pulse the arrows by adjusting opacity
+        const pulseFactor = (Math.sin(Date.now() * 0.005) + 1) / 2; // 0 to 1
 
-    // Animate the directional arrows
-    if (this.directionalArrows) {
-      // Pulse the arrows by adjusting opacity
-      const pulseFactor = (Math.sin(Date.now() * 0.005) + 1) / 2; // 0 to 1
-
-      this.directionalArrows.forEach((arrow) => {
-        arrow.mesh.material.opacity = 0.4 + pulseFactor * 0.6; // 0.4 to 1.0
-      });
+        this.directionalArrows.forEach((arrow) => {
+          arrow.mesh.material.opacity = 0.4 + pulseFactor * 0.6; // 0.4 to 1.0
+        });
+      }
+    } catch (err) {
+      console.error('[BEAST] Error in update loop:', err, err.stack);
     }
   }
 
@@ -427,92 +651,153 @@ export class Beast {
    * @param {Object} newPosition - New position {x, y, z}
    */
   moveTo(newPosition) {
-    debugLog(`Moving ${this.type} Beast to new position`, newPosition);
+    debugLog(`[BEAST] Moving ${this.type} Beast to new position`, newPosition);
 
-    // Update current position
-    this.position = {
-      x: newPosition.x,
-      y: this.position.y, // Keep the same y
-      z: newPosition.z,
-    };
-
-    // Animate the movement
-    const duration = 1000; // ms
-    const startTime = Date.now();
-    const startPos = {
-      x: this.group.position.x,
-      y: this.group.position.y,
-      z: this.group.position.z,
-    };
-
-    // Animation function
-    const animate = () => {
-      const elapsed = Date.now() - startTime;
-      const progress = Math.min(elapsed / duration, 1);
-
-      // Ease function (ease-out cubic)
-      const easeOut = 1 - Math.pow(1 - progress, 3);
-
-      // Update position
-      this.group.position.x =
-        startPos.x + (newPosition.x - startPos.x) * easeOut;
-      this.group.position.y =
-        startPos.y + (newPosition.y - startPos.y) * easeOut;
-      this.group.position.z =
-        startPos.z + (newPosition.z - startPos.z) * easeOut;
-
-      // Continue animation if not complete
-      if (progress < 1) {
-        requestAnimationFrame(animate);
-      } else {
-        debugLog(`${this.type} Beast movement complete`);
+    try {
+      // Play movement animation if available
+      if (this.animations.attack) {
+        this._playAnimation('attack');
+        
+        // Set up a listener to return to idle when attack animation finishes
+        const onAnimationFinished = (event) => {
+          if (event.type === 'finished' && event.action === this.animations.attack) {
+            this._playAnimation('idle');
+            // Remove the listener to avoid memory leaks
+            this.spriteMixer.removeEventListener('finished', onAnimationFinished);
+          }
+        };
+        
+        // Add the listener
+        this.spriteMixer.addEventListener('finished', onAnimationFinished);
       }
-    };
 
-    // Start animation
-    animate();
+      // Update current position
+      this.position = {
+        x: newPosition.x,
+        y: this.position.y, // Keep the same y
+        z: newPosition.z,
+      };
+
+      // Animate the movement
+      const duration = 1000; // ms
+      const startTime = Date.now();
+      const startPos = {
+        x: this.group.position.x,
+        y: this.group.position.y,
+        z: this.group.position.z,
+      };
+      
+      console.log('[BEAST] Starting movement animation:', {
+        from: startPos,
+        to: newPosition,
+        duration: duration
+      });
+
+      // Animation function
+      const animate = () => {
+        const elapsed = Date.now() - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+
+        // Ease function (ease-out cubic)
+        const easeOut = 1 - Math.pow(1 - progress, 3);
+
+        // Update position
+        this.group.position.x =
+          startPos.x + (newPosition.x - startPos.x) * easeOut;
+        this.group.position.y =
+          startPos.y + (newPosition.y - startPos.y) * easeOut;
+        this.group.position.z =
+          startPos.z + (newPosition.z - startPos.z) * easeOut;
+
+        // Continue animation if not complete
+        if (progress < 1) {
+          requestAnimationFrame(animate);
+        } else {
+          debugLog(`[BEAST] ${this.type} Beast movement complete`);
+          
+          // Update the current hex position after movement completes
+          this._updateCurrentHexPosition();
+        }
+      };
+
+      // Start animation
+      animate();
+    } catch (err) {
+      console.error('[BEAST] Error during movement animation:', err);
+      
+      // Fallback: immediately move to position without animation
+      this.group.position.set(newPosition.x, this.position.y, newPosition.z);
+    }
   }
 
   /**
    * Dispose of all THREE.js objects to prevent memory leaks
    */
   dispose() {
-    debugLog(`Disposing ${this.type} Beast`);
+    debugLog(`[BEAST] Disposing ${this.type} Beast`);
 
-    // Dispose texture if exists
-    if (this.beastTexture) {
-      this.beastTexture.dispose();
-      this.beastTexture = null;
-    }
-
-    // Remove and dispose sprite
-    if (this.sprite) {
-      this.group.remove(this.sprite);
-      if (this.sprite.material) {
-        this.sprite.material.dispose();
+    try {
+      // Stop any playing animations
+      if (this.currentAnimation) {
+        this.currentAnimation.stop();
+        this.currentAnimation = null;
       }
-      this.sprite = null;
-    }
+      
+      // Clear animation references
+      this.animations = {};
+      
+      // Dispose texture if exists
+      if (this.beastTexture) {
+        this.beastTexture.dispose();
+        this.beastTexture = null;
+      }
+      
+      // Dispose sprite sheet texture if exists
+      if (this.spriteSheetData && this.spriteSheetData.texture) {
+        this.spriteSheetData.texture.dispose();
+        this.spriteSheetData = null;
+      }
 
-    // Remove and dispose directional arrows
-    if (this.directionalArrows) {
-      this.directionalArrows.forEach((arrow) => {
-        this.group.remove(arrow.mesh);
-        if (arrow.mesh) {
-          if (arrow.mesh.geometry) arrow.mesh.geometry.dispose();
-          if (arrow.mesh.material) arrow.mesh.material.dispose();
+      // Remove and dispose regular sprite
+      if (this.sprite) {
+        this.group.remove(this.sprite);
+        if (this.sprite.material) {
+          this.sprite.material.dispose();
         }
-      });
-      this.directionalArrows = [];
-    }
+        this.sprite = null;
+      }
+      
+      // Remove and dispose action sprite
+      if (this.actionSprite) {
+        this.group.remove(this.actionSprite);
+        if (this.actionSprite.material) {
+          this.actionSprite.material.dispose();
+        }
+        this.actionSprite = null;
+      }
 
-    // Remove group from scene
-    if (this.group && this.scene) {
-      this.scene.remove(this.group);
-    }
-    this.group = null;
+      // Remove and dispose directional arrows
+      if (this.directionalArrows) {
+        this.directionalArrows.forEach((arrow) => {
+          this.group.remove(arrow.mesh);
+          if (arrow.mesh) {
+            if (arrow.mesh.geometry) arrow.mesh.geometry.dispose();
+            if (arrow.mesh.material) arrow.mesh.material.dispose();
+          }
+        });
+        this.directionalArrows = [];
+      }
 
-    debugLog(`${this.type} Beast disposed`);
+      // Remove group from scene
+      if (this.group && this.scene) {
+        this.scene.remove(this.group);
+      }
+      this.group = null;
+
+      debugLog(`[BEAST] ${this.type} Beast disposed successfully`);
+    } catch (err) {
+      console.error(`[BEAST] Error during disposal:`, err);
+    }
   }
 
   /**

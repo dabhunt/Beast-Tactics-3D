@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Animated Sprite Example - Beast Tactics 3D</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #222;
+            font-family: Arial, sans-serif;
+        }
+        
+        #loading-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #333;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            z-index: 9999;
+        }
+        
+        #loading-progress {
+            width: 300px;
+            height: 20px;
+            background-color: #444;
+            margin-top: 20px;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        
+        #progress-bar {
+            height: 100%;
+            width: 0%;
+            background-color: #4CAF50;
+            transition: width 0.3s;
+        }
+        
+        #error-container {
+            color: #ff6b6b;
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 5px;
+            background-color: rgba(255, 0, 0, 0.2);
+            max-width: 80%;
+            text-align: center;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="loading-screen">
+        <h2>Loading Animated Sprite Example</h2>
+        <div id="loading-progress">
+            <div id="progress-bar"></div>
+        </div>
+        <div id="error-container"></div>
+    </div>
+
+    <script type="module">
+        // Import dependencies
+        import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.module.js';
+        
+        // Make THREE available globally for our modules that expect it
+        window.THREE = THREE;
+        
+        // Track loading progress
+        const progressBar = document.getElementById('progress-bar');
+        const errorContainer = document.getElementById('error-container');
+        
+        // Function to simulate loading progress
+        function updateProgress(percent) {
+            progressBar.style.width = `${percent}%`;
+        }
+        
+        // Function to show errors
+        function showError(message) {
+            errorContainer.style.display = 'block';
+            errorContainer.textContent = message;
+        }
+        
+        // Function to hide loading screen
+        function hideLoadingScreen() {
+            const loadingScreen = document.getElementById('loading-screen');
+            loadingScreen.style.opacity = '0';
+            loadingScreen.style.transition = 'opacity 0.5s';
+            setTimeout(() => {
+                loadingScreen.style.display = 'none';
+            }, 500);
+        }
+        
+        // Start loading process
+        updateProgress(10);
+        
+        try {
+            // Load our example module
+            updateProgress(30);
+            
+            // Dynamic import of our example
+            import('./animatedSpriteExample.js')
+                .then(() => {
+                    console.log('Animated sprite example loaded successfully');
+                    updateProgress(100);
+                    setTimeout(hideLoadingScreen, 500);
+                })
+                .catch(error => {
+                    console.error('Error loading animated sprite example:', error);
+                    updateProgress(100);
+                    showError(`Failed to load example: ${error.message}`);
+                });
+        } catch (error) {
+            console.error('Error during initialization:', error);
+            updateProgress(100);
+            showError(`Initialization error: ${error.message}`);
+        }
+    </script>
+</body>
+</html>

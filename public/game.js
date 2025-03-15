@@ -6,10 +6,34 @@ async function loadModules() {
     const module = await import("https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js");
     THREE = module;
     console.log("[GAME] THREE.js module loaded successfully");
+    
+    // Load SpriteMixer library
+    console.log("[GAME] Loading SpriteMixer library...");
+    await loadScript("/libs/SpriteMixer.js");
+    console.log("[GAME] SpriteMixer library loaded successfully");
+    
     initGame();
   } catch (err) {
-    console.error("[GAME] Failed to load THREE.js:", err);
+    console.error("[GAME] Failed to load modules:", err);
   }
+}
+
+// Helper function to load scripts
+function loadScript(url) {
+  return new Promise((resolve, reject) => {
+    console.log(`[GAME] Loading script: ${url}`);
+    const script = document.createElement('script');
+    script.src = url;
+    script.onload = () => {
+      console.log(`[GAME] Script loaded successfully: ${url}`);
+      resolve();
+    };
+    script.onerror = (err) => {
+      console.error(`[GAME] Failed to load script: ${url}`, err);
+      reject(err);
+    };
+    document.head.appendChild(script);
+  });
 }
 
 // Start loading modules
@@ -880,22 +904,46 @@ try {
 
   // Add beast update to animation loop
   let originalAnimate = animate;
+  
+  // Create a clock for tracking time
+  const clock = new THREE.Clock();
 
   // Create enhanced animation function with beast updates
   function enhancedAnimate() {
+    // Calculate delta time for smooth animations
+    const now = performance.now();
+    const delta = (now - (lastFrameTime || now)) / 1000; // Convert to seconds
+    lastFrameTime = now;
+    
+    // Log delta time occasionally for debugging
+    if (frameCount % 300 === 0) {
+      console.log(`[GAME] Animation delta: ${delta.toFixed(4)}s (${(1/delta).toFixed(1)} FPS)`);
+    }
+    
     // Call original animation function first
     originalAnimate();
 
-    // Update beast if it exists
+    // Update beast if it exists with delta time
     if (fireBeast) {
-      fireBeast.update();
+      try {
+        fireBeast.update(delta);
+      } catch (err) {
+        console.error('[GAME] Error updating Fire Beast:', err);
+      }
     }
 
     // Update animation debugger if available
     if (animationDebugger) {
-      animationDebugger.update();
+      try {
+        animationDebugger.update();
+      } catch (err) {
+        console.error('[GAME] Error updating animation debugger:', err);
+      }
     }
   }
+  
+  // Track last frame time for delta calculation
+  let lastFrameTime = null;
 
   // Replace the animate function with our enhanced version
   animate = enhancedAnimate;

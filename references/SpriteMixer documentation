@@ -1,0 +1,184 @@
+[three.js forum](https://discourse.threejs.org/)
+
+# [💃 SpriteMixer for easy sprite animations](https://discourse.threejs.org/t/spritemixer-for-easy-sprite-animations/8047)
+
+[💃 SpriteMixer for easy sprite animations](https://discourse.threejs.org/t/spritemixer-for-easy-sprite-animations/8047)
+[Resources](https://discourse.threejs.org/c/resources/8)
+[textures](https://discourse.threejs.org/tag/textures)
+[sprites](https://discourse.threejs.org/tag/sprites)
+[animation](https://discourse.threejs.org/tag/animation)
+[sprite-material](https://discourse.threejs.org/tag/sprite-material)
+[felixmariotto](https://discourse.threejs.org/u/felixmariotto)
+Hi there,
+I made an easy-to-use tool to make sprite animations simpler, as I saw there is nothing built-in.
+Have a try here : https://felixmariotto.github.io/from_indexed_texture
+Here is the library’s page : [https://github.com/felixmariotto/three-SpriteMixer](https://github.com/felixmariotto/three-SpriteMixer)
+Briefly : After loading a texture, we give it to an instance of ActionSprite (which is an extended THREE.Sprite), then we instantiate Actions from this ActionSprite, with information about how it must play.
+Main features :
+
+```
+action.playOnce();
+
+action.playLoop();
+
+action.stop();
+
+action.pause();
+
+action.pauseNextEnd();
+
+action.resume();
+
+action.clampWhenFinished;
+
+action.hideWhenFinished;
+```
+
+
+```
+action.playOnce();
+
+action.playLoop();
+
+action.stop();
+
+action.pause();
+
+action.pauseNextEnd();
+
+action.resume();
+
+action.clampWhenFinished;
+
+action.hideWhenFinished;
+```
+
+After several requests from [@Aerion](https://discourse.threejs.org/u/aerion), I added these features :
+
+```
+spriteMixer.addEventListener('finished' /* or 'loop' */, function(event) {
+	console.log(event.action)
+});
+// Exactly like THREE.AnimationMixer, it now supports event listener functions
+
+actionSprite.setFrame( index );
+// Set one particular frame from the action
+```
+
+
+```
+spriteMixer.addEventListener('finished' /* or 'loop' */, function(event) {
+	console.log(event.action)
+});
+// Exactly like THREE.AnimationMixer, it now supports event listener functions
+
+actionSprite.setFrame( index );
+// Set one particular frame from the action
+```
+
+ActionSprite now can hold several actions per texture :
+[character.jpg1024×256 133 KB](https://canada1.discourse-cdn.com/flex035/uploads/threejs/original/2X/5/5ca5cbef1accc6d1156ab85e0fc068d15653728f.jpeg)
+[Texture Atlas Loader](https://discourse.threejs.org/t/texture-atlas-loader/1137/5)
+[Animate material.map image](https://discourse.threejs.org/t/animate-material-map-image/26883/2)
+[How to realize animation hotspot](https://discourse.threejs.org/t/how-to-realize-animation-hotspot/13989/2)
+[Sprite Anim Switching?](https://discourse.threejs.org/t/sprite-anim-switching/8773/14)
+[Positioning sprite sheet correctly on to PlaneGeometry](https://discourse.threejs.org/t/positioning-sprite-sheet-correctly-on-to-planegeometry/34418/6)
+[Positioning sprite sheet correctly on to PlaneGeometry](https://discourse.threejs.org/t/positioning-sprite-sheet-correctly-on-to-planegeometry/34418/8)
+[DolphinIQ](https://discourse.threejs.org/u/DolphinIQ)
+Hey, due to your game showcase I wanted to try this mixer. It’s awesome and very easy to use, however I wonder how would I go about mirroring the sprite? In the fox example, there is already whole row mirrored frame by frame, but I think a more popular approach is for artists to draw one side and then just flip the whole image.
+Perfect solution I think would be to just flip the 3d object itself, on the app level, with no need for loading the mirrored sprites. I tried setting the scale.x to negative, but that didn’t work.
+
+```
+scale.x
+```
+
+Flipping the image.png presents a different problem - whole row gets mirrored and since the mixer goes only left to right, animations are played backwards.
+
+```
+image.png
+```
+
+Sorry if Im missing something obvious here
+[felixmariotto](https://discourse.threejs.org/u/felixmariotto)
+Hi [@DolphinIQ](https://discourse.threejs.org/u/dolphiniq), this is a good point, it could save a lot in texture size. I can’t really try anything before next week when I come back home though… But if you want to try yourself, maybe you could change the texture wrapping to THREE.MirroredRepeatWrapping in the ActionSprite function, so that we just have to offset more to get to the mirrored texture. Then I guess that we can add a conditional in updateAction, that add (1 - actionSprite.material.map.offset.x) * 2 to actionSprite.material.map.offset.x when the Action’s “isMirrored” (or whatever you like) is true.
+[KiborgMaster](https://discourse.threejs.org/u/KiborgMaster)
+
+# [💃 SpriteMixer for easy sprite animations](https://discourse.threejs.org/t/spritemixer-for-easy-sprite-animations/8047)
+
+Very good solution, i try integrate this in game.
+This will help a lot to create simple effects.
+[Andrew_Normore](https://discourse.threejs.org/u/Andrew_Normore)
+This is AWESOME. I’m building an MMO and using particle effects which is pretty heavy at times. I’ll try switching to this system.
+[UI_UNICORN](https://discourse.threejs.org/u/UI_UNICORN)
+Lets say you have a play once button and you spam click it how would you make the sprite play through to the end instead of it starting again on the play once function?
+awesome stuff as well really helped me alot this!
+[sahil_gaur](https://discourse.threejs.org/u/sahil_gaur)
+Hi [@felixmariotto](https://discourse.threejs.org/u/felixmariotto)
+First of all thanks for this great utility to use in threejs. I was trying it out with this fox character image but I am getting a black background instead of a transparent one. I took the image in PNG format from the repo you have shared above too. So no transparency.
+
+Could you tell me why that may be the case?
+
+### Related topics
+
+[Flip between DIFFERENT spritesheets?](https://discourse.threejs.org/t/flip-between-different-spritesheets/9338)
+[Questions](https://discourse.threejs.org/c/questions/6)
+[textures](https://discourse.threejs.org/tag/textures)
+[materials](https://discourse.threejs.org/tag/materials)
+[loaders](https://discourse.threejs.org/tag/loaders)
+[geometry](https://discourse.threejs.org/tag/geometry)
+[animation](https://discourse.threejs.org/tag/animation)
+[Sprite Anim Switching?](https://discourse.threejs.org/t/sprite-anim-switching/8773)
+[Questions](https://discourse.threejs.org/c/questions/6)
+[textures](https://discourse.threejs.org/tag/textures)
+[materials](https://discourse.threejs.org/tag/materials)
+[loaders](https://discourse.threejs.org/tag/loaders)
+[geometry](https://discourse.threejs.org/tag/geometry)
+[animation](https://discourse.threejs.org/tag/animation)
+[Texture Position?](https://discourse.threejs.org/t/texture-position/8681)
+[Questions](https://discourse.threejs.org/c/questions/6)
+[textures](https://discourse.threejs.org/tag/textures)
+[Flipping between Animations?](https://discourse.threejs.org/t/flipping-between-animations/9201)
+[Questions](https://discourse.threejs.org/c/questions/6)
+[textures](https://discourse.threejs.org/tag/textures)
+[materials](https://discourse.threejs.org/tag/materials)
+[loaders](https://discourse.threejs.org/tag/loaders)
+[geometry](https://discourse.threejs.org/tag/geometry)
+[animation](https://discourse.threejs.org/tag/animation)
+[Sprite Animation glitch](https://discourse.threejs.org/t/sprite-animation-glitch/9062)
+[Questions](https://discourse.threejs.org/c/questions/6)
+[textures](https://discourse.threejs.org/tag/textures)
+[materials](https://discourse.threejs.org/tag/materials)
+[loaders](https://discourse.threejs.org/tag/loaders)
+[geometry](https://discourse.threejs.org/tag/geometry)
+[animation](https://discourse.threejs.org/tag/animation)
+- 
+
+          [Home](https://discourse.threejs.org/)
+
+
+- 
+
+          [Categories](https://discourse.threejs.org/categories)
+
+
+- 
+
+          [Guidelines](https://discourse.threejs.org/guidelines)
+
+
+- 
+
+            [Terms of Service](https://discourse.threejs.org/tos)
+
+
+- 
+
+            [Privacy Policy](https://discourse.threejs.org/privacy)
+
+
+[Home](https://discourse.threejs.org/)
+[Categories](https://discourse.threejs.org/categories)
+[Guidelines](https://discourse.threejs.org/guidelines)
+[Terms of Service](https://discourse.threejs.org/tos)
+[Privacy Policy](https://discourse.threejs.org/privacy)
+Powered by [Discourse](https://www.discourse.org), best viewed with JavaScript enabled
