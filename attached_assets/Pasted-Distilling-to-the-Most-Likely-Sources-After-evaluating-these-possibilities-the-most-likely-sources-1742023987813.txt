@@ -1,0 +1,102 @@
+Distilling to the Most Likely Sources
+After evaluating these possibilities, the most likely sources of the syntax error are:
+Incomplete fallbackMaterials Array Definition (Source #1)  
+The incomplete array and object definition immediately before const intersects is the strongest candidate. The parser expects the fallbackMaterials array to be completed (with closing } and ]), but instead encounters a new const declaration, leading to "Unexpected identifier 'intersects'". The error at line 230, column 9 aligns with this, as column 9 is likely the start of const intersects.
+Misplaced fallbackMaterials Declaration (Source #2)  
+The presence of a complete fallbackMaterials array earlier in the code suggests that its redefinition inside the event listener is unintended. This redundancy, combined with its incomplete state, disrupts the syntax and is likely a coding mistake (e.g., leftover code from editing).
+The other possibilities (e.g., missing braces, typos, or comments) are less probable because:
+The code snippet shows proper closure of prior blocks up to the event listener.
+
+The error specifically highlights intersects, pointing to a structural issue at that line rather than a broader scope or typo problem.
+
+Syntax errors occur at parse time, not runtime, ruling out variable scope issues as the primary cause.
+Validating Assumptions with Logging
+Before implementing a fix, let’s add logging to confirm that the incomplete fallbackMaterials definition and its misplaced declaration are the culprits. Since this is a syntax error, the code won’t execute, so traditional runtime logging won’t work. Instead, we’ll use a two-step approach: comment out problematic sections to isolate the issue and add temporary logs in a corrected version to verify behavior after fixing the syntax.
+Step 1: Isolate the Issue
+Comment out the problematic fallbackMaterials block inside the mousemove event listener and check if the syntax error disappears:
+javascript
+window.addEventListener('mousemove', (event) => {
+  console.log('[MOUSE] Mouse move event:', { 
+    clientX: event.clientX, 
+    clientY: event.clientY 
+  });
+
+  mousePos.x = (event.clientX / window.innerWidth) * 2 - 1;
+  mousePos.y = -(event.clientY / window.innerHeight) * 2 + 1;
+  
+  console.log('[MOUSE] Updated normalized coordinates:', { 
+    x: mousePos.x, 
+    y: mousePos.y 
+  });
+
+  raycaster.setFromCamera(mousePos, camera);
+
+  // Temporarily comment out the problematic section
+  /*
+  const fallbackMaterials = [
+    new THREE.MeshPhongMaterial({
+      color: 0xff5733,
+  */
+
+  // Find intersected hexagons
+  const intersects = raycaster.intersectObjects(hexagons);
+  // ... rest of the event listener ...
+});
+
+Validation: If the syntax error no longer occurs after commenting this out, it confirms that the incomplete fallbackMaterials definition is the issue.
+Step 2: Add Diagnostic Logs in a Corrected Version
+Assuming the commented version parses successfully, add logs around the intersects line to verify runtime behavior and ensure no other syntax issues persist:
+javascript
+window.addEventListener('mousemove', (event) => {
+  console.log('[MOUSE] Mouse move event:', { 
+    clientX: event.clientX, 
+    clientY: event.clientY 
+  });
+
+  mousePos.x = (event.clientX / window.innerWidth) * 2 - 1;
+  mousePos.y = -(event.clientY / window.innerHeight) * 2 + 1;
+  
+  console.log('[MOUSE] Updated normalized coordinates:', { 
+    x: mousePos.x, 
+    y: mousePos.y 
+  });
+
+  raycaster.setFromCamera(mousePos, camera);
+
+  // Log before raycasting to ensure variables are defined
+  console.log('[RAYCASTER] Preparing to find intersects', {
+    raycasterDefined: !!raycaster,
+    hexagonsDefined: !!hexagons,
+    hexagonsCount: hexagons ? hexagons.length : 0
+  });
+
+  // Find intersected hexagons
+  const intersects = raycaster.intersectObjects(hexagons);
+
+  // Log after raycasting to confirm execution
+  console.log('[RAYCASTER] Intersects found:', {
+    intersectCount: intersects.length,
+    firstIntersect: intersects.length > 0 ? intersects[0].object : null
+  });
+
+  // ... rest of the event listener ...
+});
+
+Validation Goals:
+Confirm that raycaster and hexagons are defined (no runtime errors).
+
+Verify that the intersects line executes without syntax issues once the preceding code is corrected.
+
+Ensure the event listener continues functioning as expected.
+Step 3: Check Line Numbers
+Since the error specifies "line 230, column 9," review the script to confirm that this corresponds to const intersects. If line numbers shift due to added logs, adjust accordingly. Use a code editor’s line numbering or the browser’s developer tools to pinpoint the exact location.
+Next Steps
+Once these logs validate that:
+Commenting out the incomplete fallbackMaterials resolves the syntax error.
+
+The corrected version runs and logs expected values for intersects.
+We can proceed to implement the fix by:
+Removing the erroneous const fallbackMaterials block from the mousemove event listener.
+
+Relying on the earlier, complete fallbackMaterials definition outside the listener.
+
