@@ -189,164 +189,119 @@ try {
 
   // Default fallback material (used if textures fail to load)
   // Create raycaster for hover detection
-const raycaster = new THREE.Raycaster();
-const mouse = new THREE.Vector2();
+  const raycaster = new THREE.Raycaster();
+  const mouse = new THREE.Vector2();
 
-// Create stroke material for hover effect
-const strokeMaterial = new THREE.LineBasicMaterial({
-  color: 0xffffff,
-  transparent: true,
-  opacity: 0
-});
-
-// Initialize mouse position vector outside event handler
-const mousePos = new THREE.Vector2();
-console.log('[MOUSE] Initialized mouse position vector:', mousePos);
-
-// Handle mouse move for hex hover
-window.addEventListener('mousemove', (event) => {
-  console.log('[MOUSE] Mouse move event:', { 
-    clientX: event.clientX, 
-    clientY: event.clientY 
+  // Create stroke material for hover effect
+  const strokeMaterial = new THREE.LineBasicMaterial({
+    color: 0xffffff,
+    transparent: true,
+    opacity: 0
   });
 
-  // Calculate mouse position in normalized device coordinates
-  mousePos.x = (event.clientX / window.innerWidth) * 2 - 1;
-  mousePos.y = -(event.clientY / window.innerHeight) * 2 + 1;
-  
-  console.log('[MOUSE] Updated normalized coordinates:', { 
-    x: mousePos.x, 
-    y: mousePos.y 
-  });
+  // Initialize mouse position vector outside event handler
+  const mousePos = new THREE.Vector2();
+  console.log('[MOUSE] Initialized mouse position vector:', mousePos);
 
-  // Log before raycasting to ensure variables are defined
-  console.log('[RAYCASTER] Preparing to find intersects', {
-    raycasterDefined: !!raycaster,
-    hexagonsDefined: !!hexagons,
-    hexagonsCount: hexagons ? hexagons.length : 0
-  });
+  // Handle mouse move for hex hover
+  window.addEventListener('mousemove', (event) => {
+    console.log('[MOUSE] Mouse move event:', { 
+      clientX: event.clientX, 
+      clientY: event.clientY 
+    });
 
-  // Update raycaster with new mouse position
-  raycaster.setFromCamera(mousePos, camera);
+    // Calculate mouse position in normalized device coordinates
+    mousePos.x = (event.clientX / window.innerWidth) * 2 - 1;
+    mousePos.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
-  // Find intersected hexagons
-  const intersects = raycaster.intersectObjects(hexagons);
+    console.log('[MOUSE] Updated normalized coordinates:', { 
+      x: mousePos.x, 
+      y: mousePos.y 
+    });
 
-  // Log after raycasting to confirm execution
-  console.log('[RAYCASTER] Intersects found:', {
-    intersectCount: intersects.length,
-    firstIntersect: intersects.length > 0 ? intersects[0].object : null
-  });
+    // Log before raycasting to ensure variables are defined
+    console.log('[RAYCASTER] Preparing to find intersects', {
+      raycasterDefined: !!raycaster,
+      hexagonsDefined: !!hexagons,
+      hexagonsCount: hexagons ? hexagons.length : 0
+    });
 
-  // If we were hovering a hex, remove its stroke
-  if (window.hoveredHex) {
-    const strokeMesh = window.hoveredHex.material.userData.strokeMesh;
-    if (strokeMesh) {
-      window.hoveredHex.remove(strokeMesh);
-      window.hoveredHex.material.userData.strokeMesh = null;
-      window.hoveredHex.material.userData.strokeMaterial = null;
+    // Update raycaster with new mouse position
+    raycaster.setFromCamera(mousePos, camera);
+
+    // Find intersected hexagons
+    const intersects = raycaster.intersectObjects(hexagons);
+
+    // Log after raycasting to confirm execution
+    console.log('[RAYCASTER] Intersects found:', {
+      intersectCount: intersects.length,
+      firstIntersect: intersects.length > 0 ? intersects[0].object : null
+    });
+
+    // If we were hovering a hex, remove its stroke
+    if (window.hoveredHex) {
+      const strokeMesh = window.hoveredHex.material.userData.strokeMesh;
+      if (strokeMesh) {
+        window.hoveredHex.remove(strokeMesh);
+        window.hoveredHex.material.userData.strokeMesh = null;
+        window.hoveredHex.material.userData.strokeMaterial = null;
+      }
     }
-  }
 
-  // Clear previous hover
-  window.hoveredHex = null;
+    // Clear previous hover
+    window.hoveredHex = null;
 
-  // If we found a new hex to hover
-  if (intersects.length > 0) {
-    const hex = intersects[0].object;
-    window.hoveredHex = hex;
+    // If we found a new hex to hover
+    if (intersects.length > 0) {
+      const hex = intersects[0].object;
+      window.hoveredHex = hex;
 
-    // Create stroke geometry (hexagon outline)
-    const strokeGeometry = new THREE.BufferGeometry();
-    const vertices = [];
-    const hexPoints = 6;
-    const radius = 1.05; // Slightly larger than hex radius for visible outline
+      // Create stroke geometry (hexagon outline)
+      const strokeGeometry = new THREE.BufferGeometry();
+      const vertices = [];
+      const hexPoints = 6;
+      const radius = 1.05; // Slightly larger than hex radius for visible outline
 
-    for (let i = 0; i <= hexPoints; i++) {
-      const angle = (i / hexPoints) * Math.PI * 2;
-      vertices.push(
-        radius * Math.cos(angle),
-        0.1, // Slightly above hex surface
-        radius * Math.sin(angle)
+      for (let i = 0; i <= hexPoints; i++) {
+        const angle = (i / hexPoints) * Math.PI * 2;
+        vertices.push(
+          radius * Math.cos(angle),
+          0.1, // Slightly above hex surface
+          radius * Math.sin(angle)
+        );
+      }
+
+      strokeGeometry.setAttribute(
+        'position',
+        new THREE.Float32BufferAttribute(vertices, 3)
       );
+
+      // Create stroke mesh
+      const strokeMesh = new THREE.Line(strokeGeometry, strokeMaterial.clone());
+      strokeMesh.rotation.y = Math.PI / 6; // Match hex rotation
+
+      // Store references for animation
+      hex.material.userData.strokeMesh = strokeMesh;
+      hex.material.userData.strokeMaterial = strokeMesh.material;
+
+      // Add stroke to hex
+      hex.add(strokeMesh);
     }
+  });
 
-    strokeGeometry.setAttribute(
-      'position',
-      new THREE.Float32BufferAttribute(vertices, 3)
-    );
-
-    // Create stroke mesh
-    const strokeMesh = new THREE.Line(strokeGeometry, strokeMaterial.clone());
-    strokeMesh.rotation.y = Math.PI / 6; // Match hex rotation
-    
-    // Store references for animation
-    hex.material.userData.strokeMesh = strokeMesh;
-    hex.material.userData.strokeMaterial = strokeMesh.material;
-    
-    // Add stroke to hex
-    hex.add(strokeMesh);
-  }
-});
-
-      shininess: 50,
-      specular: 0x555555,
-    }), // Combat
-    new THREE.MeshPhongMaterial({
-      color: 0x7cfc00,
-      shininess: 50,
-      specular: 0x555555,
-    }), // Corrosion
-    new THREE.MeshPhongMaterial({
-      color: 0x581845,
-      shininess: 50,
-      specular: 0x555555,
-    }), // Dark
-    new THREE.MeshPhongMaterial({
-      color: 0x964b00,
-      shininess: 50,
-      specular: 0x555555,
-    }), // Earth
-    new THREE.MeshPhongMaterial({
-      color: 0xffff00,
-      shininess: 50,
-      specular: 0x555555,
-    }), // Electric
-    new THREE.MeshPhongMaterial({
-      color: 0xff4500,
-      shininess: 50,
-      specular: 0x555555,
-    }), // Fire
-    new THREE.MeshPhongMaterial({
-      color: 0xffffff,
-      shininess: 50,
-      specular: 0x555555,
-    }), // Light
-    new THREE.MeshPhongMaterial({
-      color: 0xc0c0c0,
-      shininess: 50,
-      specular: 0x555555,
-    }), // Metal
-    new THREE.MeshPhongMaterial({
-      color: 0x2ecc71,
-      shininess: 50,
-      specular: 0x555555,
-    }), // Plant
-    new THREE.MeshPhongMaterial({
-      color: 0xd8bfd8,
-      shininess: 50,
-      specular: 0x555555,
-    }), // Spirit
-    new THREE.MeshPhongMaterial({
-      color: 0x3498db,
-      shininess: 50,
-      specular: 0x555555,
-    }), // Water
-    new THREE.MeshPhongMaterial({
-      color: 0xc6e2ff,
-      shininess: 50,
-      specular: 0x555555,
-    }), // Wind
+  const fallbackMaterials = [
+    new THREE.MeshPhongMaterial({ color: 0xff5733, shininess: 50, specular: 0x555555 }), // Combat
+    new THREE.MeshPhongMaterial({ color: 0x7cfc00, shininess: 50, specular: 0x555555 }), // Corrosion
+    new THREE.MeshPhongMaterial({ color: 0x581845, shininess: 50, specular: 0x555555 }), // Dark
+    new THREE.MeshPhongMaterial({ color: 0x964b00, shininess: 50, specular: 0x555555 }), // Earth
+    new THREE.MeshPhongMaterial({ color: 0xffff00, shininess: 50, specular: 0x555555 }), // Electric
+    new THREE.MeshPhongMaterial({ color: 0xff4500, shininess: 50, specular: 0x555555 }), // Fire
+    new THREE.MeshPhongMaterial({ color: 0xffffff, shininess: 50, specular: 0x555555 }), // Light
+    new THREE.MeshPhongMaterial({ color: 0xc0c0c0, shininess: 50, specular: 0x555555 }), // Metal
+    new THREE.MeshPhongMaterial({ color: 0x2ecc71, shininess: 50, specular: 0x555555 }), // Plant
+    new THREE.MeshPhongMaterial({ color: 0xd8bfd8, shininess: 50, specular: 0x555555 }), // Spirit
+    new THREE.MeshPhongMaterial({ color: 0x3498db, shininess: 50, specular: 0x555555 }), // Water
+    new THREE.MeshPhongMaterial({ color: 0xc6e2ff, shininess: 50, specular: 0x555555 }), // Wind
   ];
 
   // Load all textures
@@ -816,7 +771,7 @@ window.addEventListener('mousemove', (event) => {
     //  .then(module => {
     //    debugLog("Arrow Debugger module loaded successfully");
     //    arrowDebugger = new module.ArrowDebugger(scene);
-        
+
     //    // Make it globally available for debugging with a clear name
     //    window.arrowDebugger = arrowDebugger;
 
