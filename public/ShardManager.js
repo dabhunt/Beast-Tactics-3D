@@ -7,18 +7,53 @@
 class ShardManager {
   /**
    * Constructor for the ShardManager
-   * @param {Object} THREE - Three.js library instance
-   * @param {Object} scene - THREE.Scene where shards will be added
-   * @param {Object} assetLoader - Instance of AssetLoader class
-   * @param {Object} options - Configuration options for shard management
+   * Can be called with separate parameters or a single options object
+   * @param {Object|THREE} params - THREE.js library instance OR options object containing all parameters
+   * @param {Object} [scene] - THREE.Scene where shards will be added
+   * @param {Object} [assetLoader] - Instance of AssetLoader class
+   * @param {Object} [options] - Configuration options for shard management
    */
-  constructor(THREE, scene, assetLoader, options = {}) {
+  constructor(params, scene, assetLoader, options = {}) {
     console.log('[SHARDS] Initializing ShardManager');
+    console.log('[SHARDS] Constructor params:', { 
+      paramsType: typeof params,
+      isObject: params && typeof params === 'object',
+      hasScene: params && params.scene,
+      hasTHREE: params && params.THREE
+    });
     
-    // Store dependencies
-    this.THREE = THREE;
-    this.scene = scene;
-    this.assetLoader = assetLoader;
+    // Handle both parameter styles (separate params or single object)
+    if (params && params.scene && params.THREE) {
+      // Called with a single options object
+      const optionsObject = params;
+      this.THREE = optionsObject.THREE;
+      this.scene = optionsObject.scene;
+      this.assetLoader = optionsObject.assetLoader;
+      options = optionsObject;
+      
+      console.log('[SHARDS] Using object-style initialization');
+    } else {
+      // Called with separate parameters
+      this.THREE = params; // First param is THREE
+      this.scene = scene;
+      this.assetLoader = assetLoader;
+      
+      console.log('[SHARDS] Using traditional parameter initialization');
+    }
+    
+    // Validate critical dependencies
+    if (!this.THREE) {
+      console.error('[SHARDS] THREE.js library not provided to ShardManager');
+    }
+    
+    if (!this.scene) {
+      console.error('[SHARDS] Scene not provided to ShardManager');
+    }
+    
+    console.log('[SHARDS] AssetLoader availability:', {
+      available: !!this.assetLoader,
+      type: this.assetLoader ? typeof this.assetLoader : 'undefined'
+    });
     
     // Default configuration with overrides from options
     this.config = {
@@ -80,16 +115,43 @@ class ShardManager {
    */
   async placeShard(position, options = {}) {
     try {
+      // Begin with validation of input parameters
+      if (!position || typeof position !== 'object') {
+        console.error('[SHARDS] Invalid position provided to placeShard:', position);
+        return null;
+      }
+
+      // Validate position object has needed properties
+      if (position.x === undefined || position.y === undefined || position.z === undefined) {
+        console.error('[SHARDS] Position missing coordinates:', position);
+        return null;
+      }
+
       const shardId = options.id || `shard_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+      const elementType = options.elementType || 'default';
+      
       console.log(`[SHARDS] Placing shard ${shardId} at position:`, {
         x: position.x.toFixed(2),
         y: position.y.toFixed(2), 
-        z: position.z.toFixed(2)
+        z: position.z.toFixed(2),
+        element: elementType
       });
+      
+      // Critical dependency validation
+      if (!this.THREE) {
+        console.error('[SHARDS] THREE.js library not available, cannot place shard');
+        return null;
+      }
+      
+      if (!this.scene) {
+        console.error('[SHARDS] Scene not available, cannot place shard');
+        return null;
+      }
       
       // Check if AssetLoader is available
       if (!this.assetLoader) {
-        console.error('[SHARDS] AssetLoader not available, cannot place shard');
+        console.error('[SHARDS] AssetLoader not available, using fallback shard');
+        console.log('[SHARDS] If this is unexpected, check that assetLoader is properly passed to ShardManager constructor');
         return this.createFallbackShard(position, shardId);
       }
       
@@ -279,8 +341,35 @@ class ShardManager {
         z: position.z.toFixed(2)
       });
       
+      // Verify THREE.js is available
+      if (!this.THREE) {
+        console.error('[SHARDS] THREE.js not available in createFallbackShard');
+        return null;
+      }
+      
+      // Debugging THREE availability and constructors
+      console.log('[SHARDS] THREE availability check:', {
+        THREE: !!this.THREE,
+        ConeGeometry: !!this.THREE.ConeGeometry,
+        MeshStandardMaterial: !!this.THREE.MeshStandardMaterial,
+        Mesh: !!this.THREE.Mesh
+      });
+      
       // Create a simple geometric shape for the fallback
-      const geometry = new this.THREE.ConeGeometry(0.2, 0.5, 6);
+      // First verify that ConeGeometry constructor exists
+      if (!this.THREE.ConeGeometry) {
+        console.error('[SHARDS] THREE.ConeGeometry constructor not available!');  
+        // Try to use BoxGeometry as an alternative fallback
+        if (this.THREE.BoxGeometry) {
+          console.warn('[SHARDS] Attempting to use BoxGeometry as alternative fallback');
+          var geometry = new this.THREE.BoxGeometry(0.2, 0.5, 0.2);
+        } else {
+          console.error('[SHARDS] No suitable geometry constructor available');
+          return null;
+        }
+      } else {
+        var geometry = new this.THREE.ConeGeometry(0.2, 0.5, 6);
+      }
       
       // Create a vibrant, easily visible material
       const material = new this.THREE.MeshStandardMaterial({

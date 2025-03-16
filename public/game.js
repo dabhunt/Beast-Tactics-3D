@@ -1,34 +1,91 @@
 // Import Three.js and other modules using dynamic imports for better compatibility
+/**
+ * game.js - Main game entry point and initialization
+ * Handles module loading order and sharing a single THREE.js instance
+ */
+
+// Import essential game modules
 import { CameraManager } from "./camera.js";
 import { DebugMenu } from "./tools/diagnostics/DebugMenu.js";
 import { Beast } from './beast.js';
-// Import the MapGenerator module and the textureLoadingTracker
 import { MapGenerator, ELEMENT_TYPES, textureLoadingTracker } from './MapGeneration.js';
 
-// Log the imported textureLoadingTracker to verify it's properly loaded
-console.log('[GAME] Imported textureLoadingTracker:', textureLoadingTracker);
+// Advanced debugging for module loading
+console.log('[GAME] Module importing started:', { 
+  timestamp: new Date().toISOString(),
+  moduleFormat: 'ES Modules'
+});
 
-// Asset management modules will be loaded dynamically to ensure proper initialization order
-// Import Line2 and related modules for thicker lines
-import { Line2 } from 'three/addons/lines/Line2.js';
-import { LineGeometry } from 'three/addons/lines/LineGeometry.js';
-import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
+// We'll track all loading issues for debugging
+window._moduleLoadingIssues = window._moduleLoadingIssues || [];
+
+// Global variables for critical game components
+let assetLoader, shardManager;
 
 // Global THREE variable
 let THREE;
 
 /**
  * Main game initialization function - called after all modules are loaded
+ * Sets up the scene and connects all initialized components
  */
 function initGame() {
   console.log("[GAME] Initializing game with loaded modules");
-  console.log("[GAME] THREE.js available:", !!THREE);
-  console.log("[GAME] Beast class available:", typeof Beast === 'function');
   
-  // Debug log to verify Beast import was successful
-  console.log("[GAME] Imported Beast class successfully:", { 
-    beastClassAvailable: typeof Beast === 'function',
-    staticMethodsAvailable: typeof Beast.findRandomHexOfElement === 'function'
+  // Verify critical dependencies before proceeding
+  const dependencies = {
+    THREE: !!THREE && typeof THREE.Scene === 'function',
+    Beast: typeof Beast === 'function',
+    AssetLoader: !!assetLoader,
+    ShardManager: !!shardManager,
+    MapGenerator: typeof MapGenerator === 'function'
+  };
+  
+  console.log("[GAME] Dependency availability check:", dependencies);
+  
+  // Check for missing critical dependencies
+  const missingDeps = Object.entries(dependencies)
+    .filter(([_, available]) => !available)
+    .map(([name]) => name);
+  
+  if (missingDeps.length > 0) {
+    console.error(`[GAME] Missing critical dependencies: ${missingDeps.join(', ')}`);
+    document.body.innerHTML += `
+      <div style="position:fixed; top:0; left:0; right:0; background:rgba(255,0,0,0.8); color:white; padding:20px; z-index:9999;">
+        <h2>Critical Dependencies Missing</h2>
+        <p>Missing: ${missingDeps.join(', ')}</p>
+        <p>Check the console for details (F12)</p>
+      </div>
+    `;
+    return; // Cannot continue with initialization
+  }
+  
+  // Detailed log of THREE version and components for debugging
+  console.log("[GAME] THREE.js details:", { 
+    version: THREE.REVISION,
+    keyComponents: {
+      scene: !!THREE.Scene,
+      camera: !!THREE.PerspectiveCamera,
+      renderer: !!THREE.WebGLRenderer,
+      materials: !!THREE.MeshStandardMaterial
+    }
+  });
+  
+  // Also log AssetLoader and ShardManager state
+  console.log("[GAME] AssetLoader state:", {
+    initialized: !!assetLoader,
+    hasLoaders: assetLoader ? Object.keys(assetLoader.loaders || {}).length > 0 : false,
+    fbxLoaderAvailable: assetLoader ? !!assetLoader.loaders.fbx : false,
+    cacheStatus: assetLoader && assetLoader.cache ? {
+      models: assetLoader.cache.models.size,
+      textures: assetLoader.cache.textures.size
+    } : 'unavailable'
+  });
+  
+  console.log("[GAME] ShardManager state:", {
+    initialized: !!shardManager,
+    hasThree: shardManager ? !!shardManager.THREE : false,
+    hasAssetLoader: shardManager ? !!shardManager.assetLoader : false
   });
   
   // Continue with game initialization
@@ -37,59 +94,224 @@ function initGame() {
 
 /**
  * Load all required modules before starting the game
+ * This function handles the proper loading order to ensure dependencies
+ * are satisfied and only a single instance of THREE.js is used
  */
 async function loadModules() {
+  const startTime = performance.now();
+  console.log("[GAME] Starting module loading sequence", {
+    timestamp: new Date().toISOString(),
+    platform: navigator.platform,
+    userAgent: navigator.userAgent.substring(0, 50) + '...'
+  });
+  
   try {
+    // STEP 1: Load THREE.js first since everything depends on it
     console.log("[GAME] Loading THREE.js module...");
-    const threeModule = await import("/libs/three/three.module.js");
-    // Assign the module to the global THREE variable
-    THREE = threeModule;
-    console.log("[GAME] THREE.js module loaded successfully");
+    try {
+      // Use correct relative path to three.module.js from base URL
+      // The leading slash makes this an absolute path from the server root
+      // which is causing the 404 error
+      console.log("[GAME] Attempting to load THREE.js from correct path");
+      const threeModule = await import("./libs/three/three.module.js");
+      
+      // Store THREE globally for consistent access
+      window.THREE = threeModule;
+      THREE = threeModule;
+      
+      console.log("[GAME] THREE.js module loaded successfully", {
+        version: THREE.REVISION,
+        constructors: Object.keys(THREE).length
+      });
+      
+      // Log some key constructors to verify THREE is loaded properly
+      console.log("[GAME] Validating THREE.js core components:", {
+        Scene: !!THREE.Scene,
+        PerspectiveCamera: !!THREE.PerspectiveCamera,
+        WebGLRenderer: !!THREE.WebGLRenderer,
+        BoxGeometry: !!THREE.BoxGeometry,
+        Mesh: !!THREE.Mesh
+      });
+      
+      // STEP 1B: Load the THREE.js Line/Material addons that we need
+      // These are essential for hex grid rendering with thick lines
+      console.log("[GAME] Loading THREE.js line modules...");
+      
+      try {
+        // Load the Line2, LineGeometry, and LineMaterial modules and attach to THREE
+        const lineModulePromises = [
+          // Use dynamic imports to load the modules with correct relative paths
+          // (without the leading slash which causes 404 errors)
+          import('./libs/three/addons/lines/Line2.js'),
+          import('./libs/three/addons/lines/LineGeometry.js'),
+          import('./libs/three/addons/lines/LineMaterial.js')
+        ];
+        
+        console.log("[GAME] Attempting to load line modules from correct relative paths");
+        
+        // Wait for all line modules to load
+        const [Line2Module, LineGeometryModule, LineMaterialModule] = await Promise.all(lineModulePromises);
+        
+        // Don't try to modify THREE namespace directly as it might be frozen
+        // Instead check if our custom namespace is available (should be created by the modules)
+        console.log("[GAME] THREE.js line modules loaded, checking custom namespace", {
+          BeastTactics: typeof window.BeastTactics !== 'undefined',
+          THREEAddons: typeof window.BeastTactics?.THREEAddons !== 'undefined',
+          Line2: typeof window.BeastTactics?.THREEAddons?.Line2 !== 'undefined',
+          LineGeometry: typeof window.BeastTactics?.THREEAddons?.LineGeometry !== 'undefined',
+          LineMaterial: typeof window.BeastTactics?.THREEAddons?.LineMaterial !== 'undefined'
+        });
+        
+        // Check for the modules in both our namespace and global THREE to handle all cases
+        console.log("[GAME] Module export names:", {
+          Line2ModuleExports: Object.keys(Line2Module),
+          GeometryModuleExports: Object.keys(LineGeometryModule),
+          MaterialModuleExports: Object.keys(LineMaterialModule)
+        });
+      } catch (lineModuleError) {
+        console.error("[GAME] Failed to load THREE.js line modules:", lineModuleError);
+        window._moduleLoadingIssues.push({
+          component: 'THREE.js-line-modules',
+          error: lineModuleError.toString(),
+          stack: lineModuleError.stack,
+          time: new Date().toISOString()
+        });
+        // We'll continue without line modules but log the issue
+      }
+    } catch (threeError) {
+      console.error("[GAME] CRITICAL ERROR: Failed to load THREE.js:", threeError);
+      window._moduleLoadingIssues.push({
+        component: 'THREE.js',
+        error: threeError.toString(),
+        stack: threeError.stack,
+        time: new Date().toISOString()
+      });
+      throw new Error('THREE.js loading failed - cannot continue initialization');
+    }
     
-    // Verify that Line2 and related modules are available globally
-    console.log("[GAME] Verifying Line2 and LineMaterial modules availability:", {
-      Line2Available: typeof Line2 === 'function',
-      LineGeometryAvailable: typeof LineGeometry === 'function',
-      LineMaterialAvailable: typeof LineMaterial === 'function'
-    });
+    // STEP 2: Load our custom FBXLoader handler 
+    console.log("[GAME] Loading FBXLoader handler...");
+    try {
+      // Load the FBXLoader handler (non-module version that works with script tags)
+      await loadScript("/libs/three/addons/loaders/FBXLoader.handler.js");
+      console.log("[GAME] FBXLoader handler loaded, checking if initialized:", {
+        initFunctionAvailable: typeof window.initFBXLoader === 'function',
+        loaderAvailable: typeof window.FBXLoader === 'function'
+      });
+      
+      // If FBXLoader wasn't automatically initialized, do it manually
+      if (typeof window.FBXLoader !== 'function' && typeof window.initFBXLoader === 'function') {
+        console.log("[GAME] Manually initializing FBXLoader with our THREE instance");
+        window.initFBXLoader(THREE);
+      }
+    } catch (fbxError) {
+      console.warn("[GAME] Warning: FBXLoader handler failed to load:", fbxError);
+      window._moduleLoadingIssues.push({
+        component: 'FBXLoader.handler.js',
+        error: fbxError.toString(),
+        time: new Date().toISOString()
+      });
+      // Continue despite error - AssetLoader has fallbacks
+    }
     
-    // Load SpriteMixer library
-    console.log("[GAME] Loading SpriteMixer library...");
-    await loadScript("/libs/SpriteMixer.js");
-    console.log("[GAME] SpriteMixer library loaded successfully");
+    // STEP 3: Load utility libraries
+    console.log("[GAME] Loading utility libraries...");
+    await Promise.all([
+      loadScript("/libs/SpriteMixer.js").catch(e => {
+        console.warn("[GAME] Warning: SpriteMixer library failed to load:", e);
+        window._moduleLoadingIssues.push({
+          component: 'SpriteMixer.js',
+          error: e.toString(),
+          time: new Date().toISOString()
+        });
+      })
+    ]);
     
-    // Load FBXLoader for 3D models
-    console.log("[GAME] Loading FBXLoader...");
-    await loadScript("/libs/three/addons/loaders/FBXLoader.js");
-    console.log("[GAME] FBXLoader loaded successfully");
-    
-    // Load Asset Management modules
+    // STEP 4: Load Asset Management modules in correct dependency order
     console.log("[GAME] Loading asset management modules...");
     try {
-      // Load our custom asset management modules in the correct order (dependency first)
-      // 1. First the AssetLoader which provides core loading functionality
+      // First the AssetLoader which provides core loading functionality
       await loadScript("/AssetLoader.js");
       console.log("[GAME] AssetLoader module loaded successfully");
       
-      // 2. Then the ShardManager which depends on AssetLoader
-      await loadScript("/ShardManager.js");
-      console.log("[GAME] ShardManager module loaded successfully");
+      // Verify AssetLoader is available
+      if (typeof window.AssetLoader !== 'function') {
+        throw new Error('AssetLoader not available after loading script');
+      }
       
-      // Verify modules are available globally
-      console.log("[GAME] Verifying asset management modules:", {
-        AssetLoaderAvailable: typeof window.AssetLoader === 'function',
-        ShardManagerAvailable: typeof window.ShardManager === 'function'
+      // Initialize AssetLoader with our THREE instance
+      assetLoader = new window.AssetLoader(THREE, {
+        debug: true,
+        basePath: window.location.href
       });
+      console.log("[GAME] AssetLoader initialized:", {
+        loaders: Object.keys(assetLoader.loaders || {}),
+        cacheSize: assetLoader.cache ? {
+          models: assetLoader.cache.models.size,
+          textures: assetLoader.cache.textures.size
+        } : 'unknown'
+      });
+      
+      // Then load the ShardManager which depends on AssetLoader
+      await loadScript("/ShardManager.js");
+      console.log("[GAME] ShardManager module loaded");
+      
+      // Verify ShardManager is available  
+      if (typeof window.ShardManager !== 'function') {
+        throw new Error('ShardManager not available after loading script');
+      }
+      
+      // Initialize ShardManager with THREE, assetLoader, and scene
+      // When setting up the ShardManager, create and provide the scene immediately
+      // This prevents the "Scene not provided" error
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x222222);
+      console.log("[GAME] Scene created for ShardManager initialization");
+      
+      shardManager = new window.ShardManager({
+        THREE: THREE,
+        scene: scene, // Provide scene immediately instead of null
+        assetLoader: assetLoader
+      });
+      console.log("[GAME] ShardManager initialized successfully with scene");
+      
     } catch (assetError) {
-      console.error("[GAME] Failed to load asset management modules:", assetError);
+      console.error("[GAME] Failed to initialize asset management modules:", assetError);
       console.error("[GAME] This may affect 3D model loading. Stack trace:", assetError.stack);
+      window._moduleLoadingIssues.push({
+        component: 'AssetManagement',
+        error: assetError.toString(),
+        stack: assetError.stack,
+        time: new Date().toISOString()
+      });
     }
+    
+    // Log module loading completion time
+    const loadingTime = performance.now() - startTime;
+    console.log(`[GAME] All modules loaded in ${loadingTime.toFixed(2)}ms`);
     
     // Initialize the game after all modules are loaded
     initGame();
+    
   } catch (err) {
-    console.error("[GAME] Failed to load modules:", err);
+    console.error("[GAME] CRITICAL ERROR: Failed to load essential modules:", err);
     console.error("[GAME] Stack trace:", err.stack);
+    window._moduleLoadingIssues.push({
+      component: 'ModuleLoading',
+      error: err.toString(),
+      stack: err.stack,
+      time: new Date().toISOString(),
+      fatal: true
+    });
+    
+    // Display error message on screen
+    document.body.innerHTML += `
+      <div style="position:fixed; top:0; left:0; right:0; background:rgba(255,0,0,0.8); color:white; padding:20px; z-index:9999;">
+        <h2>Error Loading Game Modules</h2>
+        <p>${err.message}</p>
+        <p>Check the console for details (F12)</p>
+      </div>
+    `;
   }
 }
 
@@ -266,8 +488,39 @@ function setupScene() {
     let hoverAnimationActive = false;   // Whether animation is currently running
     let hoverAnimationFrame = null;     // Handle to cancel animation frame
     
-    // Create the stroke material with improved settings for maximum visibility
-    const strokeMaterial = new LineMaterial({
+    // Check if line modules are available in our custom namespace instead of THREE
+    console.log("[GRID] Line modules availability check:", {
+      BeastTacticsExists: typeof window.BeastTactics !== 'undefined',
+      THREEAddonsExists: typeof window.BeastTactics?.THREEAddons !== 'undefined',
+      Line2: typeof window.BeastTactics?.THREEAddons?.Line2 === 'function',
+      LineGeometry: typeof window.BeastTactics?.THREEAddons?.LineGeometry === 'function',
+      LineMaterial: typeof window.BeastTactics?.THREEAddons?.LineMaterial === 'function'
+    });
+    
+    // Also log any global window exposures of the modules
+    console.log("[GRID] Global module availability:", {
+      Line2Global: typeof window.Line2 === 'function',
+      LineGeometryGlobal: typeof window.LineGeometry === 'function',
+      LineMaterialGlobal: typeof window.LineMaterial === 'function'
+    });
+    
+    let strokeMaterial, useSimpleLine = false;
+    
+    // Try to create the stroke material with error handling
+    try {
+      // Create the stroke material with improved settings for maximum visibility
+      // Use our custom namespace to access the line material
+      console.log('[GRID] Attempting to create LineMaterial from custom namespace');
+      
+      // Try to get LineMaterial from our custom namespace
+      const LineMaterial = window.BeastTactics?.THREEAddons?.LineMaterial || window.LineMaterial;
+      
+      if (!LineMaterial) {
+        throw new Error('LineMaterial not found in BeastTactics.THREEAddons namespace or as global');
+      }
+      
+      console.log('[GRID] Using LineMaterial constructor:', typeof LineMaterial);
+      strokeMaterial = new LineMaterial({
       color: 0xFFD700,      // Brighter gold color for better visibility (0xFFD700 instead of 0xDAA520)
       linewidth: BASE_STROKE_WIDTH, // Thicker lines as requested 
       vertexColors: true,   // Enable vertex colors for wave effect
@@ -283,6 +536,28 @@ function setupScene() {
       toneMapped: false,    // Disable tone mapping to preserve bright colors
       renderOrder: 999      // Very high render order to ensure it renders on top
     });
+      console.log("[GRID] Successfully created LineMaterial");
+    } catch (materialError) {
+      console.error("[GRID] Error creating LineMaterial:", materialError);
+      console.warn("[GRID] Falling back to standard LineBasicMaterial");
+      
+      // Create a standard LineBasicMaterial as fallback
+      // Note: renderOrder is an Object3D property, not a material property
+      // so we'll set it later on the mesh object, not the material
+      strokeMaterial = new THREE.LineBasicMaterial({
+        color: 0xFFD700,
+        linewidth: 1, // Standard WebGL limitation
+        vertexColors: true,
+        transparent: true,
+        opacity: 0.9,
+        depthTest: false,
+        depthWrite: false,
+        toneMapped: false
+      });
+      
+      useSimpleLine = true;
+      console.log("[GRID] Fallback LineBasicMaterial created");
+    }
     
     console.log('[HOVER] LineMaterial created with enhanced settings:', {
       linewidth: BASE_STROKE_WIDTH,
@@ -630,9 +905,39 @@ function setupScene() {
         // Create LineGeometry and set positions and colors for Line2
         console.log('[HOVER] Creating stroke geometry with LineGeometry');
         
-        const strokeGeometry = new LineGeometry();
-        strokeGeometry.setPositions(positions);
-        strokeGeometry.setColors(colors); // Add initial colors for animation
+        // Get LineGeometry constructor from our custom namespace or window global
+        const LineGeometry = window.BeastTactics?.THREEAddons?.LineGeometry || window.LineGeometry;
+        
+        // Log LineGeometry availability for debugging
+        console.log('[HOVER] LineGeometry constructor availability:', {
+          fromBeastTactics: !!window.BeastTactics?.THREEAddons?.LineGeometry,
+          fromWindow: !!window.LineGeometry,
+          fromTHREE: !!THREE.LineGeometry,
+          constructor: typeof LineGeometry
+        });
+        
+        if (!LineGeometry) {
+          console.error('[HOVER] LineGeometry constructor not found in any namespace');
+          throw new Error('LineGeometry constructor not available');
+        }
+        
+        let strokeGeometry;
+        try {
+          // Use the LineGeometry constructor we found
+          strokeGeometry = new LineGeometry();
+          strokeGeometry.setPositions(positions);
+          strokeGeometry.setColors(colors); // Add initial colors for animation
+          console.log('[HOVER] LineGeometry created and configured successfully');
+        } catch (geometryError) {
+          console.error('[HOVER] Error creating LineGeometry:', geometryError);
+          console.warn('[HOVER] Falling back to standard THREE.BufferGeometry');
+          
+          // Create standard BufferGeometry as fallback
+          strokeGeometry = new THREE.BufferGeometry();
+          strokeGeometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+          strokeGeometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+          useSimpleLine = true;
+        }
         
         console.log('[HOVER] LineGeometry created successfully with points:', positions.length / 3);
         
@@ -640,8 +945,52 @@ function setupScene() {
         console.log('[HOVER] Creating stroke mesh with Line2');
         
         // Create the stroke mesh with our geometry and material
-        const strokeMesh = new Line2(strokeGeometry, strokeMaterial);
-        strokeMesh.computeLineDistances(); // Required for Line2
+        let strokeMesh;
+        try {
+          if (useSimpleLine) {
+            // If we're using a fallback, create a standard Line instead of Line2
+            console.log('[HOVER] Using fallback standard THREE.Line');
+            strokeMesh = new THREE.Line(strokeGeometry, new THREE.LineBasicMaterial({
+              color: strokeMaterial.color,
+              linewidth: 1, // Standard WebGL can only do width 1
+              vertexColors: true
+            }));
+          } else {
+            // Get Line2 constructor from our custom namespace or window global
+            const Line2 = window.BeastTactics?.THREEAddons?.Line2 || window.Line2;
+            
+            // Log Line2 availability for debugging
+            console.log('[HOVER] Line2 constructor availability:', {
+              fromBeastTactics: !!window.BeastTactics?.THREEAddons?.Line2,
+              fromWindow: !!window.Line2,
+              fromTHREE: !!THREE.Line2,
+              constructor: typeof Line2
+            });
+            
+            if (!Line2) {
+              throw new Error('Line2 constructor not found in any namespace');
+            }
+            
+            // Create Line2 mesh with our constructor
+            strokeMesh = new Line2(strokeGeometry, strokeMaterial);
+            strokeMesh.computeLineDistances(); // Required for Line2
+            console.log('[HOVER] Line2 created successfully with:', {
+              material: strokeMaterial.type || typeof strokeMaterial,
+              geometry: strokeGeometry ? 'valid' : 'missing',
+              renderOrder: strokeMesh.renderOrder
+            });
+          }
+        } catch (meshError) {
+          console.error('[HOVER] Error creating Line2:', meshError);
+          console.warn('[HOVER] Falling back to standard THREE.Line');
+          
+          // Create standard Line as ultimate fallback
+          strokeMesh = new THREE.Line(strokeGeometry, new THREE.LineBasicMaterial({
+            color: 0xFFD700,
+            linewidth: 1,
+            vertexColors: true
+          }));
+        }
         
         // Use hex rotation to align properly
         const hexRotationY = hex.rotation.y || 0;

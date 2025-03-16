@@ -76,7 +76,13 @@ class AssetLoader {
    * @private
    */
   async _initializeFBXLoader() {
-    console.log('[ASSETS] Initializing FBXLoader...');
+    console.log('[ASSETS] Initializing FBXLoader...', {
+      THREE: !!this.THREE,
+      constructors: this.THREE ? Object.keys(this.THREE).length : 0,
+      windowFBXLoader: !!window.FBXLoader,
+      windowTHREE: !!window.THREE,
+      initFn: !!window.initFBXLoader
+    });
     
     // Track initialization to prevent multiple parallel attempts
     if (AssetLoader._initializingFBXLoader) {
@@ -100,50 +106,176 @@ class AssetLoader {
       
       console.log('[ASSETS] FBXLoader not initialized yet, checking available loaders');
       
-      // Try different ways to access FBXLoader
-      const sources = [
-        // Try access from THREE object
-        { source: 'THREE.FBXLoader', access: () => this.THREE.FBXLoader },
-        { source: 'imported module', access: () => window.FBXLoader },
-        { source: 'dynamic import', access: async () => {
-          const module = await import('/libs/three/addons/loaders/FBXLoader.js');
-          return module.FBXLoader;
-        }}
-      ];
-      
-      // Try each potential source
-      for (const source of sources) {
+      // APPROACH 1: Try to use the handler's initFBXLoader function with our THREE instance
+      if (window.initFBXLoader && this.THREE) {
+        console.log('[ASSETS] Using FBXLoader handler with local THREE instance');
         try {
-          console.log(`[ASSETS] Trying to access FBXLoader from ${source.source}`);
-          const FBXLoader = await source.access();
-          
+          const FBXLoader = window.initFBXLoader(this.THREE);
           if (FBXLoader) {
-            console.log(`[ASSETS] Successfully accessed FBXLoader from ${source.source}`);
+            console.log('[ASSETS] Successfully initialized FBXLoader with handler');
             this.loaders.fbx = new FBXLoader();
-            this._fbxLoaderSource = source.source;
+            this._fbxLoaderSource = 'handler-with-local-THREE';
             AssetLoader._initializingFBXLoader = false;
             return;
           }
-        } catch (error) {
-          console.warn(`[ASSETS] Failed to access FBXLoader from ${source.source}:`, error);
-          window._fbxLoaderErrors.push({ source: source.source, error: error.toString() });
+        } catch (err) {
+          console.warn('[ASSETS] Failed to initialize with handler + local THREE:', err);
+          window._fbxLoaderErrors.push({ 
+            source: 'handler-with-local-THREE', 
+            error: err.toString(),
+            time: new Date().toISOString()
+          });
         }
       }
       
-      // If we get here, no FBXLoader is available
-      console.warn('[ASSETS] FBXLoader not available!', {
-        errors: window._fbxLoaderErrors || []
-      });
-      this.loaders.fbx = null;
+      // APPROACH 2: Use global window.FBXLoader if available
+      if (window.FBXLoader) {
+        try {
+          console.log('[ASSETS] Using global window.FBXLoader');
+          this.loaders.fbx = new window.FBXLoader();
+          this._fbxLoaderSource = 'window-fbx-loader';
+          console.log('[ASSETS] Successfully created FBXLoader instance from window.FBXLoader');
+          AssetLoader._initializingFBXLoader = false;
+          return;
+        } catch (err) {
+          console.warn('[ASSETS] Failed to initialize with global FBXLoader:', err);
+          window._fbxLoaderErrors.push({ 
+            source: 'window-fbx-loader', 
+            error: err.toString(),
+            time: new Date().toISOString()
+          });
+        }
+      }
+      
+      // APPROACH 3: Create a simple placeholder loader
+      console.log('[ASSETS] Creating placeholder FBXLoader');
+      this._createPlaceholderFBXLoader();
+      this._fbxLoaderSource = 'placeholder-loader';
+      console.log('[ASSETS] Using placeholder FBXLoader for now');
       
     } catch (error) {
       console.error('[ASSETS] Error initializing FBXLoader:', error);
-      window._fbxLoaderErrors.push({ type: 'initialization-error', error: error.toString() });
-      this.loaders.fbx = null;
+      window._fbxLoaderErrors.push({ 
+        type: 'initialization-error', 
+        error: error.toString(),
+        stack: error.stack,
+        time: new Date().toISOString()
+      });
+      
+      // Create a placeholder loader as fallback
+      this._createPlaceholderFBXLoader();
     }
     
     // Reset initialization flag
     AssetLoader._initializingFBXLoader = false;
+  }
+  
+  /**
+   * Creates a simple placeholder FBXLoader when the real one isn't available
+   * This allows the game to continue running with a visual placeholder instead of crashing
+   * @private
+   */
+  _createPlaceholderFBXLoader() {
+    console.log('[ASSETS] Creating placeholder FBXLoader implementation');
+    
+    try {
+      // Make sure THREE is available
+      if (!this.THREE) {
+        console.error('[ASSETS] Cannot create placeholder FBXLoader: THREE not available');
+        this.loaders.fbx = null;
+        return;
+      }
+      
+      // Create a simple loader that returns a purple box as placeholder
+      const placeholderLoader = {
+        load: (url, onLoad, onProgress, onError) => {
+          console.log('[ASSETS] PlaceholderFBXLoader.load called for:', url);
+          
+          try {
+            // Create a simple colored box as placeholder
+            const group = new this.THREE.Group();
+            group.name = `PlaceholderFBX_${url.split('/').pop()}`;
+            
+            // Add debug information to the object
+            group.userData = {
+              isPlaceholder: true,
+              originalUrl: url,
+              createdAt: new Date().toISOString()
+            };
+            
+            // Create a simple mesh
+            const geometry = new this.THREE.BoxGeometry(0.5, 0.5, 0.5);
+            let material;
+            
+            // Try to create a shiny material for visual debugging
+            try {
+              material = new this.THREE.MeshStandardMaterial({
+                color: 0x8800ff,  // Purple color to indicate placeholder
+                emissive: 0x440088,
+                roughness: 0.2,
+                metalness: 0.8,
+                name: 'PlaceholderMaterial'
+              });
+            } catch (e) {
+              // Fallback to basic material if standard isn't available
+              console.warn('[ASSETS] Couldn\'t create MeshStandardMaterial, using basic:', e);
+              material = new this.THREE.MeshBasicMaterial({ 
+                color: 0x8800ff,
+                name: 'PlaceholderBasicMaterial'
+              });
+            }
+            
+            const mesh = new this.THREE.Mesh(geometry, material);
+            mesh.name = 'PlaceholderMesh';
+            
+            // Add placeholder text if TextGeometry is available
+            if (this.THREE.TextGeometry) {
+              try {
+                const textGeo = new this.THREE.TextGeometry('FBX', {
+                  size: 0.1,
+                  height: 0.02
+                });
+                const textMat = new this.THREE.MeshBasicMaterial({ color: 0xffffff });
+                const textMesh = new this.THREE.Mesh(textGeo, textMat);
+                textMesh.position.set(0.2, 0.2, 0.2);
+                group.add(textMesh);
+              } catch (e) {
+                console.debug('[ASSETS] TextGeometry not fully available:', e);
+              }
+            }
+            
+            group.add(mesh);
+            
+            // Log success
+            console.log('[ASSETS] Created placeholder FBX object:', {
+              name: group.name,
+              children: group.children.length
+            });
+            
+            // Call the onLoad callback
+            if (typeof onLoad === 'function') {
+              onLoad(group);
+            }
+            
+            return group;
+          } catch (error) {
+            console.error('[ASSETS] Error creating placeholder FBX:', error);
+            if (typeof onError === 'function') {
+              onError(error);
+            }
+            return null;
+          }
+        }
+      };
+      
+      // Store the placeholder loader
+      this.loaders.fbx = placeholderLoader;
+      console.log('[ASSETS] Placeholder FBXLoader created successfully');
+      
+    } catch (error) {
+      console.error('[ASSETS] Failed to create placeholder FBXLoader:', error);
+      this.loaders.fbx = null;
+    }
   }
   
   /**
