@@ -446,10 +446,6 @@ export class MapGenerator {
   
   /**
    * Try to spawn a crystal shard on a given hexagon based on probability
-   * @param {Object} hex - The hexagon mesh to potentially spawn a crystal on
-   */
-  /**
-   * Try to spawn a crystal shard on a given hexagon based on probability
    * This method handles the entire crystal creation process, including:
    * - Random chance determination
    * - Model loading with fallbacks
@@ -471,7 +467,6 @@ export class MapGenerator {
       }
       
       // Check if we should spawn a crystal based on probability
-      // Using >= ensures exactly the percentage chance specified (e.g. 0.2 = 20% chance)
       if (Math.random() >= this.config.crystalSpawnChance) {
         console.log(`[MAP] Crystal spawn skipped for hex at (${hex.userData.q}, ${hex.userData.r}) - random check failed`); 
         return;
@@ -479,84 +474,140 @@ export class MapGenerator {
       
       console.log(`[MAP] Spawning crystal shard on hex at (${hex.userData.q}, ${hex.userData.r})`);
       
-      // We'll lazily load the crystal model the first time we need it
-      // This avoids unnecessary loading if no crystals are spawned
-      if (!this.crystalLoader) {
-        console.log('[MAP] Crystal loader not initialized yet, checking available loaders');
-        
-        // Check if FBXLoader is available from global import
-        if (typeof FBXLoader === 'function') {
-          console.log('[MAP] Using imported FBXLoader');
-          this.crystalLoader = new FBXLoader();
-          this.loadCrystalTexture();
-        }
-        // Check if it's available through THREE
-        else if (typeof this.THREE.FBXLoader === 'function') {
-          console.log('[MAP] Using THREE.FBXLoader');
-          this.crystalLoader = new this.THREE.FBXLoader();
-          this.loadCrystalTexture();
-        } 
-        // Try alternative loader paths
-        else if (typeof window.FBXLoader === 'function') {
-          console.log('[MAP] Using window.FBXLoader');
-          this.crystalLoader = new window.FBXLoader();
-          this.loadCrystalTexture();
-        }
-        // If no FBXLoader is available, create a fallback crystal
-        else {
-          console.warn('[MAP] FBXLoader not available! Creating fallback crystal.');
-          
-          // Verify that createFallbackCrystal exists
-          if (typeof this.createFallbackCrystal !== 'function') {
-            console.error('[MAP] Critical error: createFallbackCrystal is not defined!');
-            // Define it inline as emergency fallback if it wasn't created properly
-            this.createFallbackCrystal = (hex) => {
-              console.log('[MAP] Using emergency inline fallback crystal creation');
-              
-              try {
-                // Create a simple geometric shape as fallback
-                const crystalGeometry = new this.THREE.ConeGeometry(0.2, 0.5, 4);
-                const crystalMaterial = new this.THREE.MeshPhongMaterial({
-                  color: 0x8844AA,
-                  shininess: 100,
-                  transparent: true,
-                  opacity: 0.7
-                });
-                
-                const crystal = new this.THREE.Mesh(crystalGeometry, crystalMaterial);
-                
-                // Position slightly above hex
-                const hexPosition = hex.position.clone();
-                hexPosition.y += 0.35; // Position above the hex
-                crystal.position.copy(hexPosition);
-                
-                // Random rotation and slight tilt
-                crystal.rotation.y = Math.random() * Math.PI * 2;
-                crystal.rotation.x = (Math.random() - 0.5) * 0.5;
-                
-                // Add to scene and hex's userData
-                this.scene.add(crystal);
-                hex.userData.crystal = crystal;
-                
-                return crystal;
-              } catch (err) {
-                console.error('[MAP] Emergency fallback crystal creation failed:', err);
-                return null;
-              }
-            };
-            
-            console.log('[MAP] Emergency fallback crystal method defined');
-          }
-          
-          // Create the fallback crystal and return early
-          console.log('[MAP] Using fallback crystal method for hex:', hex.userData);
-          this.createFallbackCrystal(hex);
-          return;
-        }
+      // Initialize the crystal loader if it doesn't exist yet
+      this.initializeCrystalLoader();
+      
+      // If we have a crystal loader, use it to load the model
+      if (this.crystalLoader) {
+        this.loadCrystalModel(hex);
+      } else {
+        // Otherwise use the fallback crystal method
+        this.ensureFallbackCrystalMethod();
+        this.createFallbackCrystal(hex);
+      }
+    } catch (error) {
+      console.error('[MAP] Critical error in trySpawnCrystalShard:', error);
+      console.error('[MAP] Error details:', error.message);
+      console.error('[MAP] Stack trace:', error.stack);
+      // Attempt to create a fallback crystal as a last resort
+      try {
+        this.ensureFallbackCrystalMethod();
+        this.createFallbackCrystal(hex);
+      } catch (fallbackError) {
+        console.error('[MAP] Even fallback crystal creation failed:', fallbackError);
+      }
+    }
+  }
+  
+  /**
+   * Initialize the crystal loader if it doesn't exist
+   * Attempts to find a valid FBXLoader from multiple sources
+   */
+  initializeCrystalLoader() {
+    if (this.crystalLoader) {
+      return; // Already initialized
+    }
+    
+    console.log('[MAP] Crystal loader not initialized yet, checking available loaders');
+    
+    try {
+      // Check if FBXLoader is available from global import
+      if (typeof FBXLoader === 'function') {
+        console.log('[MAP] Using imported FBXLoader');
+        this.crystalLoader = new FBXLoader();
+        this.loadCrystalTexture();
+        return;
       }
       
+      // Check if it's available through THREE
+      if (typeof this.THREE.FBXLoader === 'function') {
+        console.log('[MAP] Using THREE.FBXLoader');
+        this.crystalLoader = new this.THREE.FBXLoader();
+        this.loadCrystalTexture();
+        return;
+      }
+      
+      // Try alternative loader paths
+      if (typeof window.FBXLoader === 'function') {
+        console.log('[MAP] Using window.FBXLoader');
+        this.crystalLoader = new window.FBXLoader();
+        this.loadCrystalTexture();
+        return;
+      }
+      
+      // If we get here, no FBXLoader is available
+      console.warn('[MAP] FBXLoader not available! Will use fallback crystals.');
+      this.crystalLoader = null;
+    } catch (error) {
+      console.error('[MAP] Error initializing crystal loader:', error);
+      this.crystalLoader = null;
+    }
+  }
+  
+  /**
+   * Make sure the fallback crystal method exists
+   * Creates an emergency implementation if needed
+   */
+  ensureFallbackCrystalMethod() {
+    if (typeof this.createFallbackCrystal === 'function') {
+      return; // Method already exists
+    }
+    
+    console.error('[MAP] Critical error: createFallbackCrystal is not defined!');
+    
+    // Define it inline as emergency fallback
+    this.createFallbackCrystal = (hex) => {
+      console.log('[MAP] Using emergency inline fallback crystal creation');
+      
+      try {
+        // Create a simple geometric shape as fallback
+        const crystalGeometry = new this.THREE.ConeGeometry(0.2, 0.5, 4);
+        const crystalMaterial = new this.THREE.MeshPhongMaterial({
+          color: 0x8844AA,
+          shininess: 100,
+          transparent: true,
+          opacity: 0.7
+        });
+        
+        const crystal = new this.THREE.Mesh(crystalGeometry, crystalMaterial);
+        
+        // Position slightly above hex
+        const hexPosition = hex.position.clone();
+        hexPosition.y += 0.35; // Position above the hex
+        crystal.position.copy(hexPosition);
+        
+        // Random rotation and slight tilt
+        crystal.rotation.y = Math.random() * Math.PI * 2;
+        crystal.rotation.x = (Math.random() - 0.5) * 0.5;
+        
+        // Add to scene and hex's userData
+        this.scene.add(crystal);
+        hex.userData.crystal = crystal;
+        
+        return crystal;
+      } catch (err) {
+        console.error('[MAP] Emergency fallback crystal creation failed:', err);
+        return null;
+      }
+    };
+    
+    console.log('[MAP] Emergency fallback crystal method defined');
+  }
+  
+  /**
+   * Load a crystal model for a specific hex using the FBXLoader
+   * @param {Object} hex - The hexagon to place the crystal on
+   */
+  loadCrystalModel(hex) {
+    if (!this.crystalLoader) {
+      console.error('[MAP] Cannot load crystal model: loader is not available');
+      this.ensureFallbackCrystalMethod();
+      this.createFallbackCrystal(hex);
+      return;
+    }
+    
+    try {
       // Now load the crystal model
-      // FBXLoader.load takes a URL, success callback, progress callback, and error callback
       this.crystalLoader.load(
         // Model path - using the path from config allows easy customization
         this.config.crystalModelPath,
@@ -567,7 +618,6 @@ export class MapGenerator {
             console.log('[MAP] Crystal model loaded successfully');
             
             // Scale down the crystal to an appropriate size
-            // We use the scaleFactor from config to allow easy adjustment
             object.scale.set(
               this.config.crystalScaleFactor,
               this.config.crystalScaleFactor,
@@ -575,7 +625,6 @@ export class MapGenerator {
             );
             
             // Position the crystal on top of the hexagon
-            // We add height to position it on the surface plus a small offset
             object.position.set(
               hex.position.x,
               hex.position.y + this.config.hexHeight/2 + this.config.crystalHeightOffset,
@@ -586,7 +635,6 @@ export class MapGenerator {
             if (this.crystalTextureLoaded && this.crystalTexture) {
               console.log('[MAP] Applying texture to crystal');
               // We need to traverse the object hierarchy to apply textures
-              // to all meshes within the model
               object.traverse((child) => {
                 if (child.isMesh) {
                   child.material.map = this.crystalTexture;
@@ -603,12 +651,10 @@ export class MapGenerator {
           } catch (modelError) {
             console.error('[MAP] Error processing loaded crystal model:', modelError);
             console.error('[MAP] Error details:', modelError.message);
-            console.error('[MAP] Stack trace:', modelError.stack);
+            
             // Try to use fallback crystal if model processing fails
-            if (typeof this.createFallbackCrystal === 'function') {
-              console.log('[MAP] Attempting fallback crystal after model processing error');
-              this.createFallbackCrystal(hex);
-            }
+            this.ensureFallbackCrystalMethod();
+            this.createFallbackCrystal(hex);
           }
         },
         
@@ -624,18 +670,18 @@ export class MapGenerator {
         (error) => {
           console.error('[MAP] Error loading crystal model:', error);
           console.error('[MAP] Model path attempted:', this.config.crystalModelPath);
+          
           // Try to use fallback crystal if model loading fails
-          if (typeof this.createFallbackCrystal === 'function') {
-            console.log('[MAP] Creating fallback crystal due to model load error');
-            this.createFallbackCrystal(hex);
-          }
+          this.ensureFallbackCrystalMethod();
+          this.createFallbackCrystal(hex);
         }
       );
     } catch (error) {
-      console.error('[MAP] Critical error in trySpawnCrystalShard:', error);
-      console.error('[MAP] Error details:', error.message);
-      console.error('[MAP] Stack trace:', error.stack);
-      // Don't attempt to use createFallbackCrystal here as it might be the source of the error
+      console.error('[MAP] Error starting crystal model load:', error);
+      
+      // Use fallback crystal if loading fails
+      this.ensureFallbackCrystalMethod();
+      this.createFallbackCrystal(hex);
     }
   }
   
