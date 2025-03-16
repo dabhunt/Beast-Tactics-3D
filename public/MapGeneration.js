@@ -180,45 +180,123 @@ export class MapGenerator {
       );
     };
     
-    // Method to create a simple fallback crystal when model loading fails
+    /**
+     * Creates a fallback crystal when model loading fails
+     * Uses advanced material properties to create a more realistic and shiny crystal
+     * 
+     * @param {Object} hex - The hexagon object to place the crystal on
+     */
     this.createFallbackCrystal = (hex) => {
-      console.log('[MAP] Creating fallback crystal geometry for hex:', hex.userData);
+      console.log('[MAP] Creating enhanced fallback crystal for hex:', { 
+        position: hex.position ? [hex.position.x, hex.position.y, hex.position.z] : 'undefined',
+        userData: hex.userData || 'missing userData'
+      });
       
       try {
-        // Create a simple crystal geometry
-        const geometry = new this.THREE.ConeGeometry(0.3, 0.6, 6);
+        // Validate hex has required properties before proceeding
+        if (!hex || !hex.position) {
+          console.error('[MAP] Invalid hex object provided to createFallbackCrystal:', hex);
+          return null;
+        }
         
-        // Create a purple material for the crystal
-        const material = new this.THREE.MeshPhongMaterial({
-          color: 0x9932CC,       // Purple color
-          shininess: 90,          // Very shiny
-          specular: 0xFFFFFF,     // White specular highlights
-          emissive: 0x4B0082,     // Slight indigo glow
-          emissiveIntensity: 0.3, // Moderate glow intensity
-        });
+        // Create a more complex crystal geometry with more facets for better light reflection
+        // Using a combined geometry approach for more interesting shape
+        console.log('[MAP] Creating advanced crystal geometry');
+        const geometryTop = new this.THREE.ConeGeometry(0.3, 0.5, 6);
+        const geometryBottom = new this.THREE.ConeGeometry(0.2, 0.3, 6);
         
-        // Create the crystal mesh
+        // Merge geometries if BufferGeometryUtils is available
+        let geometry;
+        if (this.THREE.BufferGeometryUtils) {
+          console.log('[MAP] Using BufferGeometryUtils to create merged geometry');
+          geometryBottom.rotateX(Math.PI); // Flip the bottom cone
+          geometryBottom.translate(0, -0.2, 0); // Position it below the top cone
+          geometry = this.THREE.BufferGeometryUtils.mergeBufferGeometries([geometryTop, geometryBottom]);
+        } else {
+          console.log('[MAP] BufferGeometryUtils not available, using simple geometry');
+          geometry = geometryTop;
+        }
+        
+        // Create an enhanced material based on recommendations for realistic crystals
+        // Try to use MeshPhysicalMaterial if available, otherwise fallback to MeshPhongMaterial
+        let material;
+        
+        // Log our material creation attempt for debugging
+        console.log('[MAP] Creating enhanced crystal material');
+        
+        // First try to use MeshPhysicalMaterial for more realistic rendering
+        try {
+          if (this.THREE.MeshPhysicalMaterial) {
+            // Use advanced PBR material for better realism
+            material = new this.THREE.MeshPhysicalMaterial({
+              color: 0x9932CC,           // Base purple color
+              metalness: 0.5,             // Partly metallic for shine
+              roughness: 0.2,             // Fairly smooth surface
+              transmission: 0.6,          // Partial transparency
+              thickness: 0.5,             // Material thickness for refraction
+              ior: 1.8,                   // Index of refraction (diamonds ~2.4, glass ~1.5)
+              clearcoat: 1.0,             // Add clear coat layer
+              clearcoatRoughness: 0.1,    // Make clear coat glossy
+              emissive: 0x330066,         // Deep purple glow
+              emissiveIntensity: 0.6,     // Stronger glow
+              transparent: true,          // Enable transparency
+              opacity: 0.8,               // Slight transparency
+              reflectivity: 1.0           // Maximum reflectivity
+            });
+            console.log('[MAP] Successfully created MeshPhysicalMaterial for crystal');
+          } else {
+            throw new Error('MeshPhysicalMaterial not available');
+          }
+        } catch (materialError) {
+          // Fallback to MeshPhongMaterial with enhanced properties
+          console.warn('[MAP] Could not create MeshPhysicalMaterial, using enhanced MeshPhongMaterial:', materialError.message);
+          
+          material = new this.THREE.MeshPhongMaterial({
+            color: 0x9932CC,           // Purple color
+            shininess: 150,             // Very shiny (increased from 90)
+            specular: 0xFFFFFF,         // White specular highlights
+            emissive: 0x4B0082,         // Indigo glow
+            emissiveIntensity: 0.6,     // Increased glow intensity (from 0.3)
+            transparent: true,          // Enable transparency
+            opacity: 0.8                // Slight transparency
+          });
+          console.log('[MAP] Created enhanced MeshPhongMaterial for crystal');
+        }
+        
+        // Create the crystal mesh with our enhanced geometry and material
         const crystal = new this.THREE.Mesh(geometry, material);
         
-        // Position the crystal on top of the hexagon
+        // Position the crystal on top of the hexagon with slight randomization
+        const randomOffset = Math.random() * 0.05;
         crystal.position.set(
-          hex.position.x,
-          hex.position.y + this.config.hexHeight/2 + this.config.crystalHeightOffset,
-          hex.position.z
+          hex.position.x + (Math.random() - 0.5) * 0.1,
+          hex.position.y + this.config.hexHeight/2 + this.config.crystalHeightOffset + randomOffset,
+          hex.position.z + (Math.random() - 0.5) * 0.1
         );
+        console.log(`[MAP] Positioned crystal at: ${crystal.position.x.toFixed(2)}, ${crystal.position.y.toFixed(2)}, ${crystal.position.z.toFixed(2)}`);
         
         // Add some random rotation for variety
         crystal.rotation.y = Math.random() * Math.PI * 2;
-        crystal.rotation.x = Math.random() * 0.2;
+        crystal.rotation.x = Math.random() * 0.3 - 0.15; // Allow slight tilt in both directions
+        crystal.rotation.z = Math.random() * 0.1;
+        console.log(`[MAP] Applied random rotation: ${crystal.rotation.x.toFixed(2)}, ${crystal.rotation.y.toFixed(2)}, ${crystal.rotation.z.toFixed(2)}`);
         
         // Add to scene and associate with hex
         this.scene.add(crystal);
         hex.userData.crystal = crystal;
         
-        // Log success
-        console.log(`[MAP] Fallback crystal placed on hex (${hex.userData.q}, ${hex.userData.r})`);
+        // Log success with crystal details
+        console.log(`[MAP] Enhanced fallback crystal placed on hex (${hex.userData.q}, ${hex.userData.r})`, {
+          materialType: material.type,
+          geometryType: geometry.type,
+          vertexCount: geometry.attributes.position.count
+        });
+        
+        return crystal;
       } catch (error) {
-        console.error('[MAP] Error creating fallback crystal:', error);
+        console.error('[MAP] Critical error creating fallback crystal:', error);
+        console.error('[MAP] Error details:', error.message);
+        console.error('[MAP] Error stack:', error.stack);
       }
     };
     
@@ -570,34 +648,77 @@ export class MapGenerator {
     
     console.error('[MAP] Critical error: createFallbackCrystal is not defined!');
     
-    // Define it inline as emergency fallback
+    /**
+     * Emergency fallback crystal creation method
+     * Used as a last resort if the normal fallback method is missing
+     * @param {Object} hex - The hexagon to place the crystal on
+     * @returns {Object|null} - The created crystal mesh or null on failure
+     */
     this.createFallbackCrystal = (hex) => {
-      console.log('[MAP] Using emergency inline fallback crystal creation');
+      console.log('[MAP] Using emergency inline fallback crystal creation for hex:', {
+        position: hex?.position ? [hex.position.x, hex.position.y, hex.position.z] : 'undefined',
+        userData: hex?.userData || 'missing userData'
+      });
       
       try {
-        // Create a simple geometric shape as fallback
-        const crystalGeometry = new this.THREE.ConeGeometry(0.2, 0.5, 4);
+        // Validate the hex object
+        if (!hex || !hex.position) {
+          console.error('[MAP] Invalid hex provided to emergency fallback crystal creation');
+          return null;
+        }
+        
+        // Create a more interesting emergency fallback crystal
+        console.log('[MAP] Creating emergency fallback crystal geometry');
+        const crystalGeometry = new this.THREE.ConeGeometry(0.2, 0.5, 5); // More sides for better look
+        
+        // Create a more advanced material for the emergency fallback
+        console.log('[MAP] Creating emergency fallback crystal material');
         const crystalMaterial = new this.THREE.MeshPhongMaterial({
-          color: 0x8844AA,
-          shininess: 100,
-          transparent: true,
-          opacity: 0.7
+          color: 0x8844AA,           // Purple color
+          shininess: 120,             // Increased shininess
+          specular: 0xFFFFFF,         // White highlights
+          emissive: 0x330066,         // Purple glow
+          emissiveIntensity: 0.7,     // Strong glow
+          transparent: true,          // Enable transparency
+          opacity: 0.8                // Slightly more opaque
         });
         
+        // Log material creation
+        console.log('[MAP] Emergency fallback crystal material created:', {
+          type: crystalMaterial.type,
+          shininess: crystalMaterial.shininess,
+          emissiveIntensity: crystalMaterial.emissiveIntensity
+        });
+        
+        // Create the mesh
         const crystal = new this.THREE.Mesh(crystalGeometry, crystalMaterial);
         
-        // Position slightly above hex
+        // Position slightly above hex with small random offset for natural look
         const hexPosition = hex.position.clone();
-        hexPosition.y += 0.35; // Position above the hex
+        const randomOffset = (Math.random() - 0.5) * 0.1; // Small random offset
+        hexPosition.y += 0.35 + randomOffset; // Position above the hex
         crystal.position.copy(hexPosition);
         
-        // Random rotation and slight tilt
+        // Log position data
+        console.log('[MAP] Emergency crystal positioned at:', {
+          x: crystal.position.x.toFixed(2),
+          y: crystal.position.y.toFixed(2),
+          z: crystal.position.z.toFixed(2),
+          hexY: hex.position.y.toFixed(2),
+          calculatedOffset: (0.35 + randomOffset).toFixed(2)
+        });
+        
+        // Random rotation and slight tilt for variety
         crystal.rotation.y = Math.random() * Math.PI * 2;
         crystal.rotation.x = (Math.random() - 0.5) * 0.5;
+        crystal.rotation.z = (Math.random() - 0.5) * 0.2; // Add some z-axis rotation
         
         // Add to scene and hex's userData
         this.scene.add(crystal);
         hex.userData.crystal = crystal;
+        
+        // Log successful creation
+        console.log(`[MAP] Emergency fallback crystal placed on hex (${hex.userData.q || '?'}, ${hex.userData.r || '?'})`);
         
         return crystal;
       } catch (err) {
@@ -646,17 +767,84 @@ export class MapGenerator {
               hex.position.z
             );
             
-            // Apply texture if available - makes the crystal look better
-            if (this.crystalTextureLoaded && this.crystalTexture) {
-              console.log('[MAP] Applying texture to crystal');
-              // We need to traverse the object hierarchy to apply textures
-              object.traverse((child) => {
-                if (child.isMesh) {
-                  child.material.map = this.crystalTexture;
+            // Apply enhanced materials and textures to make the crystal look better
+            console.log('[MAP] Applying enhanced materials to loaded crystal model');
+            
+            // Track how many meshes we've enhanced for logging
+            let enhancedMeshCount = 0;
+            
+            // We need to traverse the object hierarchy to apply materials
+            object.traverse((child) => {
+              if (child.isMesh) {
+                console.log(`[MAP] Enhancing material for mesh: ${child.name || 'unnamed'}`);
+                
+                try {
+                  // Store original material properties we want to preserve
+                  const originalColor = child.material.color ? child.material.color.clone() : new this.THREE.Color(0x9932CC);
+                  const originalMap = this.crystalTextureLoaded ? this.crystalTexture : child.material.map;
+                  
+                  // Check material capabilities of the renderer
+                  const originalMaterialType = child.material.type;
+                  console.log(`[MAP] Original material type: ${originalMaterialType}`);
+                  
+                  // Try to create a physical material for better realism
+                  if (this.THREE.MeshPhysicalMaterial) {
+                    // Create enhanced physical material
+                    const enhancedMaterial = new this.THREE.MeshPhysicalMaterial({
+                      map: originalMap,             // Keep original texture if any
+                      color: originalColor,         // Keep original color
+                      metalness: 0.6,               // More metallic for shine
+                      roughness: 0.15,              // Very smooth surface
+                      transmission: 0.7,            // Significant transparency
+                      thickness: 0.6,               // Material thickness for refraction
+                      ior: 1.6,                     // Index of refraction (between glass and diamond)
+                      clearcoat: 0.8,               // Add clear coat layer
+                      clearcoatRoughness: 0.1,      // Glossy clear coat
+                      emissive: new this.THREE.Color(0x330066),  // Purple glow
+                      emissiveIntensity: 0.8,       // Strong glow
+                      transparent: true,            // Enable transparency
+                      opacity: 0.9                  // Slight transparency
+                    });
+                    
+                    // Replace the original material
+                    child.material = enhancedMaterial;
+                    console.log('[MAP] Applied MeshPhysicalMaterial to crystal model part');
+                  } else {
+                    // If physical material isn't available, enhance the existing material
+                    console.log('[MAP] Physical material not available, enhancing existing material');
+                    
+                    // Keep the existing material but enhance its properties
+                    if (child.material.map || this.crystalTextureLoaded) {
+                      child.material.map = this.crystalTextureLoaded ? this.crystalTexture : child.material.map;
+                    }
+                    
+                    // Enhance standard properties available in most materials
+                    if (child.material.shininess !== undefined) child.material.shininess = 150;
+                    if (child.material.specular !== undefined) child.material.specular = new this.THREE.Color(0xFFFFFF);
+                    child.material.emissive = new this.THREE.Color(0x330066);
+                    child.material.emissiveIntensity = 0.8;
+                    
+                    // Make it transparent if possible
+                    child.material.transparent = true;
+                    child.material.opacity = 0.9;
+                  }
+                  
+                  // Force material update
                   child.material.needsUpdate = true;
+                  enhancedMeshCount++;
+                  
+                } catch (materialError) {
+                  console.error(`[MAP] Error enhancing material for mesh ${child.name || 'unnamed'}:`, materialError);
+                  // Apply texture only if material enhancement fails
+                  if (this.crystalTextureLoaded && this.crystalTexture) {
+                    child.material.map = this.crystalTexture;
+                    child.material.needsUpdate = true;
+                  }
                 }
-              });
-            }
+              }
+            });
+            
+            console.log(`[MAP] Enhanced materials for ${enhancedMeshCount} meshes in crystal model`);
             
             // Add to scene and associate with hex for future reference
             this.scene.add(object);
