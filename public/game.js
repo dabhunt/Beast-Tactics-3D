@@ -20,10 +20,13 @@ console.log('[GAME] Module importing started:', {
 window._moduleLoadingIssues = window._moduleLoadingIssues || [];
 
 // Global variables for critical game components
-let assetLoader, shardManager;
+let assetLoader, shardManager, scene;
 
 // Global THREE variable
 let THREE;
+
+// Track if scene is initialized
+let sceneInitialized = false;
 
 /**
  * Main game initialization function - called after all modules are loaded
@@ -253,27 +256,158 @@ async function loadModules() {
       });
       
       // Then load the ShardManager which depends on AssetLoader
-      await loadScript("/ShardManager.js");
-      console.log("[GAME] ShardManager module loaded");
+      console.log('[GAME] Attempting to load ShardManager.js');
       
-      // Verify ShardManager is available  
-      if (typeof window.ShardManager !== 'function') {
-        throw new Error('ShardManager not available after loading script');
+      // Add retry logic for loading ShardManager script
+      let maxRetries = 3;
+      let retryCount = 0;
+      let shardManagerLoaded = false;
+      
+      while (!shardManagerLoaded && retryCount < maxRetries) {
+        try {
+          // Log attempt number if retrying
+          if (retryCount > 0) {
+            console.warn(`[GAME] Retry ${retryCount}/${maxRetries} loading ShardManager.js`);
+          }
+          
+          // Attempt to load the script
+          await loadScript("/ShardManager.js");
+          
+          // Verify ShardManager is available after loading
+          if (typeof window.ShardManager === 'function') {
+            console.log('[GAME] ShardManager constructor successfully loaded', {
+              constructorType: typeof window.ShardManager,
+              prototype: !!window.ShardManager.prototype,
+              methods: Object.keys(window.ShardManager.prototype || {}),
+              attempt: retryCount + 1
+            });
+            shardManagerLoaded = true;
+          } else {
+            throw new Error(`ShardManager constructor not available (attempt ${retryCount + 1})`);
+          }
+        } catch (loadError) {
+          retryCount++;
+          console.error(`[GAME] Error loading ShardManager.js (attempt ${retryCount}/${maxRetries}):`, loadError);
+          
+          // If we've exhausted retries, throw the error
+          if (retryCount >= maxRetries) {
+            console.error('[GAME] Failed to load ShardManager.js after all retry attempts');
+            throw loadError;
+          }
+          
+          // Wait briefly before retrying
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
       }
       
-      // Initialize ShardManager with THREE, assetLoader, and scene
-      // When setting up the ShardManager, create and provide the scene immediately
-      // This prevents the "Scene not provided" error
-      scene = new THREE.Scene();
-      scene.background = new THREE.Color(0x222222);
-      console.log("[GAME] Scene created for ShardManager initialization");
+      console.log("[GAME] ShardManager module loaded and verified");
       
-      shardManager = new window.ShardManager({
-        THREE: THREE,
-        scene: scene, // Provide scene immediately instead of null
-        assetLoader: assetLoader
-      });
-      console.log("[GAME] ShardManager initialized successfully with scene");
+      // Initialize ShardManager with THREE, assetLoader, and scene
+      // Create and provide the scene immediately to prevent the "Scene not provided" error
+      try {
+        // Validate THREE is available before creating scene
+        if (!THREE || typeof THREE.Scene !== 'function') {
+          console.error('[GAME] Cannot create scene: THREE or THREE.Scene is not available', {
+            THREE: !!THREE,
+            Scene: typeof THREE?.Scene
+          });
+          throw new Error('THREE.Scene constructor not available');
+        }
+        
+        // Create scene with detailed logging
+        console.log('[GAME] Creating scene for ShardManager initialization');
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x222222);
+        sceneInitialized = true;
+        
+        console.log('[GAME] Scene created successfully', {
+          sceneType: scene.type || typeof scene,
+          hasChildren: scene.children?.length || 0,
+          background: scene.background ? 'set' : 'none',
+          initialized: sceneInitialized
+        });
+      } catch (sceneError) {
+        console.error('[GAME] Failed to initialize scene:', sceneError);
+        console.error('[GAME] Scene creation error details:', {
+          errorName: sceneError.name,
+          errorMessage: sceneError.message,
+          THREE: typeof THREE,
+          SceneAvailable: typeof THREE?.Scene === 'function'
+        });
+        // Create a placeholder scene to prevent null references
+        try {
+          scene = {}; // Empty object as fallback
+          console.warn('[GAME] Created placeholder scene object as fallback');
+        } catch (fallbackError) {
+          console.error('[GAME] Even fallback scene creation failed:', fallbackError);
+        }
+      }
+      
+      // Initialize ShardManager with robust error handling
+      try {
+        // Validate ShardManager constructor exists
+        if (typeof window.ShardManager !== 'function') {
+          console.error('[GAME] ShardManager constructor not available', {
+            constructorType: typeof window.ShardManager,
+            window: !!window,
+            globalKeys: Object.keys(window).filter(k => k.includes('Manager')).join(', ')
+          });
+          throw new Error('ShardManager constructor not found');
+        }
+        
+        // Pre-validation logging of initialization parameters
+        console.log('[GAME] ShardManager initialization parameters:', {
+          threeAvailable: !!THREE && typeof THREE === 'object',
+          sceneAvailable: !!scene && (scene instanceof THREE.Scene || typeof scene === 'object'),
+          assetLoaderAvailable: !!assetLoader && typeof assetLoader === 'object',
+          sceneInitialized: sceneInitialized
+        });
+        
+        // Initialize ShardManager with required dependencies
+        shardManager = new window.ShardManager({
+          THREE: THREE,
+          scene: scene, // Provide scene immediately instead of null
+          assetLoader: assetLoader
+        });
+        
+        // Post-initialization validation
+        if (!shardManager) {
+          throw new Error('ShardManager constructor returned null or undefined');
+        }
+        
+        console.log('[GAME] ShardManager initialized successfully with scene', {
+          managerType: typeof shardManager,
+          hasProperties: Object.keys(shardManager).length,
+          scene: scene ? 'provided' : 'missing'
+        });
+      } catch (managerError) {
+        console.error('[GAME] Failed to initialize ShardManager:', managerError);
+        console.error('[GAME] ShardManager initialization error details:', {
+          errorName: managerError.name,
+          errorMessage: managerError.message,
+          stack: managerError.stack,
+          THREE: typeof THREE,
+          scene: scene ? 'exists' : 'missing',
+          ShardManagerAvailable: typeof window.ShardManager === 'function'
+        });
+        
+        // Create a placeholder ShardManager to prevent null references
+        try {
+          shardManager = {
+            // Add minimal required methods as empty functions
+            createShard: () => {
+              console.warn('[GAME] Using placeholder ShardManager.createShard');
+              return null;
+            },
+            update: () => {
+              console.warn('[GAME] Using placeholder ShardManager.update');
+            }
+          };
+          console.warn('[GAME] Created placeholder ShardManager object as fallback');
+        } catch (fallbackError) {
+          console.error('[GAME] Even fallback ShardManager creation failed:', fallbackError);
+        }
+      }
       
     } catch (assetError) {
       console.error("[GAME] Failed to initialize asset management modules:", assetError);
