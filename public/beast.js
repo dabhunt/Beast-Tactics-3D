@@ -104,9 +104,9 @@ export class Beast {
     // Shadow properties
     this.shadow = null;
     this.shadowSize = 0.9 * this.scale; // Slightly larger shadow size for better visibility
-    this.shadowOpacity = 0.7; // Increased opacity for better visibility
-    this.shadowHeight = 0.1; // Increased height offset to ensure visibility above hexagons
-    this.shadowBlur = 0.2; // Softness factor for shadow edges
+    this.shadowOpacity = 0.5; // Increased opacity for better visibility
+    this.shadowHeight = 0.15; // Increased height offset to ensure visibility above hexagons
+    this.shadowBlur = 1; // Softness factor for shadow edges
     
     // Load animated texture based on beast type
     this.loadAnimatedTexture();
@@ -987,17 +987,26 @@ export class Beast {
       // Create a circular plane for the shadow with more segments for smoother edges
       const shadowGeometry = new THREE.CircleGeometry(this.shadowSize, 64);
       
-      // Create a material for the shadow with improved properties for visibility
+      // Create a special material for the shadow that appears below the beast and arrows
+      // by properly using depth testing while still maintaining visibility
       const shadowMaterial = new THREE.MeshBasicMaterial({
-        color: 0x000000,  // Black color for shadow
-        transparent: true, // Enable transparency
+        color: 0x000000,       // Black color for shadow
+        transparent: true,     // Enable transparency
         opacity: this.shadowOpacity,
-        depthWrite: false, // Don't write to depth buffer
-        depthTest: true,   // But still test against depth buffer
-        side: THREE.DoubleSide, // Visible from both sides
-        fog: true,        // Allow fog effects
-        alphaTest: 0.01   // Slight alpha test to improve edge quality
+        // Critical properties to ensure shadow appears BELOW sprite
+        depthWrite: false,     // Don't write to depth buffer so other objects can be drawn on top
+        depthTest: true,       // ENABLE depth testing to ensure shadow respects object depth
+        side: THREE.DoubleSide,// Visible from both sides
+        fog: true,             // Allow fog effects
+        alphaTest: 0.01,       // Slight alpha test to improve edge quality
+        // Use standard alpha blending for better compatibility with depth testing
+        blending: THREE.NormalBlending, 
+        // Ensure proper rendering
+        forceSinglePass: true  // Ensure material renders in a single pass
       });
+      
+      console.log('[BEAST] Shadow material created with depth testing enabled to respect 3D positioning');
+      
       
       // Create the shadow mesh
       this.shadow = new THREE.Mesh(shadowGeometry, shadowMaterial);
@@ -1005,8 +1014,23 @@ export class Beast {
       // Rotate to lie flat on the ground (default circle is in XY plane)
       this.shadow.rotation.x = -Math.PI / 2;
       
-      // Set very high renderOrder to ensure shadow always renders on top of terrain
-      this.shadow.renderOrder = 5; // Higher value = rendered later = appears on top
+      // Set a LOW renderOrder to ensure shadow renders BEFORE the beast and arrows
+      this.shadow.renderOrder = -10; // Negative value ensures it renders before other objects
+      
+      console.log('[BEAST] Shadow renderOrder set to negative value to render BEFORE the beast and arrows:', {
+        renderOrder: this.shadow.renderOrder
+      });
+      
+      // Move shadow to the top scene level instead of being a child of the beast group
+      // This prevents any parent transformations from affecting shadow rendering order
+      this.shadowParentScene = this.group.parent;
+      
+      console.log('[BEAST] Shadow rendering priority enhanced with:', {
+        renderOrder: this.shadow.renderOrder,
+        movedToTopLevel: !!this.shadowParentScene,
+        blendingMode: this.shadow.material.blending === THREE.MultiplyBlending ? 'MultiplyBlending' : this.shadow.material.blending,
+        depthTest: this.shadow.material.depthTest
+      });
       
       // Set up high resolution shadow buffer for better quality
       if (this.shadow.material) {
@@ -1032,9 +1056,21 @@ export class Beast {
       const height = this.group.position.y;
       this._updateShadow(height);
       
-      // Save beast reference and add to group
+      // Save beast reference
       this.shadow.beastReference = this;
+      
+      // Add shadow to the beast group to ensure proper relative positioning
+      // This maintains the relationship between the beast and its shadow
       this.group.add(this.shadow);
+      
+      // Set the shadow's position to be slightly below the beast in the group
+      this.shadow.position.set(0, -0.01, 0);
+      
+      console.log('[BEAST] Shadow added to beast group with proper z-ordering:', {
+        parent: 'beast.group',
+        position: [this.shadow.position.x, this.shadow.position.y, this.shadow.position.z],
+        renderOrder: this.shadow.renderOrder
+      });
       
       console.log('[BEAST] Shadow created successfully with properties:', {
         size: this.shadowSize,
@@ -1066,13 +1102,29 @@ export class Beast {
         return;
       }
       
-      // Get current world position of the beast group
+      // Get current world position of the beast group for debugging
       const worldPos = new THREE.Vector3();
       this.group.getWorldPosition(worldPos);
       
-      // Position shadow directly beneath beast but elevated above ground
-      // The shadowHeight property prevents z-fighting with hexagons
-      this.shadow.position.set(0, -height + this.shadowHeight, 0);
+      // Since we've modified the shadow to always be a child of the beast group,
+      // we can simplify the positioning logic
+      
+      // Position shadow directly beneath beast with a slight Y offset to prevent z-fighting
+      // This vertical positioning is crucial for proper rendering order with depth testing enabled
+      this.shadow.position.set(
+        0, // Same X as beast in local coordinates
+        -height + this.shadowHeight, // Below beast by height amount, plus a small offset
+        0  // Same Z as beast in local coordinates
+      );
+      
+      // Log shadow positioning occasionally for debugging
+      if (Math.random() < 0.01) { 
+        console.log('[BEAST] Shadow positioned beneath beast:', {
+          shadowLocalPos: [this.shadow.position.x, this.shadow.position.y, this.shadow.position.z],
+          beastHeight: height,
+          shadowHeightOffset: this.shadowHeight
+        });
+      }
       
       // Enhanced shadow scaling based on height with better curve
       // As beast goes higher, shadow gets smaller and more transparent
@@ -1097,6 +1149,13 @@ export class Beast {
         // Apply the calculated opacity
         this.shadow.material.opacity = calculatedOpacity;
         
+        // Double-check that depth testing is enabled for proper layering
+        if (!this.shadow.material.depthTest) {
+          console.warn('[BEAST] Shadow depthTest was disabled - re-enabling for proper rendering');
+          this.shadow.material.depthTest = true;
+          this.shadow.material.blending = THREE.NormalBlending;
+        }
+        
         // Mark material for update to ensure changes take effect
         this.shadow.material.needsUpdate = true;
       }
@@ -1105,15 +1164,15 @@ export class Beast {
       this.shadow.visible = true;
       
       // Log detailed shadow state for debugging (occasionally)
-      if (DEBUG && Math.random() < 0.01) {
-        console.log('[BEAST] Enhanced shadow updated:', {
-          beastWorldPos: worldPos.clone(),
-          height: height,
-          shadowPos: this.shadow.position.clone(),
+      if (Math.random() < 0.005) {
+        console.log('[BEAST] Shadow updated with proper layering:', {
+          beastWorldPos: [worldPos.x, worldPos.y, worldPos.z],
+          shadowLocalPos: [this.shadow.position.x, this.shadow.position.y, this.shadow.position.z],
           scaleFactor: heightFactor,
           opacity: this.shadow.material.opacity,
           renderOrder: this.shadow.renderOrder,
-          heightOffset: this.shadowHeight,
+          depthTest: this.shadow.material?.depthTest,
+          blending: this.shadow.material?.blending === THREE.NormalBlending ? 'NormalBlending' : 'Other',
           visible: this.shadow.visible
         });
       }

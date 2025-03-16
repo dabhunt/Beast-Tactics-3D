@@ -10,81 +10,107 @@ let fbxLoaderLoaded = false;
 
 /**
  * Load the FBXLoader from CDN using the same version as Three.js
- * This approach aligns with how the project loads other scripts
+ * Enhanced with better error handling, timeouts, and diagnostics
  * @returns {Promise} - Promise that resolves when the loader is available
  */
 function loadFBXLoader() {
-  console.log('[MAP] Starting FBXLoader initialization');
+  console.log('[MAP] Starting FBXLoader initialization with enhanced diagnostics');
   
-  // Early exit if already loaded
   if (typeof window.FBXLoader === 'function') {
-    console.log('[MAP] FBXLoader already available as window.FBXLoader');
-    FBXLoader = window.FBXLoader;
-    fbxLoaderLoaded = true;
-    return Promise.resolve(true);
+    try {
+      const testLoader = new window.FBXLoader();
+      if (testLoader && typeof testLoader.load === 'function') {
+        console.log('[MAP] FBXLoader already available and validated as window.FBXLoader');
+        FBXLoader = window.FBXLoader;
+        fbxLoaderLoaded = true;
+        return Promise.resolve(true);
+      }
+    } catch (validationError) {
+      console.warn('[MAP] window.FBXLoader validation failed, will reload:', validationError);
+    }
   }
   
-  // Use the same CDN and version as the project's Three.js import
   const CDN_URL = 'https://cdn.jsdelivr.net/npm/three@0.162.0/examples/jsm/loaders/FBXLoader.js';
-  
-  console.log(`[MAP] Loading FBXLoader from CDN: ${CDN_URL}`);
-  
+  console.log(`[MAP] Verifying FBXLoader URL: ${CDN_URL}`);
+
   return new Promise((resolve, reject) => {
     try {
-      // Create script element for loading the FBXLoader
-      const script = document.createElement('script');
-      script.type = 'module';
-      script.src = CDN_URL;
-      
-      // Set up success handler
-      script.onload = () => {
-        console.log('[MAP] FBXLoader script loaded successfully');
-        
-        // Dynamic import to properly get the ES module
-        import(CDN_URL)
-          .then(module => {
-            // Extract the FBXLoader constructor 
+      const loadErrors = [];
+      if (!window._fbxLoaderErrors) window._fbxLoaderErrors = [];
+
+      console.log('[MAP] Attempting direct dynamic import of FBXLoader');
+      import(CDN_URL)
+        .then(module => {
+          if (module.FBXLoader) {
             FBXLoader = module.FBXLoader;
-            
-            // Validate that we got a proper constructor
-            if (typeof FBXLoader === 'function') {
-              console.log('[MAP] FBXLoader constructor successfully imported', { 
-                type: typeof FBXLoader,
-                prototype: !!FBXLoader.prototype,
-                constructorName: FBXLoader.name
+            const testLoader = new FBXLoader();
+            if (typeof testLoader.load === 'function') {
+              console.log('[MAP] Dynamic import succeeded', {
+                moduleKeys: Object.keys(module),
+                loaderType: typeof FBXLoader,
+                loadMethod: typeof testLoader.load
               });
-              
-              // Store globally for easier access across modules
               window.FBXLoader = FBXLoader;
               fbxLoaderLoaded = true;
               resolve(true);
-            } else {
-              const error = new Error('FBXLoader is not a constructor');
-              console.error('[MAP] Failed to extract valid FBXLoader constructor:', error, {
-                receivedType: typeof FBXLoader,
-                moduleContents: Object.keys(module)
-              });
-              reject(error);
             }
-          })
-          .catch(importError => {
-            console.error('[MAP] Error during dynamic FBXLoader import:', importError);
-            reject(importError);
-          });
-      };
-      
-      // Set up error handler
-      script.onerror = (error) => {
-        console.error('[MAP] Failed to load FBXLoader script:', error);
-        reject(new Error('Failed to load FBXLoader script'));
-      };
-      
-      // Add the script to the document to start loading
-      document.head.appendChild(script);
-      
-    } catch (error) {
-      console.error('[MAP] Unexpected error during FBXLoader loading:', error);
-      reject(error);
+          } else {
+            throw new Error('FBXLoader not found in module');
+          }
+        })
+        .catch(importError => {
+          console.warn('[MAP] Dynamic import failed, falling back to script tag:', importError);
+          loadErrors.push(`Dynamic import: ${importError.message}`);
+          window._fbxLoaderErrors.push(`Dynamic import: ${importError.message}`);
+
+          console.log('[MAP] Falling back to script tag approach');
+          const script = document.createElement('script');
+          script.type = 'module';
+          script.src = CDN_URL;
+
+          // Add timing diagnostics
+          const loadStart = performance.now();
+          script.onload = () => {
+            console.log('[MAP] Script tag onload triggered', {
+              timeTaken: (performance.now() - loadStart).toFixed(2) + 'ms'
+            });
+            
+            setTimeout(() => {
+              console.log('[MAP] Checking FBXLoader after 200ms delay', {
+                windowFBXLoader: typeof window.FBXLoader,
+                localFBXLoader: typeof FBXLoader,
+                threeNamespace: typeof window.THREE?.FBXLoader
+              });
+              
+              if (typeof window.FBXLoader === 'function') {
+                FBXLoader = window.FBXLoader;
+                const testLoader = new FBXLoader();
+                if (typeof testLoader.load === 'function') {
+                  console.log('[MAP] FBXLoader validated from script tag');
+                  fbxLoaderLoaded = true;
+                  resolve(true);
+                } else {
+                  reject(new Error('FBXLoader loaded but invalid'));
+                }
+              } else {
+                reject(new Error('FBXLoader not available after script load'));
+              }
+            }, 200);
+          };
+
+          script.onerror = (error) => {
+            console.error('[MAP] Script tag failed to load:', error);
+            loadErrors.push('Script tag load failed');
+            window._fbxLoaderErrors.push('Script tag load failed');
+            reject(new Error('Script tag load failed'));
+          };
+
+          console.log('[MAP] Appending script tag to head');
+          document.head.appendChild(script);
+        });
+    } catch (unexpectedError) {
+      console.error('[MAP] Unexpected error in loadFBXLoader:', unexpectedError);
+      reject(unexpectedError);
     }
   });
 }
@@ -207,20 +233,168 @@ export class MapGenerator {
   initCrystalMethods() {
     console.log('[MAP] Initializing crystal methods');
     
-    // Method to load crystal texture
+    // Method to load crystal texture with enhanced error handling and diagnostics
     this.loadCrystalTexture = () => {
+      console.log('[MAP] Starting enhanced crystal texture and model loading process');
+      
+      // First load the crystal texture
       console.log('[MAP] Setting up crystal texture loading');
       this.crystalTexture = new this.THREE.TextureLoader().load(
         this.config.crystalTexturePath,
         (texture) => {
-          console.log('[MAP] Crystal texture loaded successfully');
+          console.log('[MAP] Crystal texture loaded successfully', {
+            imageWidth: texture.image?.width,
+            imageHeight: texture.image?.height,
+            format: texture.format,
+            timestamp: new Date().toISOString()
+          });
           this.crystalTextureLoaded = true;
+          
+          // After texture loads, try to load the model if we have a loader
+          this._loadCrystalModel();
         },
-        undefined,
+        (xhr) => {
+          // Texture loading progress
+          if (xhr.lengthComputable) {
+            const progress = (xhr.loaded / xhr.total) * 100;
+            console.log(`[MAP] Crystal texture loading progress: ${progress.toFixed(1)}%`);
+          }
+        },
         (error) => {
-          console.error('[MAP] Error loading crystal texture:', error);
+          console.error('[MAP] Error loading crystal texture:', error, {
+            path: this.config.crystalTexturePath,
+            timestamp: new Date().toISOString()
+          });
+          
+          // Even if texture fails, try to load the model
+          this._loadCrystalModel();
         }
       );
+    };
+    
+    // Private method to load crystal model
+    this._loadCrystalModel = () => {
+      // Check if crystal loader is initialized
+      if (!this.crystalLoader) {
+        console.warn('[MAP] Crystal loader not available for model loading, will use fallback crystals', {
+          reason: this._crystalLoaderSource || 'unknown',
+          errors: window._fbxLoaderErrors || [],
+          initTime: this._crystalLoaderInitTime
+        });
+        return;
+      }
+      
+      // Set and validate crystal model path
+      const modelPath = this.config.crystalModelPath;
+      if (!modelPath) {
+        console.error('[MAP] Crystal model path is not defined');
+        this.crystalModel = null;
+        return;
+      }
+      
+      // Log the loading attempt with details
+      console.log('[MAP] Attempting to load crystal model:', {
+        path: modelPath,
+        loader: this.crystalLoader.constructor.name,
+        loaderSource: this._crystalLoaderSource,
+        timestamp: new Date().toISOString()
+      });
+      
+      try {
+        // Load crystal model with FBXLoader and enhanced error handling
+        this.crystalLoader.load(
+          modelPath,
+          (fbx) => {
+            // Success callback
+            console.log('[MAP] Crystal model loaded successfully', {
+              modelType: fbx.type,
+              childCount: fbx.children?.length || 0,
+              isObject3D: fbx instanceof this.THREE.Object3D,
+              timestamp: new Date().toISOString()
+            });
+            
+            // Store the loaded crystal model
+            this.crystalModel = fbx;
+            
+            // Apply loaded texture if available
+            if (this.crystalTextureLoaded && this.crystalTexture) {
+              console.log('[MAP] Applying loaded texture to crystal model');
+              this._applyCrystalTexture(fbx, this.crystalTexture);
+            }
+            
+            // Dispatch an event that crystal loading is complete
+            const event = new CustomEvent('crystalModelLoaded', { detail: { success: true } });
+            window.dispatchEvent(event);
+          },
+          (xhr) => {
+            // Loading progress callback
+            if (xhr.lengthComputable) {
+              const progress = (xhr.loaded / xhr.total) * 100;
+              console.log('[MAP] Crystal model loading progress:', {
+                percentage: progress.toFixed(1) + '%',
+                loaded: xhr.loaded,
+                total: xhr.total,
+                timestamp: new Date().toISOString()
+              });
+            }
+          },
+          (error) => {
+            // Error callback with enhanced diagnostics
+            console.error('[MAP] Error loading crystal model:', error, {
+              modelPath: modelPath,
+              errorType: error.constructor.name,
+              errorMessage: error.message,
+              stack: error.stack,
+              timestamp: new Date().toISOString()
+            });
+            
+            this.crystalModel = null;
+            
+            // Dispatch an event that crystal loading failed
+            const event = new CustomEvent('crystalModelLoaded', { 
+              detail: { success: false, error: error.message } 
+            });
+            window.dispatchEvent(event);
+          }
+        );
+      } catch (unexpectedError) {
+        // Catch any unexpected errors in the load call itself
+        console.error('[MAP] Unexpected error during crystal model loading:', unexpectedError, {
+          callStack: unexpectedError.stack,
+          loaderState: {
+            type: typeof this.crystalLoader,
+            hasLoadMethod: typeof this.crystalLoader?.load === 'function'
+          }
+        });
+        
+        this.crystalModel = null;
+      }
+    };
+    
+    // Helper to apply texture to the FBX model
+    this._applyCrystalTexture = (model, texture) => {
+      try {
+        if (!model || !texture) return;
+        
+        // Create a standard material with the texture
+        const material = new this.THREE.MeshStandardMaterial({
+          map: texture,
+          metalness: 0.5,
+          roughness: 0.2,
+          emissive: 0x330066,
+          emissiveIntensity: 0.2
+        });
+        
+        // Apply to all mesh children
+        model.traverse((child) => {
+          if (child.isMesh) {
+            console.log('[MAP] Applying texture to crystal mesh:', child.name);
+            child.material = material;
+          }
+        });
+      } catch (error) {
+        console.error('[MAP] Error applying texture to crystal model:', error);
+      }
     };
     
     /**
@@ -644,61 +818,133 @@ export class MapGenerator {
   
   /**
    * Initialize the crystal loader if it doesn't exist
-   * Uses the FBXLoader from CDN with robust error handling
+   * Uses the FBXLoader from CDN with robust error handling and enhanced debugging
    */
   initializeCrystalLoader() {
     if (this.crystalLoader) {
+      console.log('[MAP] Crystal loader already exists - skipping initialization', {
+        loaderType: this.crystalLoader.constructor.name,
+        timeInitialized: this._crystalLoaderInitTime || 'unknown'
+      });
       return; // Already initialized
     }
     
     console.log('[MAP] Crystal loader not initialized yet, starting setup process');
+    this._crystalLoaderInitTime = new Date().toISOString();
     
     try {
-      // Log initial state for debugging purposes
-      console.log('[MAP] Current FBXLoader state:', {
-        loaderVariable: typeof FBXLoader === 'function' ? 'Available' : 'Unavailable',
-        windowLoader: typeof window.FBXLoader === 'function' ? 'Available' : 'Unavailable',
-        loaderLoaded: fbxLoaderLoaded
-      });
+      // Extended diagnostics for FBXLoader availability
+      const diagnostics = {
+        loaderVariable: typeof FBXLoader,
+        windowLoader: typeof window.FBXLoader,
+        threeLoaded: typeof THREE !== 'undefined',
+        fbxLoaderLoaded: typeof window.fbxLoaderLoaded !== 'undefined' ? window.fbxLoaderLoaded : false,
+        loadAttempted: window._fbxLoaderLoadAttempted || false,
+        // Safely check for dynamic import support without causing syntax errors
+        browserSupportsModules: (function() {
+          try {
+            // Check if import is defined in window (it won't be in non-module contexts)
+            return typeof window.dynamicImport === 'function' || 
+                   ('noModule' in document.createElement('script'));
+          } catch(e) {
+            console.log('[MAP] Module support detection error:', e);
+            return false;
+          }
+        })(),
+        documentReadyState: document.readyState,
+        timestamp: new Date().toISOString(),
+        // Check for any errors in loading
+        anyRecentErrors: window._fbxLoaderErrors || [],
+        CDN_URL: 'https://cdn.jsdelivr.net/npm/three@0.162.0/examples/jsm/loaders/FBXLoader.js'
+      };
       
-      // Scenario 1: FBXLoader is already available - use it immediately
-      if (typeof FBXLoader === 'function') {
-        console.log('[MAP] Using existing FBXLoader constructor');
+      console.log('[MAP] Extended FBXLoader diagnostics:', diagnostics);
+      
+      // Force validation of FBXLoader
+      let fbxLoaderValid = false;
+      try {
+        // Test if the FBXLoader is a proper constructor by creating a test instance
+        if (typeof FBXLoader === 'function') {
+          const testLoader = new FBXLoader();
+          fbxLoaderValid = (testLoader && typeof testLoader.load === 'function');
+          
+          console.log('[MAP] FBXLoader validation test:', {
+            created: !!testLoader, 
+            hasLoadMethod: typeof testLoader?.load === 'function',
+            valid: fbxLoaderValid
+          });
+        }
+      } catch (testError) {
+        console.error('[MAP] FBXLoader validation failed:', testError);
+        fbxLoaderValid = false;
+      }
+      
+      // Scenario 1: FBXLoader is already available and validated - use it immediately
+      if (fbxLoaderValid) {
+        console.log('[MAP] Using existing validated FBXLoader constructor');
         this.crystalLoader = new FBXLoader();
+        this._crystalLoaderSource = 'direct';
         this.loadCrystalTexture();
         return;
       }
       
-      // Scenario 2: FBXLoader isn't loaded yet - load it from CDN
-      console.log('[MAP] FBXLoader not available yet, attempting to load from CDN');
+      // Scenario 2: FBXLoader isn't loaded yet or failed validation - load it from CDN
+      console.log('[MAP] FBXLoader not available or invalid, attempting to load from CDN');
       
       // Track whether this is the first attempt to prevent multiple simultaneous loads
       if (!window._fbxLoaderLoadAttempted) {
         window._fbxLoaderLoadAttempted = true;
+        window._fbxLoaderErrors = [];
         
-        // Load the FBXLoader from CDN
-        loadFBXLoader()
+        // Load the FBXLoader from CDN with timeout
+        const loadPromise = loadFBXLoader();
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('FBXLoader load timeout after 5000ms')), 5000);
+        });
+        
+        Promise.race([loadPromise, timeoutPromise])
           .then(success => {
             console.log('[MAP] FBXLoader loaded successfully from CDN');
             
-            // If crystalLoader hasn't been initialized by another method yet
-            if (!this.crystalLoader && typeof FBXLoader === 'function') {
+            // Validate the newly loaded FBXLoader
+            let validLoader = false;
+            try {
+              if (typeof FBXLoader === 'function') {
+                const testLoader = new FBXLoader();
+                validLoader = (testLoader && typeof testLoader.load === 'function');
+              }
+            } catch (validationError) {
+              console.error('[MAP] Post-load FBXLoader validation failed:', validationError);
+              window._fbxLoaderErrors.push(validationError.message);
+              validLoader = false;
+            }
+            
+            // If loader is valid and crystalLoader hasn't been initialized by another method yet
+            if (!this.crystalLoader && validLoader) {
+              console.log('[MAP] Creating FBXLoader after async load');
               this.crystalLoader = new FBXLoader();
+              this._crystalLoaderSource = 'async';
               this.loadCrystalTexture();
+            } else if (!validLoader) {
+              console.error('[MAP] FBXLoader loaded but failed validation');
+              // Ensure fallback crystals will be used
+              this.crystalLoader = null;
             }
           })
           .catch(error => {
             console.error('[MAP] Failed to load FBXLoader from CDN:', error);
+            window._fbxLoaderErrors.push(error.message);
             // Ensure fallback crystals will be used
             this.crystalLoader = null;
           });
       } else {
-        console.log('[MAP] FBXLoader loading already in progress');
+        console.log('[MAP] FBXLoader loading already in progress, waiting for completion');
       }
       
       // Scenario 3: Use fallback while async loading happens
-      console.warn('[MAP] Using fallback crystals while waiting for FBXLoader');
+      console.warn('[MAP] Using fallback crystals while waiting for FBXLoader to load asynchronously');
       this.crystalLoader = null;
+      this._crystalLoaderSource = 'fallback';
     } catch (error) {
       console.error('[MAP] Error initializing crystal loader:', error);
       this.crystalLoader = null;

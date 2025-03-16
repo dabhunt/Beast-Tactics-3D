@@ -286,7 +286,7 @@ function setupScene() {
     function animateHoverEffect() {
       // Only run if animation is active and we have a hover stroke
       if (!hoverAnimationActive || !currentHoverStroke) {
-        console.log('[HOVER-ANIM] Animation inactive or no hover stroke');
+        //console.log('[HOVER-ANIM] Animation inactive or no hover stroke');
         return;
       }
       
@@ -295,14 +295,14 @@ function setupScene() {
       const colors = [];
       
       // Debug - log once per second that animation is running
-      if (elapsed % 1000 < 16) { // Will log once per second (assuming ~60fps)
-        console.log('[HOVER-ANIM] Animation running:', {
-          elapsedTime: elapsed,
-          strokeActive: !!currentHoverStroke,
-          hexActive: !!currentHoverHex,
-          renderOrder: currentHoverStroke?.renderOrder
-        });
-      }
+      // if (elapsed % 1000 < 16) { // Will log once per second (assuming ~60fps)
+      //   console.log('[HOVER-ANIM] Animation running:', {
+      //     elapsedTime: elapsed,
+      //     strokeActive: !!currentHoverStroke,
+      //     hexActive: !!currentHoverHex,
+      //     renderOrder: currentHoverStroke?.renderOrder
+      //   });
+      // }
       
       // Generate new gold colors with a shifting phase for wave effect
       for (let i = 0; i <= hexPointCount; i++) {
@@ -326,15 +326,6 @@ function setupScene() {
         const color = new THREE.Color().setHSL(hue, saturation, lightness);
         colors.push(color.r, color.g, color.b);
         
-        // Debug color values every 60 frames (approximately once per second)
-        if (elapsed % 60 === 0 && i === 0) {
-          console.log(`[HOVER-COLOR] Vertex ${i} color:`, { 
-            hue: hue.toFixed(4), 
-            saturation: saturation.toFixed(4), 
-            lightness: lightness.toFixed(4),
-            rgb: [color.r.toFixed(2), color.g.toFixed(2), color.b.toFixed(2)]
-          });
-        }
       }
       
       // Update the colors in the geometry
@@ -350,14 +341,6 @@ function setupScene() {
               currentHoverStroke.geometry.attributes.color) {
             currentHoverStroke.geometry.attributes.color.needsUpdate = true;
             
-            // Log vertex count periodically to verify connections
-            if (elapsed % 300 === 0) { // Every ~5 seconds
-              console.log(`[HOVER-ANIM] Vertex data check:`, {
-                vertexCount: currentHoverStroke.geometry.attributes.position.count,
-                colorCount: currentHoverStroke.geometry.attributes.color.count,
-                expectedVertices: hexPointCount + 1
-              });
-            }
           }
           
           // Update material if needed
@@ -371,7 +354,7 @@ function setupScene() {
           hoverAnimationFrame = requestAnimationFrame(animateHoverEffect);
         }
       } catch (err) {
-        console.error('[HOVER-ANIM] Error in animation:', err);
+       // console.error('[HOVER-ANIM] Error in animation:', err);
         hoverAnimationActive = false;
       }
     }
@@ -421,13 +404,6 @@ function setupScene() {
         y: mousePos.y 
       });
 
-      // Log before raycasting to ensure variables are defined
-      console.log('[RAYCASTER] Preparing to find intersects', {
-        raycasterDefined: !!raycaster,
-      hexagonsDefined: !!hexagons,
-      hexagonsCount: hexagons ? hexagons.length : 0
-    });
-
     // Update raycaster with new mouse position
     raycaster.setFromCamera(mousePos, camera);
 
@@ -457,7 +433,7 @@ function setupScene() {
       
       // If no intersections are found, try with the entire scene as fallback
       if (intersects.length === 0) {
-        console.log('[RAYCASTER] No direct intersections found, trying with scene objects');
+        //console.log('[RAYCASTER] No direct intersections found, trying with scene objects');
         const sceneIntersects = raycaster.intersectObjects(scene.children, recursive);
         
         // Filter scene intersects to only include hexagons
@@ -472,19 +448,6 @@ function setupScene() {
         });
       }
       
-      // Log after raycasting to confirm execution
-      console.log('[RAYCASTER] Intersects found:', {
-        intersectCount: intersects.length,
-        firstIntersect: intersects.length > 0 ? {
-          distance: intersects[0].distance.toFixed(2),
-          elementType: intersects[0].object.userData?.element || 'unknown',
-          position: intersects[0].object.position ? [
-            intersects[0].object.position.x.toFixed(2),
-            intersects[0].object.position.y.toFixed(2),
-            intersects[0].object.position.z.toFixed(2)
-          ] : 'unknown'
-        } : null
-      });
     } catch (err) {
       console.error('[RAYCASTER] Error during raycasting:', err, {
         raycasterDefined: !!raycaster,
