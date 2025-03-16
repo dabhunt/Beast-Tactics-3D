@@ -205,8 +205,8 @@ export class MapGenerator {
       verticalFactor: 1.0,
       // Crystal shard parameters
       crystalSpawnChance: 0.2,  // 20% chance to spawn a crystal per hex
-      crystalHeightOffset: 0.3, // Height above the hexagon
-      crystalScaleFactor: 0.005,  // Size of the crystal (scale - reduced from 0.3 to fix oversized shards)
+      crystalHeightOffset: 0.5, // Height above the hexagon - increased to make crystals more visible
+      crystalScaleFactor: 0.1,  // Size of the crystal (scale - increased from 0.005 to make crystals more visible)
       crystalModelPath: '/assets/Purple_Crystal_Shard.fbx',
       crystalTexturePath: '/assets/Purple_Crystal_Shard_texture.png'
     };
@@ -653,7 +653,7 @@ export class MapGenerator {
    * 
    * @param {Object} hex - The hexagon mesh to potentially spawn a crystal on
    */
-  trySpawnCrystalShard(hex) {
+  async trySpawnCrystalShard(hex) {
     try {
       // Log the evaluation process for debugging
       console.log(`[MAP] Evaluating crystal spawn for hex at (${hex.userData.q}, ${hex.userData.r})`);
@@ -664,8 +664,11 @@ export class MapGenerator {
         return;
       }
       
+      // OVERRIDE FOR DEBUGGING - Force crystal spawn on all hexes 
+      const debugForceSpawn = true; 
+      
       // Check if we should spawn a crystal based on probability
-      if (Math.random() >= this.config.crystalSpawnChance) {
+      if (!debugForceSpawn && Math.random() >= this.config.crystalSpawnChance) {
         console.log(`[MAP] Crystal spawn skipped for hex at (${hex.userData.q}, ${hex.userData.r}) - random check failed`); 
         return;
       }
@@ -673,13 +676,16 @@ export class MapGenerator {
       console.log(`[MAP] Spawning crystal shard on hex at (${hex.userData.q}, ${hex.userData.r})`);
       
       // Initialize the crystal loader if it doesn't exist yet
-      this.initializeCrystalLoader();
+      const loaderInitialized = await this.initializeCrystalLoader();
+      console.log(`[MAP] Crystal loader initialization result: ${loaderInitialized ? 'SUCCESS' : 'FAILED'}`);
       
       // If we have a crystal loader, use it to load the model
       if (this.crystalLoader) {
+        console.log('[MAP] Using FBX loader to load crystal model');
         this.loadCrystalModel(hex);
       } else {
         // Otherwise use the fallback crystal method
+        console.log('[MAP] Using fallback crystal method as loader is not available');
         this.ensureFallbackCrystalMethod();
         this.createFallbackCrystal(hex);
       }
@@ -700,6 +706,8 @@ export class MapGenerator {
   /**
    * Initialize the crystal loader if it doesn't exist
    * Attempts to find a valid FBXLoader from multiple sources
+   * 
+   * @returns {Promise<boolean>} - Returns true if loader was initialized successfully
    */
   async initializeCrystalLoader() {
     // Prevent multiple initializations with static tracking
@@ -726,7 +734,7 @@ export class MapGenerator {
     if (this.crystalLoader) {
       console.log('[MAP] Crystal loader already initialized from:', this._crystalLoaderSource);
       MapGenerator._initializingLoader = false;
-      return; // Already initialized
+      return true; // Already initialized
     }
     
     console.log('[MAP] Crystal loader not initialized yet, checking available loaders');
@@ -803,6 +811,7 @@ export class MapGenerator {
         errors: window._fbxLoaderErrors || []
       });
       this.crystalLoader = null;
+      return false;
     } catch (error) {
       console.error('[MAP] Error initializing crystal loader:', error);
       window._fbxLoaderErrors.push({ type: 'initialization-error', error: error.toString() });
@@ -917,6 +926,19 @@ export class MapGenerator {
    * @param {Object} hex - The hexagon to place the crystal on
    */
   loadCrystalModel(hex) {
+    console.log('[MAP] Starting crystal model loading process for hex:', {
+      hexPosition: hex.position ? [hex.position.x.toFixed(2), hex.position.y.toFixed(2), hex.position.z.toFixed(2)] : 'undefined',
+      hexCoords: hex.userData ? `(${hex.userData.q}, ${hex.userData.r})` : 'unknown',
+      modelPath: this.config.crystalModelPath
+    });
+    
+    // Debug - check if the scene is valid before we even try to load
+    console.log('[MAP] Scene validation check:', {
+      sceneExists: !!this.scene,
+      sceneType: this.scene ? this.scene.type : 'missing',
+      sceneChildren: this.scene ? this.scene.children.length : 0
+    });
+    
     if (!this.crystalLoader) {
       console.error('[MAP] Cannot load crystal model: loader is not available');
       this.ensureFallbackCrystalMethod();
@@ -925,21 +947,53 @@ export class MapGenerator {
     }
     
     try {
+      // Verify the model path is accessible
+      // Use absolute path starting with forward slash to ensure proper loading
+      const modelPath = this.config.crystalModelPath.startsWith('/') ? 
+        this.config.crystalModelPath : 
+        '/' + this.config.crystalModelPath;
+      
+      console.log('[MAP] Loading crystal model from path:', modelPath);
+      
       // Now load the crystal model
       this.crystalLoader.load(
-        // Model path - using the path from config allows easy customization
-        this.config.crystalModelPath,
+        // Model path - using the corrected absolute path
+        modelPath,
         
         // onLoad callback - called when model is successfully loaded
         (object) => {
           try {
             console.log('[MAP] Crystal model loaded successfully');
             
+            // Log the original object bounds to diagnose scaling issues
+            const originalBox = new this.THREE.Box3().setFromObject(object);
+            const originalSize = originalBox.getSize(new this.THREE.Vector3());
+            console.log('[MAP] Original crystal model size:', {
+              width: originalSize.x.toFixed(2),
+              height: originalSize.y.toFixed(2),
+              depth: originalSize.z.toFixed(2),
+              boundingBox: [
+                [originalBox.min.x.toFixed(2), originalBox.min.y.toFixed(2), originalBox.min.z.toFixed(2)],
+                [originalBox.max.x.toFixed(2), originalBox.max.y.toFixed(2), originalBox.max.z.toFixed(2)]
+              ]
+            });
+            
             // Scale down the crystal to an appropriate size
+            // If model is extremely large (>1000 units), use a much smaller scale factor
+            const maxDimension = Math.max(originalSize.x, originalSize.y, originalSize.z);
+            const adjustedScaleFactor = maxDimension > 1000 ? 
+                this.config.crystalScaleFactor / 100 : this.config.crystalScaleFactor;
+                
+            console.log('[MAP] Applying crystal scale factor:', {
+              configFactor: this.config.crystalScaleFactor,
+              adjustedFactor: adjustedScaleFactor,
+              reason: maxDimension > 1000 ? 'Model oversized (>1000 units)' : 'Normal scaling'
+            });
+            
             object.scale.set(
-              this.config.crystalScaleFactor,
-              this.config.crystalScaleFactor,
-              this.config.crystalScaleFactor
+              adjustedScaleFactor,
+              adjustedScaleFactor,
+              adjustedScaleFactor
             );
             
             // Position the crystal on top of the hexagon with slight randomization
@@ -972,9 +1026,42 @@ export class MapGenerator {
             let enhancedMeshCount = 0;
             
             // We need to traverse the object hierarchy to apply materials
+            // Log the entire object structure to debug visibility issues
+            console.log('[MAP] Crystal model structure:', {
+              name: object.name || 'unnamed',
+              type: object.type,
+              visible: object.visible,
+              childCount: object.children.length,
+              position: [object.position.x.toFixed(2), object.position.y.toFixed(2), object.position.z.toFixed(2)],
+              scale: [object.scale.x.toFixed(4), object.scale.y.toFixed(4), object.scale.z.toFixed(4)]
+            });
+            
+            // Print the first level children for debugging
+            object.children.forEach((child, index) => {
+              console.log(`[MAP] Child ${index}:`, {
+                name: child.name || 'unnamed',
+                type: child.type,
+                visible: child.visible,
+                isObject3D: child instanceof this.THREE.Object3D,
+                isMesh: child instanceof this.THREE.Mesh,
+                hasGeometry: !!child.geometry,
+                hasMaterial: !!child.material
+              });
+            });
+            
+            // Make sure the model and ALL its children are visible
+            object.visible = true;
             object.traverse((child) => {
+              // Ensure ALL objects in the hierarchy are visible
+              child.visible = true;
+              
               if (child.isMesh) {
-                console.log(`[MAP] Enhancing material for mesh: ${child.name || 'unnamed'}`);
+                console.log(`[MAP] Enhancing material for mesh: ${child.name || 'unnamed'}`, {
+                  originalVisible: child.visible,
+                  materialType: child.material ? child.material.type : 'none',
+                  hasGeometry: !!child.geometry,
+                  vertexCount: child.geometry ? (child.geometry.attributes.position ? child.geometry.attributes.position.count : 0) : 0
+                });
                 
                 try {
                   // Store original material properties we want to preserve
@@ -988,16 +1075,15 @@ export class MapGenerator {
                   // Try to create a physical material for better realism
                   if (this.THREE.MeshPhysicalMaterial) {
                     // Create enhanced physical material
-                    const enhancedMaterial = new this.THREE.MeshPhysicalMaterial({
+                    // Create a VIBRANT high-visibility material for debugging
+                    // Using MeshStandardMaterial which is more reliable across renderers
+                    const enhancedMaterial = new this.THREE.MeshStandardMaterial({
                       map: originalMap,             // Keep original texture if any
-                      color: originalColor,         // Keep original color
-                      metalness: 0.6,               // More metallic for shine
-                      roughness: 0.15,              // Very smooth surface
-                      transmission: 0.7,            // Significant transparency
-                      thickness: 0.6,               // Material thickness for refraction
-                      ior: 1.6,                     // Index of refraction (between glass and diamond)
-                      clearcoat: 0.8,               // Add clear coat layer
-                      clearcoatRoughness: 0.1,      // Glossy clear coat
+                      color: 0xFF00FF,             // BRIGHT MAGENTA for high visibility 
+                      metalness: 0.9,               // Very metallic for shine
+                      roughness: 0.1,               // Ultra smooth surface
+                      emissive: 0xFF00FF,           // Make it glow
+                      emissiveIntensity: 0.5,       // Strong glow
                       emissive: new this.THREE.Color(0x330066),  // Purple glow
                       emissiveIntensity: 0.8,       // Strong glow
                       transparent: true,            // Enable transparency
@@ -1008,23 +1094,18 @@ export class MapGenerator {
                     child.material = enhancedMaterial;
                     console.log('[MAP] Applied MeshPhysicalMaterial to crystal model part');
                   } else {
-                    // If physical material isn't available, enhance the existing material
-                    console.log('[MAP] Physical material not available, enhancing existing material');
+                    // Create a new MeshBasicMaterial for maximum visibility
+                    console.log('[MAP] Creating high-visibility debug material');
                     
-                    // Keep the existing material but enhance its properties
-                    if (child.material.map || this.crystalTextureLoaded) {
-                      child.material.map = this.crystalTextureLoaded ? this.crystalTexture : child.material.map;
-                    }
+                    // Replace with a super bright basic material that will show up regardless of lighting
+                    child.material = new this.THREE.MeshBasicMaterial({
+                      color: 0xFF00FF,             // BRIGHT MAGENTA  
+                      wireframe: false,
+                      transparent: false,
+                      side: this.THREE.DoubleSide    // Make it visible from both sides
+                    });
                     
-                    // Enhance standard properties available in most materials
-                    if (child.material.shininess !== undefined) child.material.shininess = 150;
-                    if (child.material.specular !== undefined) child.material.specular = new this.THREE.Color(0xFFFFFF);
-                    child.material.emissive = new this.THREE.Color(0x330066);
-                    child.material.emissiveIntensity = 0.8;
-                    
-                    // Make it transparent if possible with 80% opacity
-                    child.material.transparent = true;
-                    child.material.opacity = 0.8; // Set to 80% opacity (semi-translucent)
+                    console.log('[MAP] Applied high-visibility MeshBasicMaterial to enhance visibility')
                   }
                   
                   // Force material update
@@ -1045,10 +1126,55 @@ export class MapGenerator {
             console.log(`[MAP] Enhanced materials for ${enhancedMeshCount} meshes in crystal model`);
             
             // Add to scene and associate with hex for future reference
+            console.log('[MAP] About to add crystal model to scene:', {
+              objectIsValid: !!object,
+              objectType: object ? object.type : 'unknown',
+              childrenCount: object ? (object.children ? object.children.length : 0) : 0,
+              position: [object.position.x.toFixed(2), object.position.y.toFixed(2), object.position.z.toFixed(2)],
+              scale: [object.scale.x.toFixed(4), object.scale.y.toFixed(4), object.scale.z.toFixed(4)],
+              visible: object.visible
+            });
+            
+            // Make absolutely sure the object is visible
+            object.visible = true;
+            
+            // Add to scene
             this.scene.add(object);
+            
+            // Verify object was actually added to scene
+            const isInScene = this.scene.children.includes(object);
+            console.log(`[MAP] Object added to scene successfully: ${isInScene}`, {
+              sceneChildrenCount: this.scene.children.length,
+              objectUuid: object.uuid.slice(0, 8) + '...'
+            });
+            
+            // Also print all materials in the model
+            let materialCounts = {};
+            object.traverse(child => {
+              if (child.isMesh && child.material) {
+                const matType = child.material.type;
+                materialCounts[matType] = (materialCounts[matType] || 0) + 1;
+              }
+            });
+            console.log('[MAP] Materials found in crystal model:', materialCounts);
+            
+            // Store reference in hex
             hex.userData.crystal = object;
             
             console.log(`[MAP] Crystal placed on hex at (${hex.userData.q}, ${hex.userData.r})`);
+            
+            // Check if crystal position is extremely far from origin (which could be a scaling issue)
+            const distance = Math.sqrt(
+              object.position.x * object.position.x + 
+              object.position.y * object.position.y + 
+              object.position.z * object.position.z
+            );
+            if (distance > 1000) {
+              console.warn('[MAP] WARNING: Crystal position is very far from origin!', {
+                distance: distance.toFixed(2),
+                position: [object.position.x, object.position.y, object.position.z]
+              });
+            }
           } catch (modelError) {
             console.error('[MAP] Error processing loaded crystal model:', modelError);
             console.error('[MAP] Error details:', modelError.message);

@@ -286,7 +286,7 @@ function setupScene() {
     function animateHoverEffect() {
       // Only run if animation is active and we have a hover stroke
       if (!hoverAnimationActive || !currentHoverStroke) {
-        console.log('[HOVER-ANIM] Animation inactive or no hover stroke');
+        //console.log('[HOVER-ANIM] Animation inactive or no hover stroke');
         return;
       }
       
@@ -295,14 +295,6 @@ function setupScene() {
       const colors = [];
       
       // Debug - log once per second that animation is running
-      if (elapsed % 1000 < 16) { // Will log once per second (assuming ~60fps)
-        console.log('[HOVER-ANIM] Animation running:', {
-          elapsedTime: elapsed,
-          strokeActive: !!currentHoverStroke,
-          hexActive: !!currentHoverHex,
-          renderOrder: currentHoverStroke?.renderOrder
-        });
-      }
       
       // Generate new gold colors with a shifting phase for wave effect
       for (let i = 0; i <= hexPointCount; i++) {
@@ -327,14 +319,6 @@ function setupScene() {
         colors.push(color.r, color.g, color.b);
         
         // Debug color values every 60 frames (approximately once per second)
-        if (elapsed % 60 === 0 && i === 0) {
-          console.log(`[HOVER-COLOR] Vertex ${i} color:`, { 
-            hue: hue.toFixed(4), 
-            saturation: saturation.toFixed(4), 
-            lightness: lightness.toFixed(4),
-            rgb: [color.r.toFixed(2), color.g.toFixed(2), color.b.toFixed(2)]
-          });
-        }
       }
       
       // Update the colors in the geometry
@@ -351,13 +335,13 @@ function setupScene() {
             currentHoverStroke.geometry.attributes.color.needsUpdate = true;
             
             // Log vertex count periodically to verify connections
-            if (elapsed % 300 === 0) { // Every ~5 seconds
-              console.log(`[HOVER-ANIM] Vertex data check:`, {
-                vertexCount: currentHoverStroke.geometry.attributes.position.count,
-                colorCount: currentHoverStroke.geometry.attributes.color.count,
-                expectedVertices: hexPointCount + 1
-              });
-            }
+            // if (elapsed % 300 === 0) { // Every ~5 seconds
+            //   console.log(`[HOVER-ANIM] Vertex data check:`, {
+            //     vertexCount: currentHoverStroke.geometry.attributes.position.count,
+            //     colorCount: currentHoverStroke.geometry.attributes.color.count,
+            //     expectedVertices: hexPointCount + 1
+            //   });
+            // }
           }
           
           // Update material if needed
