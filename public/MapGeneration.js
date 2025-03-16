@@ -108,7 +108,7 @@ export class MapGenerator {
       // Crystal shard parameters
       crystalSpawnChance: 0.2,  // 20% chance to spawn a crystal per hex
       crystalHeightOffset: 0.3, // Height above the hexagon
-      crystalScaleFactor: 0.3,  // Size of the crystal (scale)
+      crystalScaleFactor: 0.005,  // Size of the crystal (scale - reduced from 0.3 to fix oversized shards)
       crystalModelPath: '/assets/Purple_Crystal_Shard.fbx',
       crystalTexturePath: '/assets/Purple_Crystal_Shard_texture.png'
     };
