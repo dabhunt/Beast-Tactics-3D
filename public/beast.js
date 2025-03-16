@@ -829,15 +829,35 @@ export class Beast {
         
         // Set up a listener to return to idle when attack animation finishes
         const onAnimationFinished = (event) => {
+          console.log('[BEAST] Animation finished event:', { 
+            type: event.type, 
+            action: event.action,
+            isAttackAnimation: event.action === this.animations.attack
+          });
+          
           if (event.type === 'finished' && event.action === this.animations.attack) {
             this._playAnimation('idle');
-            // Remove the listener to avoid memory leaks
-            this.spriteMixer.removeEventListener('finished', onAnimationFinished);
+            
+            // Check if removeEventListener exists before calling it
+            if (this.spriteMixer && typeof this.spriteMixer.removeEventListener === 'function') {
+              console.log('[BEAST] Removing animation finished event listener');
+              this.spriteMixer.removeEventListener('finished', onAnimationFinished);
+            } else {
+              console.warn('[BEAST] Cannot remove event listener - method not available');
+              // Store the listener to avoid adding duplicates
+              this._currentAnimationListener = onAnimationFinished;
+            }
           }
         };
         
-        // Add the listener
-        this.spriteMixer.addEventListener('finished', onAnimationFinished);
+        // Add the listener if not already added
+        if (!this._currentAnimationListener) {
+          console.log('[BEAST] Adding animation finished event listener');
+          this.spriteMixer.addEventListener('finished', onAnimationFinished);
+          this._currentAnimationListener = onAnimationFinished;
+        } else {
+          console.log('[BEAST] Animation listener already exists, reusing');
+        }
       }
 
       // Update current position

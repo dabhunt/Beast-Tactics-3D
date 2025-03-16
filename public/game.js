@@ -2,6 +2,7 @@
 import { CameraManager } from "./camera.js";
 import { DebugMenu } from "./tools/diagnostics/DebugMenu.js";
 import { Beast } from './beast.js';
+// Using standard THREE.js objects for stroke effect
 
 // Global THREE variable
 let THREE;
@@ -34,6 +35,13 @@ async function loadModules() {
     // Assign the module to the global THREE variable
     THREE = threeModule;
     console.log("[GAME] THREE.js module loaded successfully");
+    
+    // Verify that Line2 and related modules are available globally
+    console.log("[GAME] Verifying Line2 and LineMaterial modules availability:", {
+      Line2Available: typeof Line2 === 'function',
+      LineGeometryAvailable: typeof LineGeometry === 'function',
+      LineMaterialAvailable: typeof LineMaterial === 'function'
+    });
     
     // Load SpriteMixer library
     console.log("[GAME] Loading SpriteMixer library...");
@@ -244,11 +252,21 @@ function setupScene() {
     const raycaster = new THREE.Raycaster();
     const mouse = new THREE.Vector2();
 
-    // Create stroke material for hover effect
+    // Create stroke material for hover effect using standard THREE.js LineBasicMaterial
+    console.log('[HOVER] Creating stroke material with LineBasicMaterial');
+    
     const strokeMaterial = new THREE.LineBasicMaterial({
-      color: 0xffffff,
-      transparent: true,
-      opacity: 0
+      color: 0xffffff,      // White color
+      linewidth: 3,          // Note: LineBasicMaterial ignores linewidth in WebGL
+      transparent: true,     // Enable transparency
+      opacity: 0             // Start invisible
+    });
+    
+    console.log('[HOVER] Stroke material created successfully:', { 
+      material: strokeMaterial,
+      materialType: strokeMaterial.type,
+      transparent: strokeMaterial.transparent,
+      opacity: strokeMaterial.opacity
     });
 
     // Initialize mouse position vector outside event handler
@@ -359,28 +377,47 @@ function setupScene() {
         
         window.hoveredHex = hex;
 
-        // Create stroke geometry (hexagon outline)
-        const strokeGeometry = new THREE.BufferGeometry();
-        const vertices = [];
+        // Create stroke geometry (hexagon outline) using LineGeometry
+        console.log('[HOVER] Creating stroke geometry with LineGeometry:', { 
+          available: typeof window.LineGeometry === 'function' 
+        });
+        
         const hexPoints = 6;
-        const radius = 1.05; // Slightly larger than hex radius for visible outline
-
+        const radius = 0.95; // Slightly smaller than hex radius for inset effect
+        const positions = [];
+        
+        // Generate points for hexagon
         for (let i = 0; i <= hexPoints; i++) {
           const angle = (i / hexPoints) * Math.PI * 2;
-          vertices.push(
+          positions.push(
             radius * Math.cos(angle),
             0.1, // Slightly above hex surface
             radius * Math.sin(angle)
           );
         }
-
+        
+        // Create standard THREE.js BufferGeometry and set positions
+        console.log('[HOVER] Creating stroke geometry with BufferGeometry');
+        
+        const strokeGeometry = new THREE.BufferGeometry();
+        
+        // Set position attribute for the geometry
         strokeGeometry.setAttribute(
           'position',
-          new THREE.Float32BufferAttribute(vertices, 3)
+          new THREE.Float32BufferAttribute(positions, 3)
         );
+        
+        console.log('[HOVER] Stroke geometry created with positions:', { 
+          pointCount: positions.length / 3,
+          geometryValid: !!strokeGeometry
+        });
 
-        // Create stroke mesh with a fresh material clone
+        // Create stroke mesh with a fresh material clone using standard THREE.js Line
+        console.log('[HOVER] Creating stroke mesh with standard THREE.js Line');
+        
         const strokeMaterialClone = strokeMaterial.clone();
+        strokeMaterialClone.opacity = 1; // Make it visible (will be animated)
+        
         const strokeMesh = new THREE.Line(strokeGeometry, strokeMaterialClone);
         strokeMesh.rotation.y = Math.PI / 6; // Match hex rotation
 
@@ -391,7 +428,7 @@ function setupScene() {
         // Add stroke to hex
         hex.add(strokeMesh);
         
-        console.log('[HOVER] Successfully created and attached stroke mesh');
+        console.log('[HOVER] Successfully created and attached stroke mesh with standard THREE.js Line');
       } catch (err) {
         console.error('[HOVER] Error creating hover effect:', err);
       }

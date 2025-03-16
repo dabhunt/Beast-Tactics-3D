@@ -91,15 +91,19 @@
     <!-- New GIF Animation Tester -->
     <script type="module" src="tools/diagnostics/initGifTester.js"></script>
 
-    <!-- Main game script -->
-    <script type="module" src="game.js"></script>
+    <!-- Load Three.js and make it globally available -->
     <script type="module">
-        import { DebugMenu } from './tools/diagnostics/DebugMenu.js';
-        window.DebugMenu = DebugMenu;
-
-        // Make THREE available globally for the arrow debugger
+        // Import Three.js and make it globally available
         import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js";
         window.THREE = THREE;
+        console.log('[INDEX] THREE.js loaded globally');
+        
+        // Import DebugMenu
+        import { DebugMenu } from './tools/diagnostics/DebugMenu.js';
+        window.DebugMenu = DebugMenu;
     </script>
+    
+    <!-- Main game script -->
+    <script type="module" src="game.js"></script>
   </body>
 </html>
