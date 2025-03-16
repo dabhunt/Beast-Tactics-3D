@@ -2,7 +2,10 @@
 import { CameraManager } from "./camera.js";
 import { DebugMenu } from "./tools/diagnostics/DebugMenu.js";
 import { Beast } from './beast.js';
-// Using standard THREE.js objects for stroke effect
+// Import Line2 and related modules for thicker lines
+import { Line2 } from 'three/addons/lines/Line2.js';
+import { LineGeometry } from 'three/addons/lines/LineGeometry.js';
+import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
 
 // Global THREE variable
 let THREE;
@@ -252,19 +255,29 @@ function setupScene() {
     const raycaster = new THREE.Raycaster();
     const mouse = new THREE.Vector2();
 
-    // Create stroke material for hover effect using standard THREE.js LineBasicMaterial
-    console.log('[HOVER] Creating stroke material with LineBasicMaterial');
+    // Create stroke material for hover effect using LineMaterial for thicker lines
+    console.log('[HOVER] Creating stroke material with LineMaterial');
     
-    const strokeMaterial = new THREE.LineBasicMaterial({
+    const strokeMaterial = new LineMaterial({
       color: 0xffffff,      // White color
-      linewidth: 3,          // Note: LineBasicMaterial ignores linewidth in WebGL
-      transparent: true,     // Enable transparency
-      opacity: 0             // Start invisible
+      linewidth: 5,         // Thicker lines - LineMaterial supports this!
+      vertexColors: false,  // No vertex colors needed
+      dashed: false,        // Solid line
+      transparent: true,    // Enable transparency
+      opacity: 0,           // Start invisible
+      resolution: new THREE.Vector2(window.innerWidth, window.innerHeight) // Important for LineMaterial
     });
     
-    console.log('[HOVER] Stroke material created successfully:', { 
+    // Add resize handler to update resolution when window size changes
+    window.addEventListener('resize', () => {
+      console.log('[HOVER] Updating LineMaterial resolution on resize');
+      strokeMaterial.resolution.set(window.innerWidth, window.innerHeight);
+    });
+    
+    console.log('[HOVER] LineMaterial created successfully:', { 
       material: strokeMaterial,
       materialType: strokeMaterial.type,
+      linewidth: strokeMaterial.linewidth,
       transparent: strokeMaterial.transparent,
       opacity: strokeMaterial.opacity
     });
@@ -396,16 +409,13 @@ function setupScene() {
           );
         }
         
-        // Create standard THREE.js BufferGeometry and set positions
-        console.log('[HOVER] Creating stroke geometry with BufferGeometry');
+        // Create LineGeometry and set positions for Line2
+        console.log('[HOVER] Creating stroke geometry with LineGeometry');
         
-        const strokeGeometry = new THREE.BufferGeometry();
+        const strokeGeometry = new LineGeometry();
+        strokeGeometry.setPositions(positions);
         
-        // Set position attribute for the geometry
-        strokeGeometry.setAttribute(
-          'position',
-          new THREE.Float32BufferAttribute(positions, 3)
-        );
+        console.log('[HOVER] LineGeometry created successfully with points:', positions.length / 3);
         
         console.log('[HOVER] Stroke geometry created with positions:', { 
           pointCount: positions.length / 3,
@@ -417,8 +427,10 @@ function setupScene() {
         
         const strokeMaterialClone = strokeMaterial.clone();
         strokeMaterialClone.opacity = 1; // Make it visible (will be animated)
+        strokeMaterialClone.resolution.set(window.innerWidth, window.innerHeight); // Important for LineMaterial
         
-        const strokeMesh = new THREE.Line(strokeGeometry, strokeMaterialClone);
+        const strokeMesh = new Line2(strokeGeometry, strokeMaterialClone);
+        strokeMesh.computeLineDistances(); // Required for Line2
         strokeMesh.rotation.y = Math.PI / 6; // Match hex rotation
 
         // Store references for animation
@@ -428,7 +440,7 @@ function setupScene() {
         // Add stroke to hex
         hex.add(strokeMesh);
         
-        console.log('[HOVER] Successfully created and attached stroke mesh with standard THREE.js Line');
+        console.log('[HOVER] Successfully created and attached stroke mesh with Line2');
       } catch (err) {
         console.error('[HOVER] Error creating hover effect:', err);
       }
