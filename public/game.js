@@ -2,6 +2,8 @@
 import { CameraManager } from "./camera.js";
 import { DebugMenu } from "./tools/diagnostics/DebugMenu.js";
 import { Beast } from './beast.js';
+// Import the new MapGenerator module
+import { MapGenerator, ELEMENT_TYPES } from './MapGeneration.js';
 // Import Line2 and related modules for thicker lines
 import { Line2 } from 'three/addons/lines/Line2.js';
 import { LineGeometry } from 'three/addons/lines/LineGeometry.js';
@@ -208,47 +210,10 @@ function setupScene() {
       6,
     );
 
-    // Define all element types
-    const elementTypes = [
-      "Combat",
-      "Corrosion",
-      "Dark",
-      "Earth",
-      "Electric",
-      "Fire",
-      "Light",
-      "Metal",
-      "Plant",
-      "Spirit",
-      "Water",
-      "Wind",
-    ];
-
-    // Create URLs for local assets
-    const elemUrls = {};
-    elementTypes.forEach((element) => {
-      elemUrls[element] = `/assets/BiomeTiles/${element}.png`;
-    });
+    // Use element types from the MapGeneration module
+    const elementTypes = ELEMENT_TYPES;
 
     debugLog("Element types defined:", elementTypes);
-    debugLog("Element URLs mapped:", elemUrls);
-
-    // Create texture loader with error handling
-    const textureLoader = new THREE.TextureLoader();
-
-    // Create a loading tracker
-    const textureLoadingTracker = {
-      total: elementTypes.length,
-      loaded: 0,
-      failed: 0,
-      textures: {},
-    };
-
-    // Texture configuration (reverted to default)
-    const textureConfig = {
-      verticalMarginRatio: 0, // No margin adjustment
-      debug: true, // Set to true to see debugging logs about texture adjustments
-    };
 
     // Default fallback material (used if textures fail to load)
     // Create raycaster for hover detection
@@ -712,219 +677,30 @@ function setupScene() {
     new THREE.MeshPhongMaterial({ color: 0xc6e2ff, shininess: 50, specular: 0x555555 }), // Wind
   ];
 
-  // Load all textures
-  const hexMaterials = {};
-
-  function updateLoadingStatus() {
-    const total = textureLoadingTracker.total;
-    const loaded = textureLoadingTracker.loaded;
-    const failed = textureLoadingTracker.failed;
-
-    debugLog(
-      `Texture loading progress: ${loaded}/${total} loaded, ${failed} failed`,
-    );
-
-    // Check if all textures are processed (either loaded or failed)
-    if (loaded + failed === total) {
-      debugLog("All textures processed. Ready to generate map.");
-      generateHexagonGrid();
-    }
-  }
-
-  // Start loading all textures
-  elementTypes.forEach((element, index) => {
-    debugLog(`Loading texture for ${element} element...`);
-
-    textureLoader.load(
-      // URL
-      elemUrls[element],
-
-      // onLoad callback
-      (texture) => {
-        debugLog(`Successfully loaded ${element} texture`);
-
-        // Use default texture mapping (no offset)
-        texture.repeat.set(1, 1);
-        texture.offset.set(0, 0);
-
-        if (textureConfig.debug) {
-          console.log(`[TEXTURE] Applied texture offset for ${element}:`, {
-            verticalMargin: textureConfig.verticalMarginRatio,
-            repeat: texture.repeat.toArray(),
-            offset: texture.offset.toArray(),
-          });
-        }
-
-        // Create material with the loaded texture and enhanced properties for more vibrant colors
-        const material = new THREE.MeshPhongMaterial({
-          map: texture,
-          shininess: 70, // Higher shininess for more defined reflections
-          specular: 0x666666, // Brighter specular highlights
-          emissive: 0x333333, // Stronger emissive for better color representation
-          emissiveIntensity: 0.4, // Doubled emissive intensity to enhance colors
-          transparent: true,
-          side: THREE.DoubleSide, // Ensure both sides render properly
-          color: 0xffffff, // Full brightness base color to avoid muting
-        });
-
-        // Log material creation with enhanced properties
-        if (textureConfig.debug) {
-          console.log(
-            `[MATERIAL] Created enhanced material for ${element} with properties:`,
-            {
-              shininess: material.shininess,
-              specular: material.specular.getHexString(),
-              emissive: material.emissive.getHexString(),
-              emissiveIntensity: material.emissiveIntensity,
-            },
-          );
-        }
-
-        // Store the material
-        hexMaterials[element] = material;
-        textureLoadingTracker.textures[element] = texture;
-        textureLoadingTracker.loaded++;
-
-        updateLoadingStatus();
-      },
-
-      // onProgress callback (not used)
-      undefined,
-
-      // onError callback
-      (error) => {
-        console.error(`Failed to load texture for ${element}:`, error);
-
-        // Use fallback material
-        debugLog(`Using fallback material for ${element}`);
-        hexMaterials[element] = fallbackMaterials[index];
-        textureLoadingTracker.failed++;
-
-        updateLoadingStatus();
-      },
-    );
+  // Initialize map generator with scene and THREE
+  debugLog("Initializing MapGenerator...");
+  const mapGenerator = new MapGenerator(scene, THREE);
+  
+  // Define variable to store hexagons
+  let hexagons = [];
+  
+  // Listen for map generation completion
+  mapGenerator.onMapGenerated((generatedHexagons) => {
+    debugLog(`Map generation complete: ${generatedHexagons.length} hexagons created`);
+    hexagons = generatedHexagons;
   });
-
-  // Add side material (edges of hexagons)
-  const edgeMaterial = new THREE.MeshPhongMaterial({
-    color: 0x333333,
-    shininess: 10,
-  });
-
-  // Function to create individual hexagons
-  function createHex(q, r, horizontalSpacing = 1.5, verticalFactor = 1.0) {
-    // Assign element type - for now, random selection
-    const randomElement =
-      elementTypes[Math.floor(Math.random() * elementTypes.length)];
-
-    // Get appropriate material based on element type
-    const hexMaterial = hexMaterials[randomElement] || fallbackMaterials[0];
-
-    // Create multi-material for top/bottom and side
-    const materials = [
-      edgeMaterial, // Side
-      hexMaterial, // Top
-      hexMaterial, // Bottom
-    ];
-
-    // Create mesh with geometry and materials
-    const hex = new THREE.Mesh(hexGeometry, materials);
-
-    // Store element data for game logic
-    hex.userData.element = randomElement;
-    hex.userData.q = q;
-    hex.userData.r = r;
-    
-    // Make sure raycast works properly by adding a proper name and enabling raycasting
-    hex.name = `Hex_${q}_${r}_${randomElement}`;
-    hex.raycast = THREE.Mesh.prototype.raycast;
-
-    // Position hexagon in grid
-    // For perfect fit in axial coordinate system:
-    // x = hexRadius * 3/2 * q
-    // z = hexRadius * sqrt(3) * (r + q/2)
-    const x = hexRadius * horizontalSpacing * q;
-    const z = hexRadius * Math.sqrt(3) * verticalFactor * (r + q / 2);
-    hex.position.set(x, 0, z);
-
-    // Debug rotation values for troubleshooting
-    debugLog(
-      `Creating hex at (${q},${r}) with position (${x},0,${z}) - Element: ${randomElement}`,
-    );
-
-    // In THREE.js, cylinders stand upright along Y axis by default
-    // We need to rotate them 30 degrees (π/6 radians) around the Y axis
-    // for the hexagons to align properly in the grid
-    hex.rotation.x = 0;
-    hex.rotation.y = Math.PI / 6; // 30 degrees rotation
-    hex.rotation.z = 0;
-
-    // Add to scene
-    scene.add(hex);
-
-    return hex;
-  }
-
-  debugLog("Starting to generate hexagon grid...");
-  const hexagons = [];
-  let hexCount = 0;
-
-  // Function to generate the entire grid
+  
+  // Function to re-generate the hexagon grid (for compatibility with existing code)
   function generateHexagonGrid(horizontalSpacing = 1.5, verticalFactor = 1.0) {
-    // Generate grid (radius 7 - about 3x as many hexagons as radius 4)
-    const gridRadius = 7;
-    debugLog(
-      `Generating hex grid with radius ${gridRadius}, spacing: h=${horizontalSpacing}, v=${verticalFactor}`,
-    );
-
-    // Track element distribution for debugging
-    const elementDistribution = {};
-    elementTypes.forEach((element) => {
-      elementDistribution[element] = 0;
-    });
-
-    // Clear any existing hexagons if we're regenerating
-    if (hexagons.length > 0) {
-      debugLog("Clearing existing hexagons before regeneration");
-      hexagons.forEach((hex) => {
-        scene.remove(hex);
-      });
-      hexagons.length = 0;
-      hexCount = 0;
-    }
-
-    for (let q = -gridRadius; q <= gridRadius; q++) {
-      for (
-        let r = Math.max(-gridRadius, -q - gridRadius);
-        r <= Math.min(gridRadius, -q + gridRadius);
-        r++
-      ) {
-        const hex = createHex(q, r, horizontalSpacing, verticalFactor);
-        hexagons.push(hex);
-        hexCount++;
-
-        // Track element distribution if hex has element data
-        if (hex.userData.element) {
-          elementDistribution[hex.userData.element]++;
-        }
-
-        // Log progress every 20 hexagons
-        if (hexCount % 20 === 0) {
-          debugLog(`Created ${hexCount} hexagons so far...`);
-        }
-      }
-    }
-
-    debugLog(`Grid generation complete: ${hexagons.length} hexagons created`);
-    debugLog("Element distribution:", elementDistribution);
+    debugLog(`Delegating hexagon grid generation to MapGenerator...`);
+    return mapGenerator.generateHexagonGrid(horizontalSpacing, verticalFactor);
   }
-
-  // Wait for texture loading to complete before generating the grid
-  // The grid will be generated from the updateLoadingStatus function
-  // when all textures are processed
 
   // Make generateHexagonGrid available globally for diagnostics tools
   window.generateHexagonGrid = generateHexagonGrid;
+  
+  // Make mapGenerator available globally for diagnostics
+  window.mapGenerator = mapGenerator;
 
   // Initialize the debug menu after all components are created
   debugLog("Initializing debug menu...");
@@ -1359,31 +1135,16 @@ function setupScene() {
   // Trigger beast spawn after grid is generated
   debugLog("Setting up Fire Beast spawn after grid generation");
 
-  // Modified version of updateLoadingStatus to spawn beast when ready
-  const originalUpdateLoadingStatus = updateLoadingStatus;
-  function enhancedUpdateLoadingStatus() {
-    // Call original function
-    originalUpdateLoadingStatus();
-
-    // Check if grid is generated
-    const total = textureLoadingTracker.total;
-    const loaded = textureLoadingTracker.loaded;
-    const failed = textureLoadingTracker.failed;
-
-    // If all textures processed, grid should be generated
-    if (loaded + failed === total && hexagons.length > 0) {
-      // Wait a bit to make sure grid is fully set up
-      setTimeout(() => {
-        if (!fireBeast) {
-          debugLog("Grid generation complete, spawning Fire Beast");
-          spawnFireBeast();
-        }
-      }, 1000);
-    }
-  }
-
-  // Replace the updateLoadingStatus function
-  updateLoadingStatus = enhancedUpdateLoadingStatus;
+  // Spawn the Fire Beast when the map generation is complete
+  mapGenerator.onMapGenerated((generatedHexagons) => {
+    // Wait a bit to make sure grid is fully set up
+    setTimeout(() => {
+      if (!fireBeast) {
+        debugLog("Grid generation complete, spawning Fire Beast");
+        spawnFireBeast();
+      }
+    }, 1000);
+  });
 
   debugLog("Fire Beast integration complete");
   debugLog("Three.js setup complete - game should be visible now");
