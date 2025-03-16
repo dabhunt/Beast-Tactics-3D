@@ -1052,76 +1052,150 @@ export class MapGenerator {
   
   /**
    * Load a crystal model for a specific hex using the FBXLoader
+   * Enhanced with detailed debugging logs and error diagnostics
    * @param {Object} hex - The hexagon to place the crystal on
    */
   loadCrystalModel(hex) {
+    // Pre-validation: Check if the crystal loader is available
     if (!this.crystalLoader) {
-      console.error('[MAP] Cannot load crystal model: loader is not available');
+      console.error('[MAP] Crystal loader unavailable', {
+        source: this._crystalLoaderSource || 'unknown',
+        errors: window._fbxLoaderErrors || [],
+        attempted: true,
+        timestamp: new Date().toISOString()
+      });
+      
+      // Fall back to simplified crystal rendering
       this.ensureFallbackCrystalMethod();
       this.createFallbackCrystal(hex);
       return;
     }
     
+    // Pre-validation: Check if the hex object is valid
+    if (!hex || !hex.position) {
+      console.error('[MAP] Invalid hex provided to loadCrystalModel', {
+        hex: hex ? 'object exists but incomplete' : 'null/undefined',
+        hasPosition: hex?.position ? true : false,
+        userData: hex?.userData || 'missing userData'
+      });
+      return;
+    }
+    
+    // Log start of loading process with detailed information
+    const loadStart = performance.now();
+    console.log('[MAP] Starting crystal model load', {
+      path: this.config.crystalModelPath,
+      loaderType: this.crystalLoader.constructor.name,
+      loaderSource: this._crystalLoaderSource || 'unknown',
+      hexCoords: hex.userData?.q !== undefined ? `(${hex.userData.q}, ${hex.userData.r})` : 'unknown',
+      hexPosition: [hex.position.x.toFixed(2), hex.position.y.toFixed(2), hex.position.z.toFixed(2)]
+    });
+    
     try {
-      // Now load the crystal model
+      // Attempt to load the crystal model using FBXLoader
       this.crystalLoader.load(
-        // Model path - using the path from config allows easy customization
+        // Model path from config
         this.config.crystalModelPath,
         
         // onLoad callback - called when model is successfully loaded
         (object) => {
           try {
-            console.log('[MAP] Crystal model loaded successfully');
+            // Log successful load with timing information
+            console.log('[MAP] Crystal model loaded successfully', {
+              timeTaken: (performance.now() - loadStart).toFixed(2) + 'ms',
+              childCount: object.children?.length || 0,
+              hasAnimations: object.animations?.length > 0,
+              objectType: object.type || 'unknown'
+            });
+            
+            // Pre-processing validation
+            if (!object) {
+              throw new Error('Loaded object is null or undefined');
+            }
             
             // Scale down the crystal to an appropriate size
-            object.scale.set(
-              this.config.crystalScaleFactor,
-              this.config.crystalScaleFactor,
-              this.config.crystalScaleFactor
-            );
+            const scaleFactor = this.config.crystalScaleFactor;
+            object.scale.set(scaleFactor, scaleFactor, scaleFactor);
+            console.log('[MAP] Crystal scaled', { 
+              factor: scaleFactor,
+              resultingSize: `~${(scaleFactor * 100).toFixed(1)}% of original`
+            });
             
-            // Position the crystal on top of the hexagon with slight randomization
-            const randomPositionOffset = (Math.random() - 0.5) * 0.1; // Small random offset for natural variation
+            // Position the crystal on top of the hexagon with slight randomization for natural look
+            const randomXOffset = (Math.random() - 0.5) * 0.1; // ±0.05 units X
+            const randomZOffset = (Math.random() - 0.5) * 0.1; // ±0.05 units Z
+            const randomYOffset = (Math.random() - 0.5) * 0.1; // ±0.05 units Y
+            
+            // Calculate position with all components
+            const baseYPosition = hex.position.y + (this.config.hexHeight / 2);
+            const finalYPosition = baseYPosition + this.config.crystalHeightOffset + randomYOffset;
+            
+            // Apply the calculated position
             object.position.set(
-              hex.position.x + (Math.random() - 0.5) * 0.1,
-              hex.position.y + this.config.hexHeight/2 + this.config.crystalHeightOffset + randomPositionOffset,
-              hex.position.z + (Math.random() - 0.5) * 0.1
+              hex.position.x + randomXOffset,
+              finalYPosition,
+              hex.position.z + randomZOffset
             );
             
-            console.log(`[MAP] Positioned loaded crystal model at: ${object.position.x.toFixed(2)}, ${object.position.y.toFixed(2)}, ${object.position.z.toFixed(2)}`);
+            // Log detailed positioning information
+            console.log('[MAP] Crystal positioned', {
+              final: [object.position.x.toFixed(2), object.position.y.toFixed(2), object.position.z.toFixed(2)],
+              hexBase: [hex.position.x.toFixed(2), hex.position.y.toFixed(2), hex.position.z.toFixed(2)],
+              heightComponents: {
+                hexBase: hex.position.y.toFixed(2),
+                halfHeight: (this.config.hexHeight / 2).toFixed(2),
+                offset: this.config.crystalHeightOffset.toFixed(2),
+                random: randomYOffset.toFixed(2),
+                total: finalYPosition.toFixed(2)
+              },
+              randomOffsets: [randomXOffset.toFixed(3), randomYOffset.toFixed(3), randomZOffset.toFixed(3)]
+            });
             
-            // For loaded models, we need to keep them in their original upright orientation
-            // Models should already be correctly oriented in their source files
-            // No need to apply the -Math.PI/2 rotation that was causing them to lay on their side
+            // Apply only Y-axis rotation to keep crystals upright
+            const randomYRotation = Math.random() * Math.PI * 2; // 0 to 2π (0-360°)
+            object.rotation.set(0, randomYRotation, 0); // Explicitly set all 3 axes
             
-            // Apply only Y-axis rotation (360 degrees) to keep crystals upright
-            object.rotation.y = Math.random() * Math.PI * 2; // Full 360-degree rotation around vertical axis
+            console.log('[MAP] Crystal rotation applied', {
+              yRotation: `${randomYRotation.toFixed(2)} rad (${(randomYRotation * 180 / Math.PI).toFixed(0)}°)`,
+              xRotation: '0 rad (upright)',
+              zRotation: '0 rad (upright)'
+            });
             
-            // Keep X and Z at 0 to ensure upright orientation
-            object.rotation.x = 0;
-            object.rotation.z = 0;
+            // Apply enhanced materials and textures
+            console.log('[MAP] Beginning material enhancement for crystal model');
             
-            console.log(`[MAP] Applied loaded crystal Y rotation: ${object.rotation.y.toFixed(2)} radians`);
+            // Track statistics for reporting
+            let stats = {
+              meshesProcessed: 0,
+              meshesEnhanced: 0,
+              materialTypes: {},
+              errors: []
+            };
             
-            // Apply enhanced materials and textures to make the crystal look better
-            console.log('[MAP] Applying enhanced materials to loaded crystal model');
-            
-            // Track how many meshes we've enhanced for logging
-            let enhancedMeshCount = 0;
-            
-            // We need to traverse the object hierarchy to apply materials
+            // Traverse the object hierarchy to apply materials
             object.traverse((child) => {
               if (child.isMesh) {
-                console.log(`[MAP] Enhancing material for mesh: ${child.name || 'unnamed'}`);
+                stats.meshesProcessed++;
+                
+                console.log(`[MAP] Processing mesh in crystal model:`, {
+                  name: child.name || `unnamed-${stats.meshesProcessed}`,
+                  vertexCount: child.geometry?.attributes?.position?.count || 'unknown',
+                  materialType: child.material?.type || 'unknown'
+                });
                 
                 try {
                   // Store original material properties we want to preserve
-                  const originalColor = child.material.color ? child.material.color.clone() : new this.THREE.Color(0x9932CC);
-                  const originalMap = this.crystalTextureLoaded ? this.crystalTexture : child.material.map;
+                  const originalColor = child.material?.color ? 
+                    child.material.color.clone() : 
+                    new this.THREE.Color(0x9932CC); // Default purple if no color
                   
-                  // Check material capabilities of the renderer
-                  const originalMaterialType = child.material.type;
-                  console.log(`[MAP] Original material type: ${originalMaterialType}`);
+                  const originalMap = this.crystalTextureLoaded ? 
+                    this.crystalTexture : 
+                    child.material?.map;
+                  
+                  // Track material type for diagnostics
+                  const materialType = child.material?.type || 'unknown';
+                  stats.materialTypes[materialType] = (stats.materialTypes[materialType] || 0) + 1;
                   
                   // Try to create a physical material for better realism
                   if (this.THREE.MeshPhysicalMaterial) {
@@ -1144,10 +1218,12 @@ export class MapGenerator {
                     
                     // Replace the original material
                     child.material = enhancedMaterial;
-                    console.log('[MAP] Applied MeshPhysicalMaterial to crystal model part');
+                    stats.meshesEnhanced++;
+                    
+                    console.log(`[MAP] Applied MeshPhysicalMaterial to mesh: ${child.name || 'unnamed'}`);
                   } else {
                     // If physical material isn't available, enhance the existing material
-                    console.log('[MAP] Physical material not available, enhancing existing material');
+                    console.log('[MAP] Physical material not available, enhancing existing material properties');
                     
                     // Keep the existing material but enhance its properties
                     if (child.material.map || this.crystalTextureLoaded) {
@@ -1162,63 +1238,122 @@ export class MapGenerator {
                     
                     // Make it transparent if possible with 80% opacity
                     child.material.transparent = true;
-                    child.material.opacity = 0.8; // Set to 80% opacity (semi-translucent)
+                    child.material.opacity = 0.8;
+                    
+                    stats.meshesEnhanced++;
                   }
                   
                   // Force material update
                   child.material.needsUpdate = true;
-                  enhancedMeshCount++;
                   
                 } catch (materialError) {
-                  console.error(`[MAP] Error enhancing material for mesh ${child.name || 'unnamed'}:`, materialError);
+                  // Log the specific error with context
+                  const errorMsg = `Error enhancing material for mesh ${child.name || 'unnamed'}`;
+                  console.error(`[MAP] ${errorMsg}:`, materialError);
+                  stats.errors.push({
+                    mesh: child.name || `unnamed-${stats.meshesProcessed}`,
+                    error: materialError.message,
+                    materialType: child.material?.type || 'unknown'
+                  });
+                  
                   // Apply texture only if material enhancement fails
                   if (this.crystalTextureLoaded && this.crystalTexture) {
-                    child.material.map = this.crystalTexture;
-                    child.material.needsUpdate = true;
+                    try {
+                      child.material.map = this.crystalTexture;
+                      child.material.needsUpdate = true;
+                      console.log(`[MAP] Applied fallback texture to mesh: ${child.name || 'unnamed'}`);
+                    } catch (textureError) {
+                      console.error(`[MAP] Unable to apply fallback texture:`, textureError);
+                    }
                   }
                 }
               }
             });
             
-            console.log(`[MAP] Enhanced materials for ${enhancedMeshCount} meshes in crystal model`);
+            // Log comprehensive enhancement summary
+            console.log('[MAP] Crystal material enhancement completed', {
+              totalMeshes: stats.meshesProcessed,
+              enhancedMeshes: stats.meshesEnhanced,
+              successRate: stats.meshesProcessed ? 
+                `${((stats.meshesEnhanced / stats.meshesProcessed) * 100).toFixed(1)}%` : 
+                'N/A',
+              materialTypesFound: stats.materialTypes,
+              errors: stats.errors.length,
+              timeSinceLoadStart: (performance.now() - loadStart).toFixed(2) + 'ms'
+            });
             
             // Add to scene and associate with hex for future reference
             this.scene.add(object);
             hex.userData.crystal = object;
             
-            console.log(`[MAP] Crystal placed on hex at (${hex.userData.q}, ${hex.userData.r})`);
+            console.log(`[MAP] Crystal placement completed`, {
+              hexCoords: hex.userData?.q !== undefined ? `(${hex.userData.q}, ${hex.userData.r})` : 'unknown',
+              hexPosition: [hex.position.x.toFixed(2), hex.position.y.toFixed(2), hex.position.z.toFixed(2)],
+              totalTimeTaken: (performance.now() - loadStart).toFixed(2) + 'ms'
+            });
           } catch (modelError) {
-            console.error('[MAP] Error processing loaded crystal model:', modelError);
-            console.error('[MAP] Error details:', modelError.message);
+            // Catch and log any errors during model processing
+            console.error('[MAP] Error processing loaded crystal model:', {
+              errorMsg: modelError.message,
+              errorName: modelError.name,
+              errorStack: modelError.stack?.split('\n')[0] || 'No stack trace',
+              timeTaken: (performance.now() - loadStart).toFixed(2) + 'ms',
+              hexCoords: hex.userData?.q !== undefined ? `(${hex.userData.q}, ${hex.userData.r})` : 'unknown'
+            });
             
-            // Try to use fallback crystal if model processing fails
+            // Fall back to simplified crystal
             this.ensureFallbackCrystalMethod();
             this.createFallbackCrystal(hex);
           }
         },
         
-        // onProgress callback - useful for loading indicators
+        // onProgress callback - provides loading percentage updates
         (xhr) => {
           if (xhr.lengthComputable) {
-            const percentComplete = xhr.loaded / xhr.total * 100;
-            console.log(`[MAP] Crystal model ${percentComplete.toFixed(2)}% loaded`);
+            // Calculate loading percentage and log with details
+            const percent = ((xhr.loaded / xhr.total) * 100).toFixed(2);
+            
+            console.log('[MAP] Crystal model loading progress', {
+              percent: `${percent}%`,
+              loaded: `${(xhr.loaded / 1024).toFixed(2)}KB`,
+              total: `${(xhr.total / 1024).toFixed(2)}KB`,
+              timeSoFar: (performance.now() - loadStart).toFixed(2) + 'ms'
+            });
+          } else {
+            // Log when progress is not computable
+            console.log('[MAP] Crystal model loading in progress (size unknown)', {
+              timeSoFar: (performance.now() - loadStart).toFixed(2) + 'ms'
+            });
           }
         },
         
         // onError callback - called when loading fails
         (error) => {
-          console.error('[MAP] Error loading crystal model:', error);
-          console.error('[MAP] Model path attempted:', this.config.crystalModelPath);
+          console.error('[MAP] Crystal model load failed', {
+            errorMsg: error.message || 'Unknown error',
+            errorType: error.constructor.name,
+            timeTaken: (performance.now() - loadStart).toFixed(2) + 'ms',
+            path: this.config.crystalModelPath,
+            loader: this.crystalLoader?.constructor.name,
+            loaderSource: this._crystalLoaderSource || 'unknown'
+          });
           
-          // Try to use fallback crystal if model loading fails
+          // Attempt to use fallback crystal if model loading fails
           this.ensureFallbackCrystalMethod();
           this.createFallbackCrystal(hex);
         }
       );
     } catch (error) {
-      console.error('[MAP] Error starting crystal model load:', error);
+      // Catch any errors that might occur when initiating the load
+      console.error('[MAP] Error initiating crystal model load:', {
+        errorMsg: error.message,
+        errorType: error.constructor.name,
+        timeTaken: (performance.now() - loadStart).toFixed(2) + 'ms',
+        path: this.config.crystalModelPath,
+        hexCoords: hex.userData?.q !== undefined ? `(${hex.userData.q}, ${hex.userData.r})` : 'unknown'
+      });
       
-      // Use fallback crystal if loading fails
+      // Use fallback crystal approach
       this.ensureFallbackCrystalMethod();
       this.createFallbackCrystal(hex);
     }
