@@ -1,10 +1,38 @@
-// Import Three.js using dynamic import for better compatibility
+// Import Three.js and other modules using dynamic imports for better compatibility
+import { CameraManager } from "./camera.js";
+import { DebugMenu } from "./tools/diagnostics/DebugMenu.js";
+import { Beast } from './beast.js';
+
+// Global THREE variable
 let THREE;
+
+/**
+ * Main game initialization function - called after all modules are loaded
+ */
+function initGame() {
+  console.log("[GAME] Initializing game with loaded modules");
+  console.log("[GAME] THREE.js available:", !!THREE);
+  console.log("[GAME] Beast class available:", typeof Beast === 'function');
+  
+  // Debug log to verify Beast import was successful
+  console.log("[GAME] Imported Beast class successfully:", { 
+    beastClassAvailable: typeof Beast === 'function',
+    staticMethodsAvailable: typeof Beast.findRandomHexOfElement === 'function'
+  });
+  
+  // Continue with game initialization
+  setupScene();
+}
+
+/**
+ * Load all required modules before starting the game
+ */
 async function loadModules() {
   try {
     console.log("[GAME] Loading THREE.js module...");
-    const module = await import("https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js");
-    THREE = module;
+    const threeModule = await import("https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js");
+    // Assign the module to the global THREE variable
+    THREE = threeModule;
     console.log("[GAME] THREE.js module loaded successfully");
     
     // Load SpriteMixer library
@@ -12,13 +40,17 @@ async function loadModules() {
     await loadScript("/libs/SpriteMixer.js");
     console.log("[GAME] SpriteMixer library loaded successfully");
     
+    // Initialize the game after all modules are loaded
     initGame();
   } catch (err) {
     console.error("[GAME] Failed to load modules:", err);
+    console.error("[GAME] Stack trace:", err.stack);
   }
 }
 
-// Helper function to load scripts
+/**
+ * Helper function to load scripts via DOM
+ */
 function loadScript(url) {
   return new Promise((resolve, reject) => {
     console.log(`[GAME] Loading script: ${url}`);
@@ -36,19 +68,11 @@ function loadScript(url) {
   });
 }
 
-// Start loading modules
-loadModules();
-import { CameraManager } from "./camera.js";
-import { DebugMenu } from "./tools/diagnostics/DebugMenu.js";
-import { Beast } from './beast.js';
-
-// Debug log to verify Beast import was successful
-console.log("[GAME] Imported Beast class successfully:", { 
-  beastClassAvailable: typeof Beast === 'function',
-  staticMethodsAvailable: typeof Beast.findRandomHexOfElement === 'function'
-});
 // Logging setup
 console.log("Beast Tactics script loaded and starting...");
+
+// Start loading modules
+loadModules();
 
 // Global error handler for debugging
 window.addEventListener("error", (event) => {
@@ -78,174 +102,178 @@ function debugLog(message, data = null) {
   }
 }
 
-debugLog("Setting up THREE.js scene...");
+/**
+ * Set up the THREE.js scene, renderer, and other core components
+ */
+function setupScene() {
+  debugLog("Setting up THREE.js scene...");
 
-try {
-  // Scene setup
-  const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x111926); // Slightly blue-tinted dark background for better contrast
-  debugLog(
-    "Scene created with dark blue-tinted background for better contrast",
-  );
+  try {
+    // Scene setup
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x111926); // Slightly blue-tinted dark background for better contrast
+    debugLog(
+      "Scene created with dark blue-tinted background for better contrast",
+    );
 
-  // Renderer setup with anti-aliasing
-  debugLog("Creating WebGL renderer...");
-  const renderer = new THREE.WebGLRenderer({
-    antialias: true,
-    alpha: true,
-  });
-
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.setPixelRatio(window.devicePixelRatio);
-  debugLog("Renderer configured with size:", {
-    width: window.innerWidth,
-    height: window.innerHeight,
-    pixelRatio: window.devicePixelRatio,
-  });
-
-  // Add canvas to document
-  document.body.appendChild(renderer.domElement);
-  debugLog("Renderer canvas added to document");
-
-  // Initialize camera manager
-  debugLog("Initializing camera manager...");
-  const cameraManager = new CameraManager(scene);
-  const camera = cameraManager.camera; // Get the camera instance for use in the render loop
-
-  // Add enhanced lighting setup for better visibility
-  debugLog("Setting up enhanced lighting...");
-
-  // Create a lights container to organize and reference lights
-  const lights = {};
-
-  // Enhanced lighting configuration for better color vibrancy
-
-  // Brighter ambient light with warmer tone
-  lights.ambient = new THREE.AmbientLight(0xfffcf0, 0.85); // Increased intensity, slightly warmer
-  scene.add(lights.ambient);
-  debugLog(
-    "Created enhanced ambient light with intensity:",
-    lights.ambient.intensity,
-  );
-
-  // Primary directional light (sun-like) with warmer color
-  lights.directional = new THREE.DirectionalLight(0xfff0d0, 1.2); // Warmer color and higher intensity
-  lights.directional.position.set(5, 15, 5);
-  lights.directional.castShadow = true;
-  scene.add(lights.directional);
-  debugLog(
-    "Created enhanced directional light with intensity:",
-    lights.directional.intensity,
-  );
-
-  // Secondary fill light from opposite side with complementary cooler tint
-  lights.fill = new THREE.DirectionalLight(0xd0e8ff, 0.5); // Slightly higher intensity
-  lights.fill.position.set(-5, 8, -5);
-  scene.add(lights.fill);
-
-  // Small overhead point light for specular highlights - brighter
-  lights.point = new THREE.PointLight(0xffffff, 0.7, 50); // Increased intensity
-  lights.point.position.set(0, 15, 0);
-  scene.add(lights.point);
-
-  // Add an additional low rim light for edge definition
-  lights.rim = new THREE.DirectionalLight(0xffe8d0, 0.3);
-  lights.rim.position.set(0, 3, -12);
-  scene.add(lights.rim);
-
-  debugLog(
-    "Enhanced lighting setup complete with main, fill, and point lights",
-  );
-
-  // Hexagonal grid setup
-  const hexRadius = 1;
-  const hexHeight = 0.2;
-  debugLog("Creating hexagonal grid with radius:", hexRadius);
-
-  const hexGeometry = new THREE.CylinderGeometry(
-    hexRadius,
-    hexRadius,
-    hexHeight,
-    6,
-  );
-
-  // Define all element types
-  const elementTypes = [
-    "Combat",
-    "Corrosion",
-    "Dark",
-    "Earth",
-    "Electric",
-    "Fire",
-    "Light",
-    "Metal",
-    "Plant",
-    "Spirit",
-    "Water",
-    "Wind",
-  ];
-
-  // Create URLs for local assets
-  const elemUrls = {};
-  elementTypes.forEach((element) => {
-    elemUrls[element] = `/assets/BiomeTiles/${element}.png`;
-  });
-
-  debugLog("Element types defined:", elementTypes);
-  debugLog("Element URLs mapped:", elemUrls);
-
-  // Create texture loader with error handling
-  const textureLoader = new THREE.TextureLoader();
-
-  // Create a loading tracker
-  const textureLoadingTracker = {
-    total: elementTypes.length,
-    loaded: 0,
-    failed: 0,
-    textures: {},
-  };
-
-  // Texture configuration (reverted to default)
-  const textureConfig = {
-    verticalMarginRatio: 0, // No margin adjustment
-    debug: true, // Set to true to see debugging logs about texture adjustments
-  };
-
-  // Default fallback material (used if textures fail to load)
-  // Create raycaster for hover detection
-  const raycaster = new THREE.Raycaster();
-  const mouse = new THREE.Vector2();
-
-  // Create stroke material for hover effect
-  const strokeMaterial = new THREE.LineBasicMaterial({
-    color: 0xffffff,
-    transparent: true,
-    opacity: 0
-  });
-
-  // Initialize mouse position vector outside event handler
-  const mousePos = new THREE.Vector2();
-  console.log('[MOUSE] Initialized mouse position vector:', mousePos);
-
-  // Handle mouse move for hex hover
-  window.addEventListener('mousemove', (event) => {
-    console.log('[MOUSE] Mouse move event:', { 
-      clientX: event.clientX, 
-      clientY: event.clientY 
+    // Renderer setup with anti-aliasing
+    debugLog("Creating WebGL renderer...");
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      alpha: true,
     });
 
-    // Calculate mouse position in normalized device coordinates
-    mousePos.x = (event.clientX / window.innerWidth) * 2 - 1;
-    mousePos.y = -(event.clientY / window.innerHeight) * 2 + 1;
-
-    console.log('[MOUSE] Updated normalized coordinates:', { 
-      x: mousePos.x, 
-      y: mousePos.y 
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(window.devicePixelRatio);
+    debugLog("Renderer configured with size:", {
+      width: window.innerWidth,
+      height: window.innerHeight,
+      pixelRatio: window.devicePixelRatio,
     });
 
-    // Log before raycasting to ensure variables are defined
-    console.log('[RAYCASTER] Preparing to find intersects', {
-      raycasterDefined: !!raycaster,
+    // Add canvas to document
+    document.body.appendChild(renderer.domElement);
+    debugLog("Renderer canvas added to document");
+
+    // Initialize camera manager
+    debugLog("Initializing camera manager...");
+    const cameraManager = new CameraManager(scene);
+    const camera = cameraManager.camera; // Get the camera instance for use in the render loop
+
+    // Add enhanced lighting setup for better visibility
+    debugLog("Setting up enhanced lighting...");
+
+    // Create a lights container to organize and reference lights
+    const lights = {};
+
+    // Enhanced lighting configuration for better color vibrancy
+
+    // Brighter ambient light with warmer tone
+    lights.ambient = new THREE.AmbientLight(0xfffcf0, 0.85); // Increased intensity, slightly warmer
+    scene.add(lights.ambient);
+    debugLog(
+      "Created enhanced ambient light with intensity:",
+      lights.ambient.intensity,
+    );
+
+    // Primary directional light (sun-like) with warmer color
+    lights.directional = new THREE.DirectionalLight(0xfff0d0, 1.2); // Warmer color and higher intensity
+    lights.directional.position.set(5, 15, 5);
+    lights.directional.castShadow = true;
+    scene.add(lights.directional);
+    debugLog(
+      "Created enhanced directional light with intensity:",
+      lights.directional.intensity,
+    );
+
+    // Secondary fill light from opposite side with complementary cooler tint
+    lights.fill = new THREE.DirectionalLight(0xd0e8ff, 0.5); // Slightly higher intensity
+    lights.fill.position.set(-5, 8, -5);
+    scene.add(lights.fill);
+
+    // Small overhead point light for specular highlights - brighter
+    lights.point = new THREE.PointLight(0xffffff, 0.7, 50); // Increased intensity
+    lights.point.position.set(0, 15, 0);
+    scene.add(lights.point);
+
+    // Add an additional low rim light for edge definition
+    lights.rim = new THREE.DirectionalLight(0xffe8d0, 0.3);
+    lights.rim.position.set(0, 3, -12);
+    scene.add(lights.rim);
+
+    debugLog(
+      "Enhanced lighting setup complete with main, fill, and point lights",
+    );
+
+    // Hexagonal grid setup
+    const hexRadius = 1;
+    const hexHeight = 0.2;
+    debugLog("Creating hexagonal grid with radius:", hexRadius);
+
+    const hexGeometry = new THREE.CylinderGeometry(
+      hexRadius,
+      hexRadius,
+      hexHeight,
+      6,
+    );
+
+    // Define all element types
+    const elementTypes = [
+      "Combat",
+      "Corrosion",
+      "Dark",
+      "Earth",
+      "Electric",
+      "Fire",
+      "Light",
+      "Metal",
+      "Plant",
+      "Spirit",
+      "Water",
+      "Wind",
+    ];
+
+    // Create URLs for local assets
+    const elemUrls = {};
+    elementTypes.forEach((element) => {
+      elemUrls[element] = `/assets/BiomeTiles/${element}.png`;
+    });
+
+    debugLog("Element types defined:", elementTypes);
+    debugLog("Element URLs mapped:", elemUrls);
+
+    // Create texture loader with error handling
+    const textureLoader = new THREE.TextureLoader();
+
+    // Create a loading tracker
+    const textureLoadingTracker = {
+      total: elementTypes.length,
+      loaded: 0,
+      failed: 0,
+      textures: {},
+    };
+
+    // Texture configuration (reverted to default)
+    const textureConfig = {
+      verticalMarginRatio: 0, // No margin adjustment
+      debug: true, // Set to true to see debugging logs about texture adjustments
+    };
+
+    // Default fallback material (used if textures fail to load)
+    // Create raycaster for hover detection
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+
+    // Create stroke material for hover effect
+    const strokeMaterial = new THREE.LineBasicMaterial({
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0
+    });
+
+    // Initialize mouse position vector outside event handler
+    const mousePos = new THREE.Vector2();
+    console.log('[MOUSE] Initialized mouse position vector:', mousePos);
+
+    // Handle mouse move for hex hover
+    window.addEventListener('mousemove', (event) => {
+      console.log('[MOUSE] Mouse move event:', { 
+        clientX: event.clientX, 
+        clientY: event.clientY 
+      });
+
+      // Calculate mouse position in normalized device coordinates
+      mousePos.x = (event.clientX / window.innerWidth) * 2 - 1;
+      mousePos.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+      console.log('[MOUSE] Updated normalized coordinates:', { 
+        x: mousePos.x, 
+        y: mousePos.y 
+      });
+
+      // Log before raycasting to ensure variables are defined
+      console.log('[RAYCASTER] Preparing to find intersects', {
+        raycasterDefined: !!raycaster,
       hexagonsDefined: !!hexagons,
       hexagonsCount: hexagons ? hexagons.length : 0
     });
@@ -253,22 +281,54 @@ try {
     // Update raycaster with new mouse position
     raycaster.setFromCamera(mousePos, camera);
 
-    // Find intersected hexagons
-    const intersects = raycaster.intersectObjects(hexagons);
-
-    // Log after raycasting to confirm execution
-    console.log('[RAYCASTER] Intersects found:', {
-      intersectCount: intersects.length,
-      firstIntersect: intersects.length > 0 ? intersects[0].object : null
-    });
+    // Check if hexagons array is defined and not empty before raycasting
+    if (!hexagons || hexagons.length === 0) {
+      console.warn('[RAYCASTER] Cannot raycast: hexagons array is undefined or empty');
+      return; // Exit the event handler early
+    }
+    
+    // Find intersected hexagons with defensive try/catch
+    let intersects = [];
+    try {
+      intersects = raycaster.intersectObjects(hexagons);
+      
+      // Log after raycasting to confirm execution
+      console.log('[RAYCASTER] Intersects found:', {
+        intersectCount: intersects.length,
+        firstIntersect: intersects.length > 0 ? intersects[0].object : null
+      });
+    } catch (err) {
+      console.error('[RAYCASTER] Error during raycasting:', err, {
+        raycasterDefined: !!raycaster,
+        hexagonsDefined: !!hexagons,
+        hexagonsLength: hexagons ? hexagons.length : 'undefined'
+      });
+      return; // Exit the event handler early
+    }
 
     // If we were hovering a hex, remove its stroke
     if (window.hoveredHex) {
-      const strokeMesh = window.hoveredHex.material.userData.strokeMesh;
-      if (strokeMesh) {
-        window.hoveredHex.remove(strokeMesh);
-        window.hoveredHex.material.userData.strokeMesh = null;
-        window.hoveredHex.material.userData.strokeMaterial = null;
+      console.log('[HOVER] Clearing previous hover effect', {
+        hexExists: !!window.hoveredHex,
+        hasMaterial: !!window.hoveredHex.material,
+        hasUserData: window.hoveredHex.material ? !!window.hoveredHex.material.userData : false
+      });
+      
+      try {
+        // Safely access nested properties with optional chaining
+        const strokeMesh = window.hoveredHex?.material?.userData?.strokeMesh;
+        if (strokeMesh) {
+          window.hoveredHex.remove(strokeMesh);
+          if (window.hoveredHex.material && window.hoveredHex.material.userData) {
+            window.hoveredHex.material.userData.strokeMesh = null;
+            window.hoveredHex.material.userData.strokeMaterial = null;
+          }
+          console.log('[HOVER] Successfully removed stroke mesh');
+        } else {
+          console.log('[HOVER] No stroke mesh found to remove');
+        }
+      } catch (err) {
+        console.error('[HOVER] Error removing stroke mesh:', err);
       }
     }
 
@@ -277,39 +337,64 @@ try {
 
     // If we found a new hex to hover
     if (intersects.length > 0) {
-      const hex = intersects[0].object;
-      window.hoveredHex = hex;
+      try {
+        const hex = intersects[0].object;
+        console.log('[HOVER] Setting new hover on hex:', {
+          hexExists: !!hex,
+          hasMaterial: !!hex?.material,
+          hasUserData: !!hex?.material?.userData,
+          hexType: hex?.userData?.element || 'unknown'
+        });
+        
+        // Ensure the hex has required properties before proceeding
+        if (!hex || !hex.material) {
+          console.error('[HOVER] Cannot create hover effect: hex or material is undefined');
+          return;
+        }
+        
+        // Initialize userData if it doesn't exist
+        if (!hex.material.userData) {
+          hex.material.userData = {};
+        }
+        
+        window.hoveredHex = hex;
 
-      // Create stroke geometry (hexagon outline)
-      const strokeGeometry = new THREE.BufferGeometry();
-      const vertices = [];
-      const hexPoints = 6;
-      const radius = 1.05; // Slightly larger than hex radius for visible outline
+        // Create stroke geometry (hexagon outline)
+        const strokeGeometry = new THREE.BufferGeometry();
+        const vertices = [];
+        const hexPoints = 6;
+        const radius = 1.05; // Slightly larger than hex radius for visible outline
 
-      for (let i = 0; i <= hexPoints; i++) {
-        const angle = (i / hexPoints) * Math.PI * 2;
-        vertices.push(
-          radius * Math.cos(angle),
-          0.1, // Slightly above hex surface
-          radius * Math.sin(angle)
+        for (let i = 0; i <= hexPoints; i++) {
+          const angle = (i / hexPoints) * Math.PI * 2;
+          vertices.push(
+            radius * Math.cos(angle),
+            0.1, // Slightly above hex surface
+            radius * Math.sin(angle)
+          );
+        }
+
+        strokeGeometry.setAttribute(
+          'position',
+          new THREE.Float32BufferAttribute(vertices, 3)
         );
+
+        // Create stroke mesh with a fresh material clone
+        const strokeMaterialClone = strokeMaterial.clone();
+        const strokeMesh = new THREE.Line(strokeGeometry, strokeMaterialClone);
+        strokeMesh.rotation.y = Math.PI / 6; // Match hex rotation
+
+        // Store references for animation
+        hex.material.userData.strokeMesh = strokeMesh;
+        hex.material.userData.strokeMaterial = strokeMaterialClone;
+
+        // Add stroke to hex
+        hex.add(strokeMesh);
+        
+        console.log('[HOVER] Successfully created and attached stroke mesh');
+      } catch (err) {
+        console.error('[HOVER] Error creating hover effect:', err);
       }
-
-      strokeGeometry.setAttribute(
-        'position',
-        new THREE.Float32BufferAttribute(vertices, 3)
-      );
-
-      // Create stroke mesh
-      const strokeMesh = new THREE.Line(strokeGeometry, strokeMaterial.clone());
-      strokeMesh.rotation.y = Math.PI / 6; // Match hex rotation
-
-      // Store references for animation
-      hex.material.userData.strokeMesh = strokeMesh;
-      hex.material.userData.strokeMaterial = strokeMesh.material;
-
-      // Add stroke to hex
-      hex.add(strokeMesh);
     }
   });
 
@@ -599,10 +684,30 @@ try {
 
       // Update any hover animations
       if (window.hoveredHex) {
-        // Update hover stroke animation
-        const hoverProgress = (Math.sin(currentTime * 0.002) + 1) / 2; // 0 to 1 animation
-        if (window.hoveredHex.material.userData.strokeMaterial) {
-          window.hoveredHex.material.userData.strokeMaterial.opacity = hoverProgress;
+        try {
+          // Update hover stroke animation with safe property access
+          const hoverProgress = (Math.sin(currentTime * 0.002) + 1) / 2; // 0 to 1 animation
+          
+          // Debug logging - runs once every 300 frames to avoid console spam
+          if (frameCount % 300 === 0) {
+            console.log('[HOVER] Animation state:', {
+              hoveredHexExists: !!window.hoveredHex,
+              hasMaterial: !!window.hoveredHex?.material,
+              hasUserData: !!window.hoveredHex?.material?.userData,
+              hasStrokeMaterial: !!window.hoveredHex?.material?.userData?.strokeMaterial
+            });
+          }
+          
+          // Safely access and update the stroke material
+          const strokeMaterial = window.hoveredHex?.material?.userData?.strokeMaterial;
+          if (strokeMaterial) {
+            strokeMaterial.opacity = hoverProgress;
+          }
+        } catch (err) {
+          // Only log this error occasionally to prevent console spam
+          if (frameCount % 300 === 0) {
+            console.error('[HOVER] Error updating hover animation:', err);
+          }
         }
       }
 
@@ -1006,3 +1111,5 @@ try {
   `;
   document.body.appendChild(errorElement);
 }
+
+} // Close setupScene function

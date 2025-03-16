@@ -2,10 +2,10 @@
  * Beast.js - Manages game creatures with directional movement and animated sprites
  * 
  * This module handles Beast entities with animated sprites using SpriteMixer
- * for frame-based animations from sprite sheets converted from GIFs.
+ * for frame-based animations from pre-made spritesheets.
  */
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js";
-import { convertGifToSpriteSheet } from "../tools/gifToSpriteSheet.js";
+
 
 // Import SpriteMixer as a module
 const SpriteMixer = (function() {
@@ -111,67 +111,154 @@ export class Beast {
   }
 
   /**
-   * Load the animated texture for the beast using GIF frames
+   * Load the animated texture for the beast using pre-made spritesheets
    */
   loadAnimatedTexture() {
-    debugLog(`[BEAST] Loading animated texture for ${this.type} Beast`);
+    console.log(`[BEAST] Loading animated texture for ${this.type} Beast`);
     
-    // Path to the GIF file
-    const gifPath = `/assets/Beasts/${this.type}.gif`;
+    // Add a loading indicator
+    const loadingIndicator = document.createElement('div');
+    loadingIndicator.id = `beast-loading-${this.type}`;
+    loadingIndicator.style.position = 'absolute';
+    loadingIndicator.style.top = '10px';
+    loadingIndicator.style.right = '10px';
+    loadingIndicator.style.background = 'rgba(0,0,0,0.7)';
+    loadingIndicator.style.color = 'white';
+    loadingIndicator.style.padding = '5px 10px';
+    loadingIndicator.style.borderRadius = '5px';
+    loadingIndicator.style.zIndex = '1000';
+    loadingIndicator.textContent = `Loading ${this.type} Beast: 0%`;
+    document.body.appendChild(loadingIndicator);
     
     try {
-      console.log(`[BEAST] Starting conversion of ${gifPath} to sprite sheet`);
+      // Verify that SpriteMixer is available
+      if (!this.spriteMixer) {
+        console.error('[BEAST] SpriteMixer not available, falling back to colored texture');
+        this._createColoredFallbackTexture();
+        try { document.body.removeChild(loadingIndicator); } catch(e) {}
+        return;
+      }
       
-      // Convert GIF to sprite sheet format for SpriteMixer
-      convertGifToSpriteSheet(
-        gifPath,
-        (spriteSheetData) => {
-          // Store the sprite sheet data for reference
-          this.spriteSheetData = spriteSheetData;
-          
-          console.log('[BEAST] Sprite sheet created successfully:', {
-            frameCount: spriteSheetData.frameCount,
-            dimensions: `${spriteSheetData.width}x${spriteSheetData.height}`,
-            grid: `${spriteSheetData.tilesHoriz}x${spriteSheetData.tilesVert}`
-          });
-          
-          // Create the ActionSprite using the sprite sheet texture
-          this.actionSprite = this.spriteMixer.ActionSprite(
-            spriteSheetData.texture,
-            spriteSheetData.tilesHoriz,
-            spriteSheetData.tilesVert
-          );
-          
-          // Scale the sprite appropriately
-          this.actionSprite.scale.set(2 * this.scale, 2 * this.scale, 1);
-          
-          // Add the sprite to our group
-          this.group.add(this.actionSprite);
-          
-          // Create animations based on the sprite sheet
-          this._createAnimations(spriteSheetData);
-          
-          // Start the default animation
-          this._playAnimation('idle');
-          
-          this.isLoaded = true;
-          debugLog(`[BEAST] ${this.type} Beast animated sprite created and added to scene`);
+      // Path to the pre-made spritesheet
+      const spritesheetPath = `/assets/Beasts/spritesheets/${this.type}_spritesheet.png`;
+      console.log(`[BEAST] Loading spritesheet from: ${spritesheetPath}`);
+      
+      // Load the spritesheet texture
+      const textureLoader = new THREE.TextureLoader();
+      textureLoader.load(
+        spritesheetPath,
+        (texture) => {
+          try {
+            console.log(`[BEAST] Spritesheet loaded successfully for ${this.type} Beast`);
+            
+            // Configure texture settings for pixel art
+            texture.magFilter = THREE.NearestFilter;
+            texture.minFilter = THREE.NearestFilter;
+            
+            // Define spritesheet data based on beast type
+            // Each frame is 32x32 pixels
+            console.log(`[BEAST] Configuring spritesheet for ${this.type} Beast`);
+            
+            // All beasts use 2x2 layout with 32x32 pixel frames
+            let tilesHoriz = 2; // 2 columns
+            let tilesVert = 2;  // 2 rows
+            let frameCount = 4; // 4 total frames
+            
+            console.log(`[BEAST] Using standard configuration for ${this.type} Beast: 2 columns, 2 rows (4 frames)`);
+            
+            // Note: There's one exception in the Beasts folder, but for now we're focusing on the Fire Beast
+            
+            // Log the configuration for debugging
+            console.log('[BEAST] Spritesheet configuration:', {
+              type: this.type,
+              frameSize: '32x32',
+              columns: tilesHoriz,
+              rows: tilesVert,
+              totalFrames: frameCount
+            });
+            
+            const spriteSheetData = {
+              texture: texture,
+              tilesHoriz: tilesHoriz,
+              tilesVert: tilesVert,
+              frameCount: frameCount,
+              frameSize: 32, // 32x32 pixel frames
+              averageFrameDelay: 15 // 150ms per frame for smoother animation
+            };
+            
+            // Store the sprite sheet data for reference
+            this.spriteSheetData = spriteSheetData;
+            
+            // Create the ActionSprite using the sprite sheet texture
+            this.actionSprite = this.spriteMixer.ActionSprite(
+              spriteSheetData.texture,
+              spriteSheetData.tilesHoriz,
+              spriteSheetData.tilesVert
+            );
+            
+            // Scale the sprite appropriately
+            this.actionSprite.scale.set(2 * this.scale, 2 * this.scale, 1);
+            
+            // Add the sprite to our group
+            this.group.add(this.actionSprite);
+            
+            // Create animations based on the sprite sheet
+            this._createAnimations(spriteSheetData);
+            
+            // Start the default animation
+            this._playAnimation('idle');
+            
+            this.isLoaded = true;
+            console.log(`[BEAST] ${this.type} Beast animated sprite created and added to scene`);
+            
+            // Debug: display the sprite sheet
+            if (DEBUG) {
+              const debugImg = document.createElement('img');
+              debugImg.src = spritesheetPath;
+              debugImg.style.position = 'absolute';
+              debugImg.style.bottom = '10px';
+              debugImg.style.right = '10px';
+              debugImg.style.width = '100px';
+              debugImg.style.border = '2px solid white';
+              debugImg.style.zIndex = '1000';
+              document.body.appendChild(debugImg);
+              
+              // Remove after 5 seconds
+              setTimeout(() => {
+                try { document.body.removeChild(debugImg); } catch(e) {}
+              }, 5000);
+            }
+          } catch (err) {
+            console.error('[BEAST] Error creating ActionSprite:', err);
+            this._createColoredFallbackTexture();
+          } finally {
+            // Remove loading indicator
+            try { document.body.removeChild(loadingIndicator); } catch(e) {}
+          }
         },
         (progress) => {
           // Track loading progress
-          this.loadingProgress = progress.percentage;
-          debugLog(`[BEAST] ${this.type} Beast texture loading: ${progress.percentage}% (Frame ${progress.frame}/${progress.total})`);
+          const percentage = Math.round((progress.loaded / progress.total) * 100);
+          this.loadingProgress = percentage;
+          if (loadingIndicator) {
+            loadingIndicator.textContent = `Loading ${this.type} Beast: ${percentage}%`;
+          }
+          console.log(`[BEAST] ${this.type} Beast texture loading: ${percentage}%`);
         },
         (error) => {
-          console.error(`[BEAST] Error creating sprite sheet for ${this.type} Beast:`, error);
-          // Fall back to static texture if GIF conversion fails
-          this._loadStaticTextureFallback();
+          console.error(`[BEAST] Error loading spritesheet for ${this.type} Beast:`, error);
+          // Fall back to colored texture
+          this._createColoredFallbackTexture();
+          // Remove loading indicator
+          try { document.body.removeChild(loadingIndicator); } catch(e) {}
         }
       );
     } catch (err) {
       console.error(`[BEAST] Exception during animated texture loading:`, err);
-      // Fall back to static texture if GIF conversion throws an exception
-      this._loadStaticTextureFallback();
+      // Fall back to colored texture
+      this._createColoredFallbackTexture();
+      // Remove loading indicator
+      try { document.body.removeChild(loadingIndicator); } catch(e) {}
     }
   }
   
@@ -185,55 +272,142 @@ export class Beast {
       console.log('[BEAST] Creating animations from sprite sheet');
       
       // Calculate the average frame duration in milliseconds
-      const frameDuration = Math.max(50, Math.round(spriteSheetData.averageFrameDelay * 10));
+      // Default to 100ms if not provided
+      const frameDuration = Math.max(50, Math.round((spriteSheetData.averageFrameDelay || 100) * 10));
+      
+      console.log('[BEAST] Animation frame duration:', {
+        averageFrameDelay: spriteSheetData.averageFrameDelay,
+        calculatedDuration: frameDuration
+      });
+      
+      // Validate frame count to avoid errors
+      if (!spriteSheetData.frameCount || spriteSheetData.frameCount < 1) {
+        console.error('[BEAST] Invalid frame count:', spriteSheetData.frameCount);
+        return;
+      }
       
       // Create an 'idle' animation using all frames
-      this.animations.idle = this.spriteMixer.Action(
-        this.actionSprite,
-        0,                              // Start frame index
-        spriteSheetData.frameCount - 1, // End frame index
-        frameDuration                   // Frame duration in ms
-      );
-      
-      // Set animation properties
-      this.animations.idle.clampWhenFinished = false; // Loop indefinitely
-      this.animations.idle.hideWhenFinished = false;  // Keep visible
-      
-      console.log('[BEAST] Created animations:', {
-        idle: {
+      try {
+        this.animations.idle = this.spriteMixer.Action(
+          this.actionSprite,
+          0,                              // Start frame index
+          spriteSheetData.frameCount - 1, // End frame index
+          frameDuration                   // Frame duration in ms
+        );
+        
+        // Set animation properties
+        this.animations.idle.clampWhenFinished = false; // Loop indefinitely
+        this.animations.idle.hideWhenFinished = false;  // Keep visible
+        
+        console.log('[BEAST] Created idle animation:', {
           frames: spriteSheetData.frameCount,
           frameDuration: frameDuration,
           totalDuration: frameDuration * spriteSheetData.frameCount
-        }
-      });
-      
-      // If we have enough frames, create additional animations
-      if (spriteSheetData.frameCount >= 8) {
-        // Create 'attack' animation using first half of frames
-        const attackFrames = Math.floor(spriteSheetData.frameCount / 2);
-        this.animations.attack = this.spriteMixer.Action(
-          this.actionSprite,
-          0,                  // Start frame
-          attackFrames - 1,   // End frame
-          frameDuration - 10  // Slightly faster
-        );
-        this.animations.attack.clampWhenFinished = true;
-        this.animations.attack.hideWhenFinished = false;
-        
-        // Create 'hurt' animation using second half of frames
-        this.animations.hurt = this.spriteMixer.Action(
-          this.actionSprite,
-          attackFrames,                   // Start frame
-          spriteSheetData.frameCount - 1, // End frame
-          frameDuration + 20              // Slightly slower
-        );
-        this.animations.hurt.clampWhenFinished = true;
-        this.animations.hurt.hideWhenFinished = false;
-        
-        console.log('[BEAST] Created additional animations:', {
-          attack: { frames: attackFrames, frameDuration: frameDuration - 10 },
-          hurt: { frames: spriteSheetData.frameCount - attackFrames, frameDuration: frameDuration + 20 }
         });
+      } catch (err) {
+        console.error('[BEAST] Failed to create idle animation:', err);
+      }
+      
+      // Create animations based on available frames
+      console.log('[BEAST] Creating animations with frame count:', spriteSheetData.frameCount);
+      
+      // For beasts with 4 frames (2x2 layout)
+      if (spriteSheetData.frameCount >= 4) {
+        try {
+          // Create 'attack' animation using first half of frames
+          const attackFrames = Math.ceil(spriteSheetData.frameCount / 2);
+          this.animations.attack = this.spriteMixer.Action(
+            this.actionSprite,
+            0,                  // Start frame
+            attackFrames - 1,   // End frame
+            frameDuration - 10  // Slightly faster
+          );
+          this.animations.attack.clampWhenFinished = true;
+          this.animations.attack.hideWhenFinished = false;
+          this.animations.attack.loop = 0;  // Play once
+          
+          console.log('[BEAST] Created attack animation:', {
+            startFrame: 0,
+            endFrame: attackFrames - 1,
+            frames: attackFrames,
+            frameDuration: frameDuration - 10
+          });
+        } catch (err) {
+          console.error('[BEAST] Failed to create attack animation:', err);
+        }
+        
+        try {
+          // Create 'hurt' animation using second half of frames
+          const attackFrames = Math.ceil(spriteSheetData.frameCount / 2);
+          this.animations.hurt = this.spriteMixer.Action(
+            this.actionSprite,
+            attackFrames,                   // Start frame
+            spriteSheetData.frameCount - 1, // End frame
+            frameDuration + 20              // Slightly slower
+          );
+          this.animations.hurt.clampWhenFinished = true;
+          this.animations.hurt.hideWhenFinished = false;
+          this.animations.hurt.loop = 0;  // Play once
+          
+          console.log('[BEAST] Created hurt animation:', {
+            startFrame: attackFrames,
+            endFrame: spriteSheetData.frameCount - 1,
+            frames: spriteSheetData.frameCount - attackFrames,
+            frameDuration: frameDuration + 20
+          });
+        } catch (err) {
+          console.error('[BEAST] Failed to create hurt animation:', err);
+        }
+      } 
+      // For beasts with only 2 frames (Fire beast with 1x2 layout)
+      else if (spriteSheetData.frameCount === 2) {
+        try {
+          // For the 2-frame case, use both frames for attack
+          this.animations.attack = this.spriteMixer.Action(
+            this.actionSprite,
+            0,                               // Start frame
+            spriteSheetData.frameCount - 1,  // End frame
+            frameDuration - 10               // Slightly faster
+          );
+          
+          // Set animation properties
+          this.animations.attack.clampWhenFinished = true;  // Stop at end
+          this.animations.attack.hideWhenFinished = false;  // Keep visible
+          this.animations.attack.loop = 0;                  // Play once
+          
+          console.log('[BEAST] Created attack animation for 2-frame sprite:', {
+            startFrame: 0,
+            endFrame: spriteSheetData.frameCount - 1,
+            frameDuration: frameDuration - 10,
+            loop: 0
+          });
+        } catch (err) {
+          console.error('[BEAST] Failed to create attack animation for 2-frame sprite:', err);
+        }
+        
+        try {
+          // Create 'hurt' animation using both frames but with different timing
+          this.animations.hurt = this.spriteMixer.Action(
+            this.actionSprite,
+            0,                               // Start frame
+            spriteSheetData.frameCount - 1,  // End frame
+            frameDuration + 20               // Slower for hurt effect
+          );
+          
+          // Set animation properties
+          this.animations.hurt.clampWhenFinished = true;  // Stop at end
+          this.animations.hurt.hideWhenFinished = false;  // Keep visible
+          this.animations.hurt.loop = 0;                  // Play once
+          
+          console.log('[BEAST] Created hurt animation for 2-frame sprite:', {
+            startFrame: 0,
+            endFrame: spriteSheetData.frameCount - 1,
+            frameDuration: frameDuration + 20,
+            loop: 0
+          });
+        } catch (err) {
+          console.error('[BEAST] Failed to create hurt animation for 2-frame sprite:', err);
+        }
       }
     } catch (err) {
       console.error('[BEAST] Error creating animations:', err);
@@ -273,88 +447,83 @@ export class Beast {
   }
   
   /**
-   * Load a static texture as fallback when animated texture fails
+   * Create a colored fallback texture when all else fails
    * @private
    */
-  _loadStaticTextureFallback() {
-    const textureLoader = new THREE.TextureLoader();
-    const texturePath = `/assets/Beasts/${this.type}.png`;
-
-    debugLog(`[BEAST] Falling back to static texture for ${this.type} Beast: ${texturePath}`);
-
-    textureLoader.load(
-      texturePath,
-      (texture) => {
-        debugLog(`[BEAST] ${this.type} Beast fallback texture loaded successfully`);
-
-        this.beastTexture = texture;
-
-        // Create sprite with the loaded texture
-        const material = new THREE.SpriteMaterial({
-          map: texture,
-          color: 0xffffff,
-        });
-
-        this.sprite = new THREE.Sprite(material);
-        this.sprite.scale.set(1.5 * this.scale, 1.5 * this.scale, 1);
-        this.group.add(this.sprite);
-
-        this.isLoaded = true;
-        debugLog(`[BEAST] ${this.type} Beast fallback sprite created and added to scene`);
-      },
-      (xhr) => {
-        // Loading progress
-        const progress = (xhr.loaded / xhr.total) * 100;
-        debugLog(`[BEAST] ${this.type} Beast fallback texture loading: ${progress.toFixed(2)}%`);
-      },
-      (error) => {
-        console.error(`[BEAST] Error loading ${this.type} Beast fallback texture:`, error);
-        this._createFallbackSprite();
-      },
-    );
+  _createColoredFallbackTexture() {
+    console.log('[BEAST] Creating colored fallback texture');
+    
+    try {
+      // Create a simple colored canvas as absolute fallback
+      const canvas = document.createElement('canvas');
+      canvas.width = 64;
+      canvas.height = 64;
+      const ctx = canvas.getContext('2d');
+      
+      // Choose color based on beast type
+      let color = '#ff6b6b';
+      switch(this.type.toLowerCase()) {
+        case 'fire': color = '#ff6b6b'; break;
+        case 'water': color = '#118ab2'; break;
+        case 'earth': color = '#06d6a0'; break;
+        case 'wind': color = '#73d2de'; break;
+        case 'electric': color = '#ffd166'; break;
+        case 'plant': color = '#06d6a0'; break;
+        case 'dark': color = '#073b4c'; break;
+        case 'light': color = '#ffd166'; break;
+        case 'metal': color = '#adb5bd'; break;
+        case 'spirit': color = '#b5838d'; break;
+        case 'combat': color = '#e07a5f'; break;
+        case 'corrosion': color = '#81b29a'; break;
+        default: color = '#ff6b6b'; break;
+      }
+      
+      // Fill with a gradient
+      const gradient = ctx.createLinearGradient(0, 0, 64, 64);
+      gradient.addColorStop(0, color);
+      gradient.addColorStop(1, '#ffffff');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, 64, 64);
+      
+      // Add a border
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(2, 2, 60, 60);
+      
+      // Add beast type text
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '10px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(this.type, 32, 32);
+      
+      // Create a texture
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.needsUpdate = true;
+      
+      // Configure texture
+      texture.magFilter = THREE.NearestFilter;
+      texture.minFilter = THREE.NearestFilter;
+      
+      // Create a simple sprite with the texture
+      const material = new THREE.SpriteMaterial({ map: texture });
+      const sprite = new THREE.Sprite(material);
+      
+      // Scale the sprite
+      sprite.scale.set(2 * this.scale, 2 * this.scale, 1);
+      
+      // Add to our group
+      this.group.add(sprite);
+      
+      this.isLoaded = true;
+      console.log('[BEAST] Colored fallback sprite created and added to scene');
+      
+    } catch (err) {
+      console.error('[BEAST] Failed to create colored fallback texture:', err);
+    }
   }
 
-  /**
-   * Create a colored fallback sprite when texture loading fails
-   * @private
-   */
-  _createFallbackSprite() {
-    debugLog(`Creating colored fallback sprite for ${this.type} Beast`);
 
-    // Element color mapping
-    const elementColors = {
-      Fire: 0xff4500,
-      Water: 0x3498db,
-      Earth: 0x964b00,
-      Wind: 0xc6e2ff,
-      Electric: 0xffff00,
-      Plant: 0x2ecc71,
-      Metal: 0xc0c0c0,
-      Light: 0xffffff,
-      Dark: 0x581845,
-      Combat: 0xff5733,
-      Spirit: 0xd8bfd8,
-      Corrosion: 0x7cfc00,
-    };
-
-    // Get appropriate color or default to fire color
-    const color = elementColors[this.type] || 0xff4500;
-
-    // Create fallback colored sprite
-    const fallbackMaterial = new THREE.SpriteMaterial({
-      color: color,
-      transparent: true,
-    });
-
-    this.sprite = new THREE.Sprite(fallbackMaterial);
-    this.sprite.scale.set(this.scale, this.scale, 1);
-    this.group.add(this.sprite);
-    this.isLoaded = true;
-
-    debugLog(`Created colored fallback sprite for ${this.type} Beast`, {
-      color: color.toString(16),
-    });
-  }
 
   /**
    * Create directional arrows pointing to adjacent hexes
