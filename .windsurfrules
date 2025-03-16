@@ -1,6 +1,6 @@
 when you want specific information about Three.js, use this MCP to query for relevant documentation, Ex: 
 debug/direct-threejs-query.js "how to create a shiny material"
 
-When you need specific information available from the web you don't have comprehensive training on,
+When you need specific information available from the web you don't have comprehensive training on not directly related to Three.js,
 or the user mentions perplexity, 
-use the query node debug/direct-perplexity-query.js
+use the query format 'node debug/direct-perplexity-query.js "Your question for perplexity here"'
