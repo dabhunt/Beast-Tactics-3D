@@ -2,8 +2,11 @@
 import { CameraManager } from "./camera.js";
 import { DebugMenu } from "./tools/diagnostics/DebugMenu.js";
 import { Beast } from './beast.js';
-// Import the new MapGenerator module
-import { MapGenerator, ELEMENT_TYPES } from './MapGeneration.js';
+// Import the new MapGenerator module and the textureLoadingTracker
+import { MapGenerator, ELEMENT_TYPES, textureLoadingTracker } from './MapGeneration.js';
+
+// Log the imported textureLoadingTracker to verify it's properly loaded
+console.log('[GAME] Imported textureLoadingTracker:', textureLoadingTracker);
 // Import Line2 and related modules for thicker lines
 import { Line2 } from 'three/addons/lines/Line2.js';
 import { LineGeometry } from 'three/addons/lines/LineGeometry.js';

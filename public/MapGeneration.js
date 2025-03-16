@@ -6,17 +6,54 @@
 
 // Try to import FBXLoader if available
 let FBXLoader;
-try {
-  import('three/addons/loaders/FBXLoader.js')
+
+// Different possible paths to try for loading FBXLoader
+const FBXLOADER_PATHS = [
+  'three/addons/loaders/FBXLoader.js',
+  './libs/three/addons/loaders/FBXLoader.js',
+  '/libs/three/addons/loaders/FBXLoader.js'
+];
+
+// Track if we've successfully loaded the FBXLoader
+let fbxLoaderPromise = null;
+let fbxLoaderSuccess = false;
+let fbxLoaderAttempts = 0;
+
+/**
+ * Try loading FBXLoader from different paths until successful
+ * @returns {Promise} - A promise that resolves when loader is found or all paths failed
+ */
+function attemptLoadFBXLoader() {
+  console.log(`[MAP] Attempting to load FBXLoader (attempt ${fbxLoaderAttempts + 1}/${FBXLOADER_PATHS.length})`);
+  
+  if (fbxLoaderAttempts >= FBXLOADER_PATHS.length) {
+    console.warn('[MAP] All FBXLoader import attempts failed');
+    return Promise.resolve(false);
+  }
+  
+  const path = FBXLOADER_PATHS[fbxLoaderAttempts];
+  console.log(`[MAP] Trying to import FBXLoader from: ${path}`);
+  
+  return import(path)
     .then(module => {
       FBXLoader = module.FBXLoader;
-      console.log('[MAP] FBXLoader imported successfully');
+      console.log('[MAP] FBXLoader imported successfully from:', path);
+      fbxLoaderSuccess = true;
+      return true;
     })
     .catch(error => {
-      console.warn('[MAP] Failed to import FBXLoader:', error);
+      console.warn(`[MAP] Failed to import FBXLoader from ${path}:`, error);
+      fbxLoaderAttempts++;
+      return attemptLoadFBXLoader(); // Try next path recursively
     });
+}
+
+// Start the loading process
+try {
+  fbxLoaderPromise = attemptLoadFBXLoader();
 } catch (e) {
   console.warn('[MAP] Error setting up FBXLoader import:', e);
+  fbxLoaderPromise = Promise.resolve(false);
 }
 
 // Track loading status of resources
@@ -472,16 +509,47 @@ export class MapGenerator {
           // Verify that createFallbackCrystal exists
           if (typeof this.createFallbackCrystal !== 'function') {
             console.error('[MAP] Critical error: createFallbackCrystal is not defined!');
-            // If somehow the method wasn't defined in initCrystalMethods, we'll call it again
-            this.initCrystalMethods();
+            // Define it inline as emergency fallback if it wasn't created properly
+            this.createFallbackCrystal = (hex) => {
+              console.log('[MAP] Using emergency inline fallback crystal creation');
+              
+              try {
+                // Create a simple geometric shape as fallback
+                const crystalGeometry = new this.THREE.ConeGeometry(0.2, 0.5, 4);
+                const crystalMaterial = new this.THREE.MeshPhongMaterial({
+                  color: 0x8844AA,
+                  shininess: 100,
+                  transparent: true,
+                  opacity: 0.7
+                });
+                
+                const crystal = new this.THREE.Mesh(crystalGeometry, crystalMaterial);
+                
+                // Position slightly above hex
+                const hexPosition = hex.position.clone();
+                hexPosition.y += 0.35; // Position above the hex
+                crystal.position.copy(hexPosition);
+                
+                // Random rotation and slight tilt
+                crystal.rotation.y = Math.random() * Math.PI * 2;
+                crystal.rotation.x = (Math.random() - 0.5) * 0.5;
+                
+                // Add to scene and hex's userData
+                this.scene.add(crystal);
+                hex.userData.crystal = crystal;
+                
+                return crystal;
+              } catch (err) {
+                console.error('[MAP] Emergency fallback crystal creation failed:', err);
+                return null;
+              }
+            };
             
-            // Double-check after initialization
-            if (typeof this.createFallbackCrystal !== 'function') {
-              console.error('[MAP] Failed to define createFallbackCrystal method!');
-              return; // Can't proceed without a proper method
-            }
+            console.log('[MAP] Emergency fallback crystal method defined');
           }
           
+          // Create the fallback crystal and return early
+          console.log('[MAP] Using fallback crystal method for hex:', hex.userData);
           this.createFallbackCrystal(hex);
           return;
         }
