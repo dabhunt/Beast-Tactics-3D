@@ -275,19 +275,17 @@ export class MapGenerator {
         );
         console.log(`[MAP] Positioned crystal at: ${crystal.position.x.toFixed(2)}, ${crystal.position.y.toFixed(2)}, ${crystal.position.z.toFixed(2)}`);
         
-        // Apply full 360-degree rotation on Y axis while preserving bottom alignment
-        // We use Euler rotation order 'YXZ' to ensure Y rotation happens first, then X and Z
-        crystal.rotation.order = 'YXZ';
+        // Apply only a 360-degree rotation around Y axis to keep crystals upright
+        // No need for custom rotation order since we're only rotating on Y
         
         // Full 360-degree rotation around Y axis
         crystal.rotation.y = Math.random() * Math.PI * 2;
         
-        // Apply slight tilt but keep bottom mostly aligned with hexagon
-        // Limiting X rotation to small range to maintain bottom alignment
-        crystal.rotation.x = (Math.random() * 0.3 - 0.15); // Small tilt range (-0.15 to 0.15 radians)
-        crystal.rotation.z = (Math.random() * 0.2 - 0.1);  // Small Z tilt for natural look
+        // Reset any X and Z rotation to ensure crystals are upright
+        crystal.rotation.x = 0;
+        crystal.rotation.z = 0;
         
-        console.log(`[MAP] Applied crystal rotation with bottom alignment: Y:${crystal.rotation.y.toFixed(2)}, X:${crystal.rotation.x.toFixed(2)}, Z:${crystal.rotation.z.toFixed(2)} radians`);
+        console.log(`[MAP] Applied crystal Y rotation: ${crystal.rotation.y.toFixed(2)} radians`);
         console.log(`[MAP] Applied random rotation: ${crystal.rotation.x.toFixed(2)}, ${crystal.rotation.y.toFixed(2)}, ${crystal.rotation.z.toFixed(2)}`);
         
         // Add to scene and associate with hex
@@ -717,18 +715,16 @@ export class MapGenerator {
           calculatedOffset: (0.35 + randomOffset).toFixed(2)
         });
         
-        // Apply full 360-degree rotation while preserving bottom alignment
-        crystal.rotation.order = 'YXZ'; // Change rotation order to ensure Y happens first
-        
-        // Full 360-degree rotation around Y axis
+        // Apply only a 360-degree rotation around Y axis
+        // Full 360-degree rotation around Y axis keeping crystals upright
         crystal.rotation.y = Math.random() * Math.PI * 2;
         
-        // Small X and Z rotations to maintain bottom alignment with hex
-        crystal.rotation.x = (Math.random() - 0.5) * 0.25; // Reduced tilt range for better alignment
-        crystal.rotation.z = (Math.random() - 0.5) * 0.15; // Smaller Z rotation
+        // Reset X and Z rotations to ensure crystal is perfectly upright
+        crystal.rotation.x = 0;
+        crystal.rotation.z = 0;
         
         // Log the applied rotation
-        console.log(`[MAP] Applied emergency crystal rotation: Y:${crystal.rotation.y.toFixed(2)}, X:${crystal.rotation.x.toFixed(2)}, Z:${crystal.rotation.z.toFixed(2)} radians`);
+        console.log(`[MAP] Applied emergency crystal Y rotation: ${crystal.rotation.y.toFixed(2)} radians`);
         
         // Add to scene and hex's userData
         this.scene.add(crystal);
@@ -787,21 +783,18 @@ export class MapGenerator {
             
             console.log(`[MAP] Positioned loaded crystal model at: ${object.position.x.toFixed(2)}, ${object.position.y.toFixed(2)}, ${object.position.z.toFixed(2)}`);
             
-            // When we load a model, default rotation is needed to account for coordinate system differences
-            // Standard FBX orientation fix for Y-up coordinate system
-            object.rotation.x = -Math.PI / 2;
+            // For loaded models, we need to keep them in their original upright orientation
+            // Models should already be correctly oriented in their source files
+            // No need to apply the -Math.PI/2 rotation that was causing them to lay on their side
             
-            // Apply random 360-degree rotation around Y-axis while preserving bottom alignment
-            // We use rotation order to ensure the proper sequence of rotations
-            object.rotation.order = 'XZY'; // Apply X first (standard orientation fix), then Z, then Y for the 360 spin
+            // Apply only Y-axis rotation (360 degrees) to keep crystals upright
+            object.rotation.y = Math.random() * Math.PI * 2; // Full 360-degree rotation around vertical axis
             
-            // Apply full 360-degree Y rotation (after the X rotation that fixed orientation)
-            object.rotation.y = Math.random() * Math.PI * 2; // Full 360-degree rotation
+            // Keep X and Z at 0 to ensure upright orientation
+            object.rotation.x = 0;
+            object.rotation.z = 0;
             
-            // Apply a very small random Z rotation for natural variation, keeping bottom aligned
-            object.rotation.z = (Math.random() - 0.5) * 0.1; // Very small Z tilt
-            
-            console.log(`[MAP] Applied loaded crystal rotation: X:${object.rotation.x.toFixed(2)}, Y:${object.rotation.y.toFixed(2)}, Z:${object.rotation.z.toFixed(2)} radians`);
+            console.log(`[MAP] Applied loaded crystal Y rotation: ${object.rotation.y.toFixed(2)} radians`);
             
             // Apply enhanced materials and textures to make the crystal look better
             console.log('[MAP] Applying enhanced materials to loaded crystal model');
