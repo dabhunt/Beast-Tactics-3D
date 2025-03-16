@@ -4,7 +4,7 @@
  * This module handles Beast entities with animated sprites using SpriteMixer
  * for frame-based animations from pre-made spritesheets.
  */
-import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js";
+import * as THREE from "/libs/three/three.module.js";
 
 
 // Import SpriteMixer as a module

@@ -39,7 +39,7 @@ function initGame() {
 async function loadModules() {
   try {
     console.log("[GAME] Loading THREE.js module...");
-    const threeModule = await import("https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js");
+    const threeModule = await import("/libs/three/three.module.js");
     // Assign the module to the global THREE variable
     THREE = threeModule;
     console.log("[GAME] THREE.js module loaded successfully");

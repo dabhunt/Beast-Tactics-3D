@@ -103,8 +103,8 @@
 
     <!-- Load Three.js and make it globally available -->
     <script type="module">
-        // Import Three.js and make it globally available
-        import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js";
+        // Import Three.js from local path and make it globally available
+        import * as THREE from "/libs/three/three.module.js";
         window.THREE = THREE;
         console.log('[INDEX] THREE.js loaded globally');
         

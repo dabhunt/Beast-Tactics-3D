@@ -17,7 +17,7 @@ console.log(`[MODULE-VALIDATOR] Running in ${isModule ? 'module' : 'non-module'}
 try {
   const testImport = async () => {
     try {
-      const THREE = await import("https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js");
+      const THREE = await import("/libs/three/three.module.js");
       console.log("[MODULE-VALIDATOR] Successfully imported THREE.js:", {
         version: THREE.REVISION,
         hasCamera: !!THREE.PerspectiveCamera,

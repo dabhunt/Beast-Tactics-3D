@@ -5,7 +5,7 @@
  * Creates a visual testing tool to verify GIF animations are working properly.
  */
 
-import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js";
+import * as THREE from "/libs/three/three.module.js";
 import { SimpleGIFAnimator } from "../SimpleGIFAnimator.js";
 
 export class GifAnimationTester {

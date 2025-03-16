@@ -224,7 +224,7 @@ export class ArrowDebugger {
     if (!arrowMesh) return;
 
     // We need THREE.js for this function
-    import("https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js").then(THREE => {
+    import("/libs/three/three.module.js").then(THREE => {
       // Create a box geometry slightly larger than the arrow
       const boundingBox = new THREE.Box3().setFromObject(arrowMesh);
       const size = new THREE.Vector3();

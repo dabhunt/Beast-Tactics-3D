@@ -14,21 +14,30 @@ const FBXLOADER_PATHS = [
   '/libs/three/addons/loaders/FBXLoader.js'
 ];
 
+// Paths to try with script tag loading approach
+const FBXLOADER_SCRIPT_PATHS = [
+  '/libs/three/addons/loaders/FBXLoader.js'
+];
+
 // Track if we've successfully loaded the FBXLoader
 let fbxLoaderPromise = null;
 let fbxLoaderSuccess = false;
 let fbxLoaderAttempts = 0;
+let scriptLoadAttempts = 0;
+
+// Create a global variable to track errors during loading
+window._fbxLoaderErrors = window._fbxLoaderErrors || [];
 
 /**
- * Try loading FBXLoader from different paths until successful
+ * Try loading FBXLoader from different paths until successful using ES6 imports
  * @returns {Promise} - A promise that resolves when loader is found or all paths failed
  */
 function attemptLoadFBXLoader() {
-  console.log(`[MAP] Attempting to load FBXLoader (attempt ${fbxLoaderAttempts + 1}/${FBXLOADER_PATHS.length})`);
+  console.log(`[MAP] Attempting to load FBXLoader via ES6 import (attempt ${fbxLoaderAttempts + 1}/${FBXLOADER_PATHS.length})`);
   
   if (fbxLoaderAttempts >= FBXLOADER_PATHS.length) {
-    console.warn('[MAP] All FBXLoader import attempts failed');
-    return Promise.resolve(false);
+    console.warn('[MAP] All FBXLoader ES6 import attempts failed, trying script tag approach');
+    return attemptLoadFBXLoaderViaScript();
   }
   
   const path = FBXLOADER_PATHS[fbxLoaderAttempts];
@@ -36,23 +45,112 @@ function attemptLoadFBXLoader() {
   
   return import(path)
     .then(module => {
-      FBXLoader = module.FBXLoader;
-      console.log('[MAP] FBXLoader imported successfully from:', path);
-      fbxLoaderSuccess = true;
-      return true;
+      console.log('[MAP] Import succeeded, module contents:', Object.keys(module));
+      // Check different ways the module might export FBXLoader
+      if (module.FBXLoader) {
+        FBXLoader = module.FBXLoader;
+        console.log('[MAP] FBXLoader imported successfully via module.FBXLoader');
+        window.FBXLoader = FBXLoader; // Make it available globally
+        fbxLoaderSuccess = true;
+        return true;
+      } else if (module.default && module.default.FBXLoader) {
+        FBXLoader = module.default.FBXLoader;
+        console.log('[MAP] FBXLoader imported successfully via module.default.FBXLoader');
+        window.FBXLoader = FBXLoader; // Make it available globally
+        fbxLoaderSuccess = true;
+        return true;
+      } else if (module.default && typeof module.default === 'function') {
+        FBXLoader = module.default;
+        console.log('[MAP] Using module.default as FBXLoader');
+        window.FBXLoader = FBXLoader; // Make it available globally
+        fbxLoaderSuccess = true;
+        return true;
+      } else {
+        console.warn('[MAP] Module loaded but FBXLoader not found in:', module);
+        window._fbxLoaderErrors.push({ type: 'module-structure', module: Object.keys(module) });
+        fbxLoaderAttempts++;
+        return attemptLoadFBXLoader(); // Try next path
+      }
     })
     .catch(error => {
       console.warn(`[MAP] Failed to import FBXLoader from ${path}:`, error);
+      window._fbxLoaderErrors.push({ type: 'import-error', path, error: error.toString() });
       fbxLoaderAttempts++;
       return attemptLoadFBXLoader(); // Try next path recursively
     });
 }
 
+/**
+ * Try loading FBXLoader using script tags as a fallback approach
+ * @returns {Promise} - A promise that resolves when loader is found or all paths failed
+ */
+function attemptLoadFBXLoaderViaScript() {
+  if (scriptLoadAttempts >= FBXLOADER_SCRIPT_PATHS.length) {
+    console.error('[MAP] All script loading attempts failed');
+    window._fbxLoaderErrors.push({ type: 'script-attempts-exhausted' });
+    return Promise.resolve(false);
+  }
+  
+  const scriptPath = FBXLOADER_SCRIPT_PATHS[scriptLoadAttempts];
+  console.log(`[MAP] Attempting to load FBXLoader via script tag from: ${scriptPath}`);
+  
+  return new Promise((resolve) => {
+    const script = document.createElement('script');
+    script.src = scriptPath;
+    script.async = true;
+    
+    script.onload = () => {
+      console.log('[MAP] Script loaded successfully, checking for FBXLoader...');
+      
+      // Check if the script exposed FBXLoader globally
+      if (typeof window.FBXLoader === 'function') {
+        console.log('[MAP] FBXLoader available on window object');
+        FBXLoader = window.FBXLoader;
+        fbxLoaderSuccess = true;
+        resolve(true);
+      } else if (typeof THREE.FBXLoader === 'function') {
+        console.log('[MAP] FBXLoader available via THREE.FBXLoader');
+        FBXLoader = THREE.FBXLoader;
+        window.FBXLoader = FBXLoader; // Make it globally available
+        fbxLoaderSuccess = true;
+        resolve(true);
+      } else {
+        console.warn('[MAP] Script loaded but FBXLoader not found on window or THREE');
+        window._fbxLoaderErrors.push({ 
+          type: 'script-no-fbxloader', 
+          windowKeys: Object.keys(window).filter(k => k.includes('FBX') || k.includes('Load')),
+          threeKeys: THREE ? Object.keys(THREE).filter(k => k.includes('FBX') || k.includes('Load')) : 'THREE not available'
+        });
+        scriptLoadAttempts++;
+        resolve(attemptLoadFBXLoaderViaScript()); // Try next path
+      }
+    };
+    
+    script.onerror = (error) => {
+      console.warn(`[MAP] Error loading script from ${scriptPath}:`, error);
+      window._fbxLoaderErrors.push({ type: 'script-error', path: scriptPath, error: error.toString() });
+      scriptLoadAttempts++;
+      resolve(attemptLoadFBXLoaderViaScript()); // Try next path
+    };
+    
+    document.head.appendChild(script);
+  });
+}
+
 // Start the loading process
 try {
+  console.log('[MAP] Starting FBXLoader loading process with enhanced diagnostics');
   fbxLoaderPromise = attemptLoadFBXLoader();
+  
+  // Add a catch-all handler to help with debugging
+  fbxLoaderPromise.catch(error => {
+    console.error('[MAP] Unhandled error in FBXLoader loading chain:', error);
+    window._fbxLoaderErrors.push({ type: 'unhandled-promise-error', error: error.toString() });
+    return false;
+  });
 } catch (e) {
   console.warn('[MAP] Error setting up FBXLoader import:', e);
+  window._fbxLoaderErrors.push({ type: 'setup-error', error: e.toString() });
   fbxLoaderPromise = Promise.resolve(false);
 }
 
@@ -603,44 +701,115 @@ export class MapGenerator {
    * Initialize the crystal loader if it doesn't exist
    * Attempts to find a valid FBXLoader from multiple sources
    */
-  initializeCrystalLoader() {
+  async initializeCrystalLoader() {
+    // Prevent multiple initializations with static tracking
+    if (!MapGenerator._initializingLoader) {
+      MapGenerator._initializingLoader = true;
+    } else {
+      console.log('[MAP] Another initialization is already in progress, waiting...');
+      // Wait for the current initialization to complete before returning
+      await new Promise(resolve => {
+        const checkInterval = setInterval(() => {
+          if (!MapGenerator._initializingLoader) {
+            clearInterval(checkInterval);
+            resolve();
+          }
+        }, 100);
+      });
+      console.log('[MAP] Previous initialization completed, reusing loader');
+      return;
+    }
+    
+    // Cache the source of our crystal loader for diagnostics
+    this._crystalLoaderSource = 'none';
+    
     if (this.crystalLoader) {
+      console.log('[MAP] Crystal loader already initialized from:', this._crystalLoaderSource);
+      MapGenerator._initializingLoader = false;
       return; // Already initialized
     }
     
     console.log('[MAP] Crystal loader not initialized yet, checking available loaders');
     
     try {
+      // Wait for any pending FBXLoader import to complete
+      if (fbxLoaderPromise && !fbxLoaderSuccess) {
+        console.log('[MAP] Waiting for FBXLoader import to complete...');
+        try {
+          await fbxLoaderPromise;
+          console.log('[MAP] FBXLoader import completed, success status:', fbxLoaderSuccess);
+        } catch (err) {
+          console.warn('[MAP] Error waiting for FBXLoader import:', err);
+          window._fbxLoaderErrors.push({ type: 'await-error', error: err.toString() });
+        }
+      }
+      
       // Check if FBXLoader is available from global import
       if (typeof FBXLoader === 'function') {
-        console.log('[MAP] Using imported FBXLoader');
+        console.log('[MAP] Using imported FBXLoader (global variable)');
         this.crystalLoader = new FBXLoader();
+        this._crystalLoaderSource = 'global-import';
         this.loadCrystalTexture();
         return;
       }
       
       // Check if it's available through THREE
-      if (typeof this.THREE.FBXLoader === 'function') {
+      if (this.THREE && typeof this.THREE.FBXLoader === 'function') {
         console.log('[MAP] Using THREE.FBXLoader');
         this.crystalLoader = new this.THREE.FBXLoader();
+        this._crystalLoaderSource = 'three-object';
         this.loadCrystalTexture();
         return;
       }
       
-      // Try alternative loader paths
+      // Try window global
       if (typeof window.FBXLoader === 'function') {
         console.log('[MAP] Using window.FBXLoader');
         this.crystalLoader = new window.FBXLoader();
+        this._crystalLoaderSource = 'window-global';
+        this.loadCrystalTexture();
+        return;
+      }
+      
+      // Try one more direct script loading as last resort
+      console.log('[MAP] Last resort: Adding FBXLoader script directly...');
+      await new Promise((resolve) => {
+        const script = document.createElement('script');
+        script.src = '/libs/three/addons/loaders/FBXLoader.js';
+        script.onload = () => {
+          console.log('[MAP] Direct script load succeeded, checking for FBXLoader...');
+          resolve();
+        };
+        script.onerror = (e) => {
+          console.warn('[MAP] Direct script load failed:', e);
+          window._fbxLoaderErrors.push({ type: 'direct-script-error', error: e.toString() });
+          resolve();
+        };
+        document.head.appendChild(script);
+      });
+      
+      // Check after direct script loading
+      if (typeof window.FBXLoader === 'function') {
+        console.log('[MAP] SUCCESS: Got FBXLoader after direct script load');
+        this.crystalLoader = new window.FBXLoader();
+        this._crystalLoaderSource = 'direct-script';
         this.loadCrystalTexture();
         return;
       }
       
       // If we get here, no FBXLoader is available
-      console.warn('[MAP] FBXLoader not available! Will use fallback crystals.');
+      console.warn('[MAP] FBXLoader not available! Will use fallback crystals.', {
+        source: this._crystalLoaderSource,
+        errors: window._fbxLoaderErrors || []
+      });
       this.crystalLoader = null;
     } catch (error) {
       console.error('[MAP] Error initializing crystal loader:', error);
+      window._fbxLoaderErrors.push({ type: 'initialization-error', error: error.toString() });
       this.crystalLoader = null;
+    } finally {
+      // Always release the initialization lock, even if errors occurred
+      MapGenerator._initializingLoader = false;
     }
   }
   

@@ -7,7 +7,7 @@
  */
 
 // Import THREE.js
-import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js";
+import * as THREE from "/libs/three/three.module.js";
 
 // Debug logging
 const DEBUG = true;
