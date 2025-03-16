@@ -323,8 +323,14 @@ function setupScene() {
       }
       
       // Calculate elapsed time for smooth animation
-      const elapsed = Date.now() - animationStartTime;
+      // Use the global animation time for continuous animation across hex transitions
+      const currentTime = Date.now();
+      const elapsed = currentTime - animationStartTime;
       const colors = [];
+      
+      // Update global animation time to track the continuous animation
+      // This ensures seamless transitions between hexes
+      globalAnimationTime = currentTime - elapsed;
       
       // Debug - log once per second that animation is running
       if (elapsed % 1000 < 16) { // Will log once per second (assuming ~60fps)
@@ -332,8 +338,33 @@ function setupScene() {
           elapsedTime: elapsed,
           strokeActive: !!currentHoverStroke,
           hexActive: !!currentHoverHex,
-          renderOrder: currentHoverStroke?.renderOrder
+          renderOrder: currentHoverStroke?.renderOrder,
+          lineWidth: currentHoverStroke?.material?.linewidth || 'unknown'
         });
+      }
+      
+      // ALWAYS update the line width based on camera distance for consistent visual appearance
+      // This ensures no frames with incorrect scaling
+      if (currentHoverStroke && currentHoverStroke.material && currentHoverHex) {
+        const cameraDistance = camera.position.distanceTo(currentHoverHex.position);
+        const baseDistance = 10;
+        const scaleFactor = baseDistance / cameraDistance;
+        const adjustedLineWidth = BASE_STROKE_WIDTH * Math.max(0.5, Math.min(2.0, scaleFactor));
+        
+        // Always update every frame to ensure consistent thickness
+        // Removed the conditional check to prevent any frames with incorrect scaling
+        currentHoverStroke.material.linewidth = adjustedLineWidth;
+        currentHoverStroke.material.needsUpdate = true;
+        
+        // Log line width updates every ~2 seconds to avoid console spam
+        if (elapsed % 120 === 0) {
+          console.log('[HOVER-SCALE] Continuous width update:', {
+            cameraDistance: cameraDistance.toFixed(2),
+            scaleFactor: scaleFactor.toFixed(2),
+            lineWidth: adjustedLineWidth.toFixed(2),
+            rawWidth: currentHoverStroke.material.linewidth.toFixed(2)
+          });
+        }
       }
       
       // Generate new gold colors with a shifting phase for wave effect
@@ -408,13 +439,22 @@ function setupScene() {
       }
     }
     
+    // Global state to preserve animation between hover transitions
+    let globalAnimationTime = Date.now();
+    let isTransitioning = false;
+    
     // Function to clear hover effect
-    function clearHoverEffect() {
-      // Stop animation
-      hoverAnimationActive = false;
-      if (hoverAnimationFrame) {
-        cancelAnimationFrame(hoverAnimationFrame);
-        hoverAnimationFrame = null;
+    function clearHoverEffect(preserveAnimation = false) {
+      console.log(`[HOVER] Clearing hover effect, preserveAnimation=${preserveAnimation}`);
+      
+      // When transitioning between hexes, keep the animation time continuous
+      if (!preserveAnimation) {
+        // Only stop animation if we're not preserving it for a transition
+        hoverAnimationActive = false;
+        if (hoverAnimationFrame) {
+          cancelAnimationFrame(hoverAnimationFrame);
+          hoverAnimationFrame = null;
+        }
       }
       
       // If we have a current hover hex and stroke
@@ -432,9 +472,13 @@ function setupScene() {
         }
       }
       
-      // Reset references
+      // Reset references, but don't reset animation times during transitions
       currentHoverHex = null;
-      window.hoveredHex = null;
+      
+      // Only reset hoveredHex if we're not preserving animation
+      if (!preserveAnimation) {
+        window.hoveredHex = null;
+      }
     }
 
     // Handle mouse move for hex hover
@@ -526,12 +570,26 @@ function setupScene() {
       return; // Exit the event handler early
     }
 
+    // Check if we're hovering a different hex now
+    const previousHex = window.hoveredHex;
+    const newHex = intersects.length > 0 ? intersects[0].object : null;
+    
+    // Determine if we're transitioning between different hexes
+    const isHexTransition = previousHex && newHex && previousHex !== newHex;
+    
+    // If transitioning between hexes, we'll preserve the animation timing
+    if (isHexTransition) {
+      isTransitioning = true;
+      console.log('[HOVER] Transitioning between hexagons, preserving animation');
+    }
+    
     // If we were hovering a hex, remove its stroke
     if (window.hoveredHex) {
       console.log('[HOVER] Clearing previous hover effect', {
         hexExists: !!window.hoveredHex,
         hasMaterial: !!window.hoveredHex.material,
-        hasUserData: window.hoveredHex.material ? !!window.hoveredHex.material.userData : false
+        hasUserData: window.hoveredHex.material ? !!window.hoveredHex.material.userData : false,
+        preservingAnimation: isHexTransition
       });
       
       try {
@@ -552,8 +610,30 @@ function setupScene() {
       }
     }
 
-    // Clear previous hover
-    window.hoveredHex = null;
+    // Calculate the current camera distance and scale factor for immediate use during transition
+    const currentCameraDistance = camera.position.distanceTo(newHex ? newHex.position : scene.position);
+    const currentBaseDistance = 10;
+    const currentScaleFactor = currentBaseDistance / currentCameraDistance;
+    
+    // Log this for debugging transitions
+    if (isHexTransition) {
+      console.log('[HOVER-TRANSITION] Pre-calculated scaling for transition:', {
+        cameraDistance: currentCameraDistance.toFixed(2),
+        scaleFactor: currentScaleFactor.toFixed(2),
+        expectedLineWidth: (BASE_STROKE_WIDTH * Math.max(0.5, Math.min(2.0, currentScaleFactor))).toFixed(2)
+      });
+    }
+    
+    // Store the pre-calculated scale factor for immediate use during transition
+    window.currentHoverScaleFactor = currentScaleFactor;
+    
+    // Clear the previous hover effect with animation preservation if transitioning
+    clearHoverEffect(isHexTransition);
+    
+    // Clear previous hover reference only if not transitioning
+    if (!isHexTransition) {
+      window.hoveredHex = null;
+    }
 
     // If we found a new hex to hover
     if (intersects.length > 0) {
@@ -577,11 +657,26 @@ function setupScene() {
           hex.material.userData = {};
         }
         
+        // Use the global animation time if we're transitioning between hexes
+        // This ensures color continuity and prevents the dark flash
+        if (isTransitioning) {
+          // We're continuing the animation from the previous hex
+          console.log('[HOVER] Using continuous animation timing for transition');
+          // Don't reset the animation time
+        } else {
+          // Starting a fresh hover, set the global time
+          globalAnimationTime = Date.now();
+          console.log('[HOVER] Starting new hover animation');
+        }
+        
         // Add timestamp to track hover duration for debugging
         hex.material.userData.hoverStartTime = Date.now();
         
         // Store as global reference for inspection
         window.hoveredHex = hex;
+        
+        // Reset transition flag after it's been handled
+        isTransitioning = false;
         
         console.log(`[HOVER] Hovering hex of type: ${hex.userData.element}`, {
           position: [hex.position.x.toFixed(2), hex.position.y.toFixed(2), hex.position.z.toFixed(2)],
@@ -677,6 +772,26 @@ function setupScene() {
         // Make sure it's visible regardless of distance
         strokeMesh.frustumCulled = false;
         
+        // Scale the hover effect based on camera distance to maintain consistent line width
+        // Calculate distance from camera to target
+        const cameraDistance = camera.position.distanceTo(hex.position);
+        
+        // Apply scaling factor to compensate for zoom
+        const baseDistance = 10; // A reference distance for standard size
+        const scaleFactor = baseDistance / cameraDistance; // Inverted formula for correct scaling
+        const adjustedLineWidth = BASE_STROKE_WIDTH * Math.max(0.5, Math.min(2.0, scaleFactor));
+        
+        // Apply adjusted line width immediately to prevent any initial frames with incorrect scaling
+        strokeMaterial.linewidth = adjustedLineWidth;
+        strokeMaterial.needsUpdate = true; // Force immediate material update
+        
+        console.log('[HOVER] Applied camera distance scaling:', {
+          cameraDistance: cameraDistance.toFixed(2),
+          scaleFactor: scaleFactor.toFixed(2),
+          adjustedLineWidth: adjustedLineWidth.toFixed(2),
+          formula: 'baseDistance / cameraDistance'
+        });
+        
         // Store mesh references
         currentHoverStroke = strokeMesh;
         currentHoverHex = hex;
@@ -685,12 +800,35 @@ function setupScene() {
         // Add stroke to hex
         hex.add(strokeMesh);
         
-        // Start the animation
-        animationStartTime = Date.now();
+        // If transitioning, use the existing global animation time
+        // otherwise use the current time
+        animationStartTime = isTransitioning ? globalAnimationTime : Date.now();
+        
+        // If we have a pre-calculated scale factor from transition, apply it immediately
+        if (isTransitioning && window.currentHoverScaleFactor) {
+          const immediateWidth = BASE_STROKE_WIDTH * Math.max(0.5, Math.min(2.0, window.currentHoverScaleFactor));
+          strokeMaterial.linewidth = immediateWidth;
+          strokeMaterial.needsUpdate = true;
+          
+          console.log('[HOVER-TRANSITION] Applied pre-calculated scaling:', {
+            scaleFactor: window.currentHoverScaleFactor.toFixed(2),
+            lineWidth: immediateWidth.toFixed(2)
+          });
+        }
+        
+        // Start or continue the animation
         hoverAnimationActive = true;
         hoverAnimationFrame = requestAnimationFrame(animateHoverEffect);
         
-        console.log('[HOVER] Successfully created and attached animated gold stroke mesh');
+        console.log('[HOVER] Successfully created and attached animated gold stroke mesh', {
+          transitionMode: isTransitioning ? 'Continuous animation' : 'Fresh animation',
+          animationStartTime: new Date(animationStartTime).toISOString(),
+          cameraDistance: camera.position.distanceTo(hex.position).toFixed(2),
+          lineWidth: strokeMaterial.linewidth.toFixed(2)
+        });
+        
+        // Clear the pre-calculated scale factor after use
+        window.currentHoverScaleFactor = null;
       } catch (err) {
         console.error('[HOVER] Error creating hover effect:', err);
       }
