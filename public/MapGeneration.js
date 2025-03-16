@@ -368,6 +368,21 @@ export class MapGenerator {
     // Check if all textures are processed (either loaded or failed)
     if (loaded + failed === total) {
       debugLog("All textures processed. Ready to generate map.");
+      
+      // Check if we already have hexagons to avoid duplicate generation
+      if (this.hexagons && this.hexagons.length > 0) {
+        console.log(`[MAP] Map already generated with ${this.hexagons.length} hexagons, skipping generation`);
+        
+        // Ensure callbacks are still triggered even if we skip generation
+        if (this.onMapGeneratedCallback) {
+          console.log('[MAP] Triggering onMapGenerated callback with existing hexagons');
+          this.onMapGeneratedCallback(this.hexagons);
+        }
+        
+        return;
+      }
+      
+      // If no hexagons yet, proceed with generation
       this.generateHexagonGrid();
     }
   }

@@ -684,13 +684,26 @@ function setupScene() {
   debugLog("Initializing MapGenerator...");
   const mapGenerator = new MapGenerator(scene, THREE);
   
-  // Define variable to store hexagons
-  let hexagons = [];
+  // Define variable to store hexagons with immediate initialization from MapGenerator
+  // This helps avoid race conditions where code tries to access hexagons before they're ready
+  let hexagons = mapGenerator.getHexagons() || [];
+  console.log(`[GAME] Initial hexagons array: ${hexagons.length} hexagons available at startup`);
   
-  // Listen for map generation completion
+  // Listen for map generation completion to update the hexagons array
   mapGenerator.onMapGenerated((generatedHexagons) => {
-    debugLog(`Map generation complete: ${generatedHexagons.length} hexagons created`);
-    hexagons = generatedHexagons;
+    console.log(`[GAME] Map generation complete: ${generatedHexagons.length} hexagons received via callback`);
+    if (generatedHexagons && generatedHexagons.length > 0) {
+      hexagons = generatedHexagons;
+      console.log(`[GAME] Hexagons array updated with ${hexagons.length} hexagons`);
+      
+      // Update any components that depend on hexagons array
+      if (debugMenu) {
+        console.log('[GAME] Updating debug menu with new hexagons array');
+        debugMenu.updateHexagons(hexagons);
+      }
+    } else {
+      console.warn('[GAME] Received empty hexagons array from map generator callback!');
+    }
   });
   
   // Function to re-generate the hexagon grid (for compatibility with existing code)

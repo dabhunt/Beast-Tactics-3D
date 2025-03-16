@@ -2,6 +2,10 @@
  * Debug menu for Beast Tactics
  * Provides real-time control of rendering parameters and game settings
  */
+/**
+ * Debug Menu for Beast Tactics
+ * Provides real-time control of rendering parameters and game settings
+ */
 export class DebugMenu {
   /**
    * Creates a new debug menu
@@ -17,7 +21,12 @@ export class DebugMenu {
     this.scene = scene;
     this.camera = camera;
     this.renderer = renderer;
-    this.hexagons = hexagons;
+    
+    // Store the hexagons reference and report the initial state
+    this.hexagons = hexagons || [];
+    console.log(`[DEBUG] Initial hexagons array contains ${this.hexagons.length} hexagons`);
+    
+    // Store lights and textures
     this.lights = lights;
     this.textures = textures;
 
@@ -26,18 +35,18 @@ export class DebugMenu {
       material: {},
       lighting: {},
       camera: {},
-      grid: {},
+      grid: {}
     };
-
+    
     // Default material values
     this.materialDefaults = {
       shininess: 70,
       emissiveIntensity: 0.4,
       specularR: 0.4,
       specularG: 0.4,
-      specularB: 0.4,
+      specularB: 0.4
     };
-
+    
     // Default lighting values
     this.lightingDefaults = {
       ambientIntensity: 0.85,
@@ -49,19 +58,79 @@ export class DebugMenu {
       rimIntensity: 0.3,
       rimColor: "#ffe8d0",
       pointIntensity: 0.7,
-      pointColor: "#ffffff",
+      pointColor: "#ffffff"
     };
 
     // Default grid values
     this.gridDefaults = {
       horizontalSpacing: 1.5,
-      verticalFactor: 1.0,
+      verticalFactor: 1.0
     };
 
     // Create the UI
     this._createUI();
 
     console.log("[DEBUG] Debug menu initialized");
+  }
+  
+  /**
+   * Updates the hexagons array reference
+   * This is needed when hexagons are generated after the debug menu is created
+   * @param {Array} newHexagons - The updated hexagons array
+   */
+  updateHexagons(newHexagons) {
+    try {
+      // Validate the new hexagons array
+      if (!newHexagons) {
+        console.error('[DEBUG] Failed to update hexagons: provided array is null or undefined');
+        return;
+      }
+      
+      // Log the before and after state for debugging
+      const oldCount = this.hexagons ? this.hexagons.length : 0;
+      const newCount = newHexagons.length;
+      
+      console.log(`[DEBUG] Updating hexagons array: ${oldCount} → ${newCount} hexagons`);
+      
+      // Update the reference
+      this.hexagons = newHexagons;
+      
+      // Report success and provide data shape for debugging
+      console.log('[DEBUG] Hexagons array updated successfully', {
+        hexagonCount: newCount,
+        hexagonTypes: newHexagons.length > 0 ? 
+          Array.from(new Set(newHexagons.map(h => h.userData?.element))).join(', ') : 
+          'none',
+        firstHexData: newHexagons.length > 0 ? {
+          position: newHexagons[0].position,
+          userData: newHexagons[0].userData
+        } : 'none'
+      });
+      
+      // Update any debug menu controls that depend on hexagons
+      this.refreshHexagonControls();
+    } catch (error) {
+      // Detailed error reporting
+      console.error('[DEBUG] Error updating hexagons array:', error);
+      console.error('[DEBUG] Error details:', {
+        message: error.message,
+        stack: error.stack,
+        hexagonsValid: Array.isArray(newHexagons)
+      });
+    }
+  }
+  
+  /**
+   * Refreshes any debug menu controls that depend on the hexagons array
+   * Called after hexagons are updated to ensure UI reflects current state
+   * @private
+   */
+  refreshHexagonControls() {
+    // This would update any UI components that show hex information
+    console.log('[DEBUG] Refreshing hexagon-dependent controls');
+    
+    // Implementation would depend on what controls exist in the debug menu
+    // For now this is a placeholder for future functionality
   }
 
   /**
