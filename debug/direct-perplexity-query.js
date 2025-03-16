@@ -1,6 +1,9 @@
 /**
- * Debug utility script to query Perplexity for information about Three.js crystal materials
- * This temporary script directly includes the searchPerplexity function logic
+ * Debug utility script to query Perplexity for information
+ * This script accepts a query as a command-line argument
+ * 
+ * Usage: node debug/direct-perplexity-query.js "your query here"
+ * Example: node debug/direct-perplexity-query.js "How to improve emission and shininess on 3D crystal objects in Three.js?"
  */
 
 const { exec } = require('child_process');
@@ -34,8 +37,9 @@ function searchPerplexity(query) {
   });
 }
 
-// Query about improving crystal appearance in Three.js
-const query = 'How to improve emission and shininess on 3D crystal objects in Three.js to make them look more realistic?';
+// Get query from command line arguments or use default
+const query = process.argv[2] || 'How to improve emission and shininess on 3D crystal objects in Three.js?';
+console.log('[DEBUG] Command line args:', process.argv);
 console.log(`[DEBUG] Preparing to send query to Perplexity: "${query}"`);
 
 // Execute the search and log results

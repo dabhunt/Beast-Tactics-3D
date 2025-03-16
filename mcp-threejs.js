@@ -33,7 +33,7 @@ function queryThreeJsDocs(query, options = {}) {
     // Define the request options
     const requestOptions = {
       hostname: 'threejs-mcp.replit.app',
-      path: '/api/query',
+      path: '/api/v1/tools',
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -43,12 +43,12 @@ function queryThreeJsDocs(query, options = {}) {
 
     console.log('[THREE.JS MCP] Preparing request to threejs-mcp server');
 
-    // Create request payload
+    // Create request payload following MCP protocol
     const payload = JSON.stringify({
+      tool: 'search_documentation',
       query: query,
       timestamp: new Date().toISOString()
     });
-
     // Start a timer to track query performance
     const startTime = Date.now();
 
