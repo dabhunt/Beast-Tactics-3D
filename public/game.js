@@ -255,17 +255,45 @@ function setupScene() {
     const raycaster = new THREE.Raycaster();
     const mouse = new THREE.Vector2();
 
-    // Create stroke material for hover effect using LineMaterial for thicker lines
-    console.log('[HOVER] Creating stroke material with LineMaterial');
+    // Create stroke material for hover effect using LineMaterial for thicker lines with gold animation
+    console.log('[HOVER] Creating stroke material with LineMaterial for gold animated effect');
     
+    // Base values for stroke effect
+    const BASE_STROKE_WIDTH = 10;   // Thicker line as requested
+    const hexPointCount = 6;        // Number of points in hexagon
+    
+    // Create reusable hover effect elements
+    let currentHoverStroke = null;      // The Line2 object that renders the hover effect
+    let currentHoverHex = null;         // Which hex currently has the hover
+    let animationStartTime = 0;         // When the animation started
+    let hoverAnimationActive = false;   // Whether animation is currently running
+    let hoverAnimationFrame = null;     // Handle to cancel animation frame
+    
+    // Create the stroke material with improved settings for maximum visibility
     const strokeMaterial = new LineMaterial({
-      color: 0xffffff,      // White color
-      linewidth: 5,         // Thicker lines - LineMaterial supports this!
-      vertexColors: false,  // No vertex colors needed
+      color: 0xFFD700,      // Brighter gold color for better visibility (0xFFD700 instead of 0xDAA520)
+      linewidth: BASE_STROKE_WIDTH, // Thicker lines as requested 
+      vertexColors: true,   // Enable vertex colors for wave effect
       dashed: false,        // Solid line
       transparent: true,    // Enable transparency
-      opacity: 0,           // Start invisible
-      resolution: new THREE.Vector2(window.innerWidth, window.innerHeight) // Important for LineMaterial
+      opacity: 0.9,         // 90% opacity for better visibility
+      resolution: new THREE.Vector2(window.innerWidth, window.innerHeight), // Important for LineMaterial
+      linecap: 'round',     // Round line caps to help with connections
+      linejoin: 'round',    // Round joins for smoother connections
+      depthTest: false,     // Disable depth testing to ensure visibility above other objects
+      depthWrite: false,    // Don't write to depth buffer (prevents z-fighting)
+      alphaToCoverage: true, // Improves antialiasing of transparent lines
+      toneMapped: false,    // Disable tone mapping to preserve bright colors
+      renderOrder: 999      // Very high render order to ensure it renders on top
+    });
+    
+    console.log('[HOVER] LineMaterial created with enhanced settings:', {
+      linewidth: BASE_STROKE_WIDTH,
+      opacity: 0.8,
+      type: 'LineMaterial',
+      color: '#DAA520',
+      vertexColors: true,
+      resolution: [window.innerWidth, window.innerHeight]
     });
     
     // Add resize handler to update resolution when window size changes
@@ -285,6 +313,129 @@ function setupScene() {
     // Initialize mouse position vector outside event handler
     const mousePos = new THREE.Vector2();
     console.log('[MOUSE] Initialized mouse position vector:', mousePos);
+    
+    // Function to animate the hover effect with gold wave
+    function animateHoverEffect() {
+      // Only run if animation is active and we have a hover stroke
+      if (!hoverAnimationActive || !currentHoverStroke) {
+        console.log('[HOVER-ANIM] Animation inactive or no hover stroke');
+        return;
+      }
+      
+      // Calculate elapsed time for smooth animation
+      const elapsed = Date.now() - animationStartTime;
+      const colors = [];
+      
+      // Debug - log once per second that animation is running
+      if (elapsed % 1000 < 16) { // Will log once per second (assuming ~60fps)
+        console.log('[HOVER-ANIM] Animation running:', {
+          elapsedTime: elapsed,
+          strokeActive: !!currentHoverStroke,
+          hexActive: !!currentHoverHex,
+          renderOrder: currentHoverStroke?.renderOrder
+        });
+      }
+      
+      // Generate new gold colors with a shifting phase for wave effect
+      for (let i = 0; i <= hexPointCount; i++) {
+        // Faster animation for more vibrant effect
+        const phase = (elapsed / 500); // Increased speed for more dynamic wave
+        
+        // Calculate wave position - offset each vertex by its position around the hexagon
+        const vertexPosition = i / hexPointCount;
+        const angle = ((vertexPosition * Math.PI * 2) + phase) % (Math.PI * 2);
+        
+        // Enhanced gold effect with more pronounced shimmer
+        const baseHue = 0.13; // Rich gold base hue
+        const hueVariation = 0.01 * Math.sin(angle * 2); // Subtle hue shift
+        const hue = baseHue + hueVariation;
+        
+        // More dynamic saturation and lightness for a shinier effect
+        const saturation = 0.9 + Math.sin(angle) * 0.1; // 0.8-1.0 range
+        const lightness = 0.6 + Math.cos(angle) * 0.25; // 0.35-0.85 range for stronger highlight
+        
+        // Create color and add to array
+        const color = new THREE.Color().setHSL(hue, saturation, lightness);
+        colors.push(color.r, color.g, color.b);
+        
+        // Debug color values every 60 frames (approximately once per second)
+        if (elapsed % 60 === 0 && i === 0) {
+          console.log(`[HOVER-COLOR] Vertex ${i} color:`, { 
+            hue: hue.toFixed(4), 
+            saturation: saturation.toFixed(4), 
+            lightness: lightness.toFixed(4),
+            rgb: [color.r.toFixed(2), color.g.toFixed(2), color.b.toFixed(2)]
+          });
+        }
+      }
+      
+      // Update the colors in the geometry
+      try {
+        if (currentHoverStroke.geometry && 
+            typeof currentHoverStroke.geometry.setColors === 'function') {
+          
+          // Apply colors to geometry
+          currentHoverStroke.geometry.setColors(colors);
+          
+          // Make sure attributes are updated
+          if (currentHoverStroke.geometry.attributes && 
+              currentHoverStroke.geometry.attributes.color) {
+            currentHoverStroke.geometry.attributes.color.needsUpdate = true;
+            
+            // Log vertex count periodically to verify connections
+            if (elapsed % 300 === 0) { // Every ~5 seconds
+              console.log(`[HOVER-ANIM] Vertex data check:`, {
+                vertexCount: currentHoverStroke.geometry.attributes.position.count,
+                colorCount: currentHoverStroke.geometry.attributes.color.count,
+                expectedVertices: hexPointCount + 1
+              });
+            }
+          }
+          
+          // Update material if needed
+          if (currentHoverStroke.material) {
+            currentHoverStroke.material.needsUpdate = true;
+          }
+        }
+        
+        // Schedule next frame if still active
+        if (hoverAnimationActive) {
+          hoverAnimationFrame = requestAnimationFrame(animateHoverEffect);
+        }
+      } catch (err) {
+        console.error('[HOVER-ANIM] Error in animation:', err);
+        hoverAnimationActive = false;
+      }
+    }
+    
+    // Function to clear hover effect
+    function clearHoverEffect() {
+      // Stop animation
+      hoverAnimationActive = false;
+      if (hoverAnimationFrame) {
+        cancelAnimationFrame(hoverAnimationFrame);
+        hoverAnimationFrame = null;
+      }
+      
+      // If we have a current hover hex and stroke
+      if (currentHoverHex && currentHoverStroke) {
+        try {
+          // Remove the stroke from its parent
+          currentHoverHex.remove(currentHoverStroke);
+          
+          // Clean up references
+          if (currentHoverHex.material && currentHoverHex.material.userData) {
+            currentHoverHex.material.userData.strokeMesh = null;
+          }
+        } catch (err) {
+          console.error('[HOVER] Error removing stroke mesh:', err);
+        }
+      }
+      
+      // Reset references
+      currentHoverHex = null;
+      window.hoveredHex = null;
+    }
 
     // Handle mouse move for hex hover
     window.addEventListener('mousemove', (event) => {
@@ -318,15 +469,53 @@ function setupScene() {
       return; // Exit the event handler early
     }
     
+    // Debug camera and scene state for troubleshooting ray intersection issues
+    console.log('[RAYCASTER] Camera state:', {
+      position: [camera.position.x.toFixed(2), camera.position.y.toFixed(2), camera.position.z.toFixed(2)],
+      rotation: [camera.rotation.x.toFixed(2), camera.rotation.y.toFixed(2), camera.rotation.z.toFixed(2)],
+      near: camera.near,
+      far: camera.far
+    });
+    
+    // Use recursive flag to ensure we check child objects too
+    // This is critical if the hexagons have any nested structures
+    const recursive = true;
+    
     // Find intersected hexagons with defensive try/catch
     let intersects = [];
     try {
-      intersects = raycaster.intersectObjects(hexagons);
+      // Try first with direct objects approach
+      intersects = raycaster.intersectObjects(hexagons, recursive);
+      
+      // If no intersections are found, try with the entire scene as fallback
+      if (intersects.length === 0) {
+        console.log('[RAYCASTER] No direct intersections found, trying with scene objects');
+        const sceneIntersects = raycaster.intersectObjects(scene.children, recursive);
+        
+        // Filter scene intersects to only include hexagons
+        intersects = sceneIntersects.filter(intersect => {
+          // Check if this object or any parent is in our hexagons array
+          let obj = intersect.object;
+          while (obj) {
+            if (hexagons.includes(obj)) return true;
+            obj = obj.parent;
+          }
+          return false;
+        });
+      }
       
       // Log after raycasting to confirm execution
       console.log('[RAYCASTER] Intersects found:', {
         intersectCount: intersects.length,
-        firstIntersect: intersects.length > 0 ? intersects[0].object : null
+        firstIntersect: intersects.length > 0 ? {
+          distance: intersects[0].distance.toFixed(2),
+          elementType: intersects[0].object.userData?.element || 'unknown',
+          position: intersects[0].object.position ? [
+            intersects[0].object.position.x.toFixed(2),
+            intersects[0].object.position.y.toFixed(2),
+            intersects[0].object.position.z.toFixed(2)
+          ] : 'unknown'
+        } : null
       });
     } catch (err) {
       console.error('[RAYCASTER] Error during raycasting:', err, {
@@ -383,64 +572,125 @@ function setupScene() {
           return;
         }
         
-        // Initialize userData if it doesn't exist
+        // Initialize userData if it doesn't exist and track hover state
         if (!hex.material.userData) {
           hex.material.userData = {};
         }
         
+        // Add timestamp to track hover duration for debugging
+        hex.material.userData.hoverStartTime = Date.now();
+        
+        // Store as global reference for inspection
         window.hoveredHex = hex;
+        
+        console.log(`[HOVER] Hovering hex of type: ${hex.userData.element}`, {
+          position: [hex.position.x.toFixed(2), hex.position.y.toFixed(2), hex.position.z.toFixed(2)],
+          rotation: [hex.rotation.x.toFixed(2), hex.rotation.y.toFixed(2), hex.rotation.z.toFixed(2)],
+          timestamp: new Date().toISOString()
+        });
 
         // Create stroke geometry (hexagon outline) using LineGeometry
-        console.log('[HOVER] Creating stroke geometry with LineGeometry:', { 
-          available: typeof window.LineGeometry === 'function' 
-        });
+        console.log('[HOVER] Creating stroke geometry with LineGeometry');
         
-        const hexPoints = 6;
         const radius = 0.95; // Slightly smaller than hex radius for inset effect
         const positions = [];
         
-        // Generate points for hexagon
-        for (let i = 0; i <= hexPoints; i++) {
-          const angle = (i / hexPoints) * Math.PI * 2;
+        // CRITICAL: Store the first point coordinates to ensure perfect closure
+        const firstX = radius * Math.cos(0);
+        const firstZ = radius * Math.sin(0);
+        
+        // Generate points for hexagon ensuring proper closure
+        // Store all points for debugging
+        const hexPoints = [];
+        
+        for (let i = 0; i <= hexPointCount; i++) {
+          let x, z;
+          
+          if (i === hexPointCount) {
+            // Use EXACT same coordinates for first and last point
+            // This guarantees perfect closure with no visible seam
+            x = firstX; 
+            z = firstZ;
+            console.log('[HOVER] Closing loop with exact coordinates match');
+          } else {
+            const angle = (i / hexPointCount) * Math.PI * 2;
+            x = radius * Math.cos(angle);
+            z = radius * Math.sin(angle);
+          }
+          
+          // Track point for debugging
+          hexPoints.push({index: i, x: x.toFixed(6), z: z.toFixed(6)});
+          
           positions.push(
-            radius * Math.cos(angle),
-            0.1, // Slightly above hex surface
-            radius * Math.sin(angle)
+            x,
+            0.01, // Slightly above hex surface to prevent z-fighting
+            z
           );
         }
         
-        // Create LineGeometry and set positions for Line2
+        // Log first and last points to verify perfect closure
+        console.log('[HOVER] Hexagon stroke points verification:', {
+          pointCount: hexPoints.length,
+          firstPoint: hexPoints[0],
+          lastPoint: hexPoints[hexPoints.length-1],
+          identical: hexPoints[0].x === hexPoints[hexPoints.length-1].x && 
+                     hexPoints[0].z === hexPoints[hexPoints.length-1].z
+        });
+        
+        console.log(`[HOVER] Created ${positions.length / 3} vertices for hexagon stroke`);
+        
+        // Generate initial gold colors
+        const colors = [];
+        for (let i = 0; i <= hexPointCount; i++) {
+          const gold = new THREE.Color(0xDAA520); // Default gold color
+          colors.push(gold.r, gold.g, gold.b);
+        }
+        
+        // Create LineGeometry and set positions and colors for Line2
         console.log('[HOVER] Creating stroke geometry with LineGeometry');
         
         const strokeGeometry = new LineGeometry();
         strokeGeometry.setPositions(positions);
+        strokeGeometry.setColors(colors); // Add initial colors for animation
         
         console.log('[HOVER] LineGeometry created successfully with points:', positions.length / 3);
         
-        console.log('[HOVER] Stroke geometry created with positions:', { 
-          pointCount: positions.length / 3,
-          geometryValid: !!strokeGeometry
-        });
-
-        // Create stroke mesh with a fresh material clone using standard THREE.js Line
-        console.log('[HOVER] Creating stroke mesh with standard THREE.js Line');
+        // Create stroke mesh with material
+        console.log('[HOVER] Creating stroke mesh with Line2');
         
-        const strokeMaterialClone = strokeMaterial.clone();
-        strokeMaterialClone.opacity = 1; // Make it visible (will be animated)
-        strokeMaterialClone.resolution.set(window.innerWidth, window.innerHeight); // Important for LineMaterial
-        
-        const strokeMesh = new Line2(strokeGeometry, strokeMaterialClone);
+        // Create the stroke mesh with our geometry and material
+        const strokeMesh = new Line2(strokeGeometry, strokeMaterial);
         strokeMesh.computeLineDistances(); // Required for Line2
-        strokeMesh.rotation.y = Math.PI / 6; // Match hex rotation
-
-        // Store references for animation
+        
+        // Use hex rotation to align properly
+        const hexRotationY = hex.rotation.y || 0;
+        strokeMesh.rotation.y = hexRotationY;
+        
+        console.log(`[HOVER] Using hex rotation: ${hexRotationY.toFixed(4)} radians`);
+        
+        // Position higher above hex to avoid z-fighting
+        strokeMesh.position.y = 0.05;
+        
+        // Set very high rendering order to ensure visibility
+        strokeMesh.renderOrder = 1000;
+        
+        // Make sure it's visible regardless of distance
+        strokeMesh.frustumCulled = false;
+        
+        // Store mesh references
+        currentHoverStroke = strokeMesh;
+        currentHoverHex = hex;
         hex.material.userData.strokeMesh = strokeMesh;
-        hex.material.userData.strokeMaterial = strokeMaterialClone;
 
         // Add stroke to hex
         hex.add(strokeMesh);
         
-        console.log('[HOVER] Successfully created and attached stroke mesh with Line2');
+        // Start the animation
+        animationStartTime = Date.now();
+        hoverAnimationActive = true;
+        hoverAnimationFrame = requestAnimationFrame(animateHoverEffect);
+        
+        console.log('[HOVER] Successfully created and attached animated gold stroke mesh');
       } catch (err) {
         console.error('[HOVER] Error creating hover effect:', err);
       }
@@ -584,6 +834,10 @@ function setupScene() {
     hex.userData.element = randomElement;
     hex.userData.q = q;
     hex.userData.r = r;
+    
+    // Make sure raycast works properly by adding a proper name and enabling raycasting
+    hex.name = `Hex_${q}_${r}_${randomElement}`;
+    hex.raycast = THREE.Mesh.prototype.raycast;
 
     // Position hexagon in grid
     // For perfect fit in axial coordinate system:
