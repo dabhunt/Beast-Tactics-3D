@@ -183,7 +183,7 @@ export class Beast {
               tilesVert: tilesVert,
               frameCount: frameCount,
               frameSize: 32, // 32x32 pixel frames
-              averageFrameDelay: 15 // 150ms per frame for smoother animation
+              averageFrameDelay: 30 // 150ms per frame for smoother animation
             };
             
             // Store the sprite sheet data for reference
@@ -197,7 +197,7 @@ export class Beast {
             );
             
             // Scale the sprite appropriately
-            this.actionSprite.scale.set(2 * this.scale, 2 * this.scale, 1);
+            this.actionSprite.scale.set(this.scale,this.scale, 1);
             
             // Add the sprite to our group
             this.group.add(this.actionSprite);
@@ -510,7 +510,7 @@ export class Beast {
       const sprite = new THREE.Sprite(material);
       
       // Scale the sprite
-      sprite.scale.set(2 * this.scale, 2 * this.scale, 1);
+      sprite.scale.set(this.scale,this.scale, 1);
       
       // Add to our group
       this.group.add(sprite);

@@ -122,7 +122,7 @@ export class AnimatedSprite {
         this.elapsedTime += delta * 1000; // Convert to milliseconds
         
         // Get current frame delay (in milliseconds)
-        const frameDelay = this.frameDelays[this.currentFrame] * 10; // Convert from 1/100th sec to ms
+        const frameDelay = this.frameDelays[this.currentFrame] * 60; // Convert from 1/100th sec to ms
         
         // Check if it's time to advance to the next frame
         if (this.elapsedTime >= frameDelay) {

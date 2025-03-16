@@ -98,7 +98,7 @@ elementTypes.forEach(element => {
   img.alt = element;
   img.title = `${element} Tile - Right-click and Save Image As... ${element}.png`;
   img.style.margin = '10px';
-  img.style.border = '1px solid black';
+  img.style.border = '2px solid black';
   
   // Add to document body or a specific container
   document.body.appendChild(img);
