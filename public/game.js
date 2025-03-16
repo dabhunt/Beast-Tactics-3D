@@ -2,11 +2,13 @@
 import { CameraManager } from "./camera.js";
 import { DebugMenu } from "./tools/diagnostics/DebugMenu.js";
 import { Beast } from './beast.js';
-// Import the new MapGenerator module and the textureLoadingTracker
+// Import the MapGenerator module and the textureLoadingTracker
 import { MapGenerator, ELEMENT_TYPES, textureLoadingTracker } from './MapGeneration.js';
 
 // Log the imported textureLoadingTracker to verify it's properly loaded
 console.log('[GAME] Imported textureLoadingTracker:', textureLoadingTracker);
+
+// Asset management modules will be loaded dynamically to ensure proper initialization order
 // Import Line2 and related modules for thicker lines
 import { Line2 } from 'three/addons/lines/Line2.js';
 import { LineGeometry } from 'three/addons/lines/LineGeometry.js';
@@ -55,6 +57,33 @@ async function loadModules() {
     console.log("[GAME] Loading SpriteMixer library...");
     await loadScript("/libs/SpriteMixer.js");
     console.log("[GAME] SpriteMixer library loaded successfully");
+    
+    // Load FBXLoader for 3D models
+    console.log("[GAME] Loading FBXLoader...");
+    await loadScript("/libs/three/addons/loaders/FBXLoader.js");
+    console.log("[GAME] FBXLoader loaded successfully");
+    
+    // Load Asset Management modules
+    console.log("[GAME] Loading asset management modules...");
+    try {
+      // Load our custom asset management modules in the correct order (dependency first)
+      // 1. First the AssetLoader which provides core loading functionality
+      await loadScript("/AssetLoader.js");
+      console.log("[GAME] AssetLoader module loaded successfully");
+      
+      // 2. Then the ShardManager which depends on AssetLoader
+      await loadScript("/ShardManager.js");
+      console.log("[GAME] ShardManager module loaded successfully");
+      
+      // Verify modules are available globally
+      console.log("[GAME] Verifying asset management modules:", {
+        AssetLoaderAvailable: typeof window.AssetLoader === 'function',
+        ShardManagerAvailable: typeof window.ShardManager === 'function'
+      });
+    } catch (assetError) {
+      console.error("[GAME] Failed to load asset management modules:", assetError);
+      console.error("[GAME] This may affect 3D model loading. Stack trace:", assetError.stack);
+    }
     
     // Initialize the game after all modules are loaded
     initGame();

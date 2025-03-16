@@ -2,157 +2,13 @@
  * MapGeneration.js
  * Responsible for generating and managing the hexagonal grid map system
  * including biome distribution, crystal shard spawning, and related functionality.
+ * 
+ * This module now uses AssetLoader and ShardManager for handling 3D assets.
+ * Those modules must be loaded before this module is used.
  */
 
-// Try to import FBXLoader if available
-let FBXLoader;
-
-// Different possible paths to try for loading FBXLoader
-const FBXLOADER_PATHS = [
-  'three/addons/loaders/FBXLoader.js',
-  './libs/three/addons/loaders/FBXLoader.js',
-  '/libs/three/addons/loaders/FBXLoader.js'
-];
-
-// Paths to try with script tag loading approach
-const FBXLOADER_SCRIPT_PATHS = [
-  '/libs/three/addons/loaders/FBXLoader.js'
-];
-
-// Track if we've successfully loaded the FBXLoader
-let fbxLoaderPromise = null;
-let fbxLoaderSuccess = false;
-let fbxLoaderAttempts = 0;
-let scriptLoadAttempts = 0;
-
-// Create a global variable to track errors during loading
-window._fbxLoaderErrors = window._fbxLoaderErrors || [];
-
-/**
- * Try loading FBXLoader from different paths until successful using ES6 imports
- * @returns {Promise} - A promise that resolves when loader is found or all paths failed
- */
-function attemptLoadFBXLoader() {
-  console.log(`[MAP] Attempting to load FBXLoader via ES6 import (attempt ${fbxLoaderAttempts + 1}/${FBXLOADER_PATHS.length})`);
-  
-  if (fbxLoaderAttempts >= FBXLOADER_PATHS.length) {
-    console.warn('[MAP] All FBXLoader ES6 import attempts failed, trying script tag approach');
-    return attemptLoadFBXLoaderViaScript();
-  }
-  
-  const path = FBXLOADER_PATHS[fbxLoaderAttempts];
-  console.log(`[MAP] Trying to import FBXLoader from: ${path}`);
-  
-  return import(path)
-    .then(module => {
-      console.log('[MAP] Import succeeded, module contents:', Object.keys(module));
-      // Check different ways the module might export FBXLoader
-      if (module.FBXLoader) {
-        FBXLoader = module.FBXLoader;
-        console.log('[MAP] FBXLoader imported successfully via module.FBXLoader');
-        window.FBXLoader = FBXLoader; // Make it available globally
-        fbxLoaderSuccess = true;
-        return true;
-      } else if (module.default && module.default.FBXLoader) {
-        FBXLoader = module.default.FBXLoader;
-        console.log('[MAP] FBXLoader imported successfully via module.default.FBXLoader');
-        window.FBXLoader = FBXLoader; // Make it available globally
-        fbxLoaderSuccess = true;
-        return true;
-      } else if (module.default && typeof module.default === 'function') {
-        FBXLoader = module.default;
-        console.log('[MAP] Using module.default as FBXLoader');
-        window.FBXLoader = FBXLoader; // Make it available globally
-        fbxLoaderSuccess = true;
-        return true;
-      } else {
-        console.warn('[MAP] Module loaded but FBXLoader not found in:', module);
-        window._fbxLoaderErrors.push({ type: 'module-structure', module: Object.keys(module) });
-        fbxLoaderAttempts++;
-        return attemptLoadFBXLoader(); // Try next path
-      }
-    })
-    .catch(error => {
-      console.warn(`[MAP] Failed to import FBXLoader from ${path}:`, error);
-      window._fbxLoaderErrors.push({ type: 'import-error', path, error: error.toString() });
-      fbxLoaderAttempts++;
-      return attemptLoadFBXLoader(); // Try next path recursively
-    });
-}
-
-/**
- * Try loading FBXLoader using script tags as a fallback approach
- * @returns {Promise} - A promise that resolves when loader is found or all paths failed
- */
-function attemptLoadFBXLoaderViaScript() {
-  if (scriptLoadAttempts >= FBXLOADER_SCRIPT_PATHS.length) {
-    console.error('[MAP] All script loading attempts failed');
-    window._fbxLoaderErrors.push({ type: 'script-attempts-exhausted' });
-    return Promise.resolve(false);
-  }
-  
-  const scriptPath = FBXLOADER_SCRIPT_PATHS[scriptLoadAttempts];
-  console.log(`[MAP] Attempting to load FBXLoader via script tag from: ${scriptPath}`);
-  
-  return new Promise((resolve) => {
-    const script = document.createElement('script');
-    script.src = scriptPath;
-    script.async = true;
-    
-    script.onload = () => {
-      console.log('[MAP] Script loaded successfully, checking for FBXLoader...');
-      
-      // Check if the script exposed FBXLoader globally
-      if (typeof window.FBXLoader === 'function') {
-        console.log('[MAP] FBXLoader available on window object');
-        FBXLoader = window.FBXLoader;
-        fbxLoaderSuccess = true;
-        resolve(true);
-      } else if (typeof THREE.FBXLoader === 'function') {
-        console.log('[MAP] FBXLoader available via THREE.FBXLoader');
-        FBXLoader = THREE.FBXLoader;
-        window.FBXLoader = FBXLoader; // Make it globally available
-        fbxLoaderSuccess = true;
-        resolve(true);
-      } else {
-        console.warn('[MAP] Script loaded but FBXLoader not found on window or THREE');
-        window._fbxLoaderErrors.push({ 
-          type: 'script-no-fbxloader', 
-          windowKeys: Object.keys(window).filter(k => k.includes('FBX') || k.includes('Load')),
-          threeKeys: THREE ? Object.keys(THREE).filter(k => k.includes('FBX') || k.includes('Load')) : 'THREE not available'
-        });
-        scriptLoadAttempts++;
-        resolve(attemptLoadFBXLoaderViaScript()); // Try next path
-      }
-    };
-    
-    script.onerror = (error) => {
-      console.warn(`[MAP] Error loading script from ${scriptPath}:`, error);
-      window._fbxLoaderErrors.push({ type: 'script-error', path: scriptPath, error: error.toString() });
-      scriptLoadAttempts++;
-      resolve(attemptLoadFBXLoaderViaScript()); // Try next path
-    };
-    
-    document.head.appendChild(script);
-  });
-}
-
-// Start the loading process
-try {
-  console.log('[MAP] Starting FBXLoader loading process with enhanced diagnostics');
-  fbxLoaderPromise = attemptLoadFBXLoader();
-  
-  // Add a catch-all handler to help with debugging
-  fbxLoaderPromise.catch(error => {
-    console.error('[MAP] Unhandled error in FBXLoader loading chain:', error);
-    window._fbxLoaderErrors.push({ type: 'unhandled-promise-error', error: error.toString() });
-    return false;
-  });
-} catch (e) {
-  console.warn('[MAP] Error setting up FBXLoader import:', e);
-  window._fbxLoaderErrors.push({ type: 'setup-error', error: e.toString() });
-  fbxLoaderPromise = Promise.resolve(false);
-}
+// Track loading status of resources
+// Export this so game.js can access it for debugging
 
 // Track loading status of resources
 // Export this so game.js can access it for debugging
@@ -188,7 +44,7 @@ function debugLog(message, data = null) {
  */
 export class MapGenerator {
   constructor(scene, THREE) {
-    console.log('[MAP] Initializing Map Generator...');
+    console.log('[MAP] Initializing Map Generator with modular asset loading system...');
     
     this.scene = scene;
     this.THREE = THREE;
@@ -206,9 +62,17 @@ export class MapGenerator {
       // Crystal shard parameters
       crystalSpawnChance: 0.2,  // 20% chance to spawn a crystal per hex
       crystalHeightOffset: 0.5, // Height above the hexagon - increased to make crystals more visible
-      crystalScaleFactor: 0.1,  // Size of the crystal (scale - increased from 0.005 to make crystals more visible)
-      crystalModelPath: '/assets/Purple_Crystal_Shard.fbx',
-      crystalTexturePath: '/assets/Purple_Crystal_Shard_texture.png'
+      shardConfig: {
+        modelPath: '/assets/Shards/crystal-shard.fbx',
+        debug: true, // Enable debug mode for detailed logging
+        textures: {
+          baseColorMap: '/assets/Shards/Textures/shard_basecolor.png',
+          normalMap: '/assets/Shards/Textures/shard_normal.png',
+          metalnessMap: '/assets/Shards/Textures/shard_metallic.png',
+          roughnessMap: '/assets/Shards/Textures/shard_roughness.png',
+          emissiveMap: '/assets/Shards/Textures/shard_emissive.png'
+        }
+      }
     };
     
     // Define all element types
@@ -248,11 +112,42 @@ export class MapGenerator {
     textureLoadingTracker.textures = {};
     console.log('[MAP] Reset textureLoadingTracker:', textureLoadingTracker);
     
-    // Define crystal-related methods to avoid 'not a function' errors
-    this.initCrystalMethods();
+    // Initialize the asset management system
+    this.initAssetManagement();
     
     // Load textures
     this.loadTextures();
+  }
+  
+  /**
+   * Initialize asset management by creating ShardManager instance
+   * This handles all crystal shard loading and placement
+   */
+  initAssetManagement() {
+    console.log('[MAP] Initializing asset management system...');
+    
+    try {
+      // Check if the ShardManager class is available globally
+      if (typeof window.ShardManager !== 'function') {
+        console.warn('[MAP] ShardManager not found in global scope. Asset loading functionality will be limited.');
+        console.warn('[MAP] Make sure AssetLoader.js and ShardManager.js are loaded before initializing MapGenerator');
+        return;
+      }
+      
+      // Create the ShardManager instance with our scene and THREE reference
+      console.log('[MAP] Creating ShardManager instance with configuration:', this.config.shardConfig);
+      this.shardManager = new window.ShardManager({
+        scene: this.scene,
+        THREE: this.THREE,
+        ...this.config.shardConfig
+      });
+      
+      console.log('[MAP] ShardManager initialized successfully:', this.shardManager);
+    } catch (error) {
+      console.error('[MAP] Failed to initialize asset management system:', error);
+      console.error('[MAP] Stack trace:', error.stack);
+      console.warn('[MAP] Game will continue with limited asset loading functionality');
+    }
   }
   
   /**
@@ -644,62 +539,178 @@ export class MapGenerator {
   
   /**
    * Try to spawn a crystal shard on a given hexagon based on probability
-   * This method handles the entire crystal creation process, including:
-   * - Random chance determination
-   * - Model loading with fallbacks
-   * - Texture application
-   * - Positioning and scaling
-   * - Error handling at multiple levels
+   * This method uses the new ShardManager to handle the crystal creation process
    * 
    * @param {Object} hex - The hexagon mesh to potentially spawn a crystal on
    */
+  /**
+   * Try to spawn a crystal shard on a given hexagon based on probability
+   * This method uses the ShardManager to handle the crystal creation process
+   * 
+   * @param {Object} hex - The hexagon mesh to potentially spawn a crystal on
+   * @returns {Promise<Object|null>} - Returns the created shard object or null if not created
+   */
   async trySpawnCrystalShard(hex) {
+    // Pre-validation logging to track execution flow
+    console.log(`[MAP] BEGIN trySpawnCrystalShard for hex at (${hex?.userData?.q}, ${hex?.userData?.r})`);
+    console.log(`[MAP] Hex data:`, {
+      valid: !!hex,
+      userDataExists: !!hex?.userData,
+      hasCrystal: !!hex?.userData?.crystal,
+      element: hex?.userData?.element,
+      position: hex?.position ? {
+        x: hex.position.x.toFixed(2),
+        y: hex.position.y.toFixed(2),
+        z: hex.position.z.toFixed(2)
+      } : 'undefined'
+    });
+    
     try {
-      // Log the evaluation process for debugging
-      console.log(`[MAP] Evaluating crystal spawn for hex at (${hex.userData.q}, ${hex.userData.r})`);
-      
-      // First validate the hex is a valid object with necessary properties
-      if (!hex || !hex.userData || hex.userData.crystal) {
-        console.log(`[MAP] Skipping crystal spawn - invalid hex or crystal already exists`);
-        return;
+      // Validate the hex is a valid object with necessary properties
+      // This prevents errors when accessing properties of undefined objects
+      if (!hex || !hex.userData) {
+        console.warn(`[MAP] Skipping crystal spawn - invalid hex object or missing userData`);
+        return null;
       }
       
-      // OVERRIDE FOR DEBUGGING - Force crystal spawn on all hexes 
-      const debugForceSpawn = true; 
+      // Check if this hex already has a crystal to avoid duplicates
+      if (hex.userData.crystal) {
+        console.log(`[MAP] Skipping crystal spawn - hex at (${hex.userData.q}, ${hex.userData.r}) already has a crystal`);
+        return hex.userData.crystal; // Return the existing crystal
+      }
       
-      // Check if we should spawn a crystal based on probability
+      // DEBUGGING OVERRIDE - Force crystal spawn regardless of probability
+      // Useful during development to ensure crystals appear for testing
+      const debugForceSpawn = this.config.shards?.debugForceSpawn || false;
+      if (debugForceSpawn) {
+        console.log(`[MAP] Debug force spawn enabled - bypassing probability check`);
+      }
+      
+      // Standard probability check - only spawn crystals on some hexes
+      // This creates a more natural, randomized distribution
       if (!debugForceSpawn && Math.random() >= this.config.crystalSpawnChance) {
-        console.log(`[MAP] Crystal spawn skipped for hex at (${hex.userData.q}, ${hex.userData.r}) - random check failed`); 
-        return;
+        console.log(`[MAP] Crystal spawn skipped for hex at (${hex.userData.q}, ${hex.userData.r}) - random check failed [${(this.config.crystalSpawnChance * 100).toFixed(0)}% chance]`); 
+        return null;
       }
       
+      // Beginning the actual crystal spawning process
       console.log(`[MAP] Spawning crystal shard on hex at (${hex.userData.q}, ${hex.userData.r})`);
       
-      // Initialize the crystal loader if it doesn't exist yet
-      const loaderInitialized = await this.initializeCrystalLoader();
-      console.log(`[MAP] Crystal loader initialization result: ${loaderInitialized ? 'SUCCESS' : 'FAILED'}`);
+      // Verify that the ShardManager is available and properly initialized
+      // This is critical since we'll be delegating the model loading/creation to it
+      if (!this.shardManager) {
+        console.error('[MAP] ShardManager not available, cannot spawn crystal shard');
+        console.error('[MAP] Ensure asset modules are properly loaded before map generation');
+        
+        // Fall back to the original crystal creation method if available
+        if (typeof this.createFallbackCrystal === 'function') {
+          console.warn('[MAP] Attempting to use fallback crystal creation method...');
+          const fallbackCrystal = this.createFallbackCrystal(hex);
+          return fallbackCrystal;
+        }
+        return null;
+      }
       
-      // If we have a crystal loader, use it to load the model
-      if (this.crystalLoader) {
-        console.log('[MAP] Using FBX loader to load crystal model');
-        this.loadCrystalModel(hex);
+      // Create a position for the crystal by cloning the hex position
+      // We clone to avoid modifying the original hex position
+      const position = hex.position.clone();
+      
+      // Apply height offset to position the crystal on top of the hex
+      // We need this because the hex position is at the center of the hex
+      position.y += this.config.hexHeight/2 + this.config.crystalHeightOffset;
+      
+      // Log the exact position for debugging purposes
+      console.log(`[MAP] Calculated crystal position:`, {
+        x: position.x.toFixed(2),
+        y: position.y.toFixed(2),
+        z: position.z.toFixed(2),
+        offsetApplied: this.config.hexHeight/2 + this.config.crystalHeightOffset
+      });
+      
+      // Generate a unique ID for the shard based on hex coordinates
+      // This makes it easier to reference and find specific shards later
+      const shardId = `shard_${hex.userData.q}_${hex.userData.r}`;
+      
+      // Get the element type from the hex for potential element-specific customization
+      const elementType = hex.userData.element || 'default';
+      
+      // Configure detailed options for the shard placement
+      // These options control appearance, positioning, and behavior
+      const shardOptions = {
+        id: shardId,                // Unique identifier for this shard
+        elementType,               // Element type for potential material variations
+        randomRotation: true,      // Enable random Y-axis rotation for visual variety
+        
+        // Apply slight random position offsets for natural appearance
+        // This prevents all crystals from looking too uniformly placed
+        positionOffset: {
+          x: (Math.random() - 0.5) * 0.2,  // Small random X offset (+/- 0.1)
+          y: Math.random() * 0.1,          // Small random height variation (0 to 0.1)
+          z: (Math.random() - 0.5) * 0.2   // Small random Z offset (+/- 0.1)
+        },
+        
+        // Enable debug mode for this shard to see detailed logs during placement
+        debug: true
+      };
+      
+      // Log the options being used for this shard
+      console.log(`[MAP] Placing shard with options:`, {
+        shardId,
+        elementType,
+        position: `${position.x.toFixed(2)}, ${position.y.toFixed(2)}, ${position.z.toFixed(2)}`,
+        options: shardOptions
+      });
+      
+      // Delegate the actual shard creation and placement to the ShardManager
+      // This is an async operation as it might need to load models and textures
+      console.log(`[MAP] Calling ShardManager.placeShard...`);
+      const shard = await this.shardManager.placeShard(position, shardOptions);
+      
+      // Check if shard creation was successful
+      if (shard) {
+        // Store a reference to the shard in the hex userData for future access
+        hex.userData.crystal = shard;
+        hex.userData.crystalId = shardId;
+        
+        // Log successful placement with details about the created shard
+        console.log(`[MAP] Successfully added crystal to hex at (${hex.userData.q}, ${hex.userData.r})`, {
+          shardId,
+          elementType,
+          shardObject: shard.uuid ? `Three.js object ${shard.uuid}` : 'Custom object'
+        });
+        
+        return shard;
       } else {
-        // Otherwise use the fallback crystal method
-        console.log('[MAP] Using fallback crystal method as loader is not available');
-        this.ensureFallbackCrystalMethod();
-        this.createFallbackCrystal(hex);
+        // Log failure to place shard
+        console.warn(`[MAP] Failed to place shard on hex at (${hex.userData.q}, ${hex.userData.r})`);
+        return null;
       }
     } catch (error) {
+      // Detailed error logging for debugging complex issues
       console.error('[MAP] Critical error in trySpawnCrystalShard:', error);
       console.error('[MAP] Error details:', error.message);
       console.error('[MAP] Stack trace:', error.stack);
+      console.error('[MAP] Hex data during error:', {
+        coords: hex?.userData ? `(${hex.userData.q}, ${hex.userData.r})` : 'unknown',
+        element: hex?.userData?.element || 'unknown'
+      });
+      
       // Attempt to create a fallback crystal as a last resort
-      try {
-        this.ensureFallbackCrystalMethod();
-        this.createFallbackCrystal(hex);
-      } catch (fallbackError) {
-        console.error('[MAP] Even fallback crystal creation failed:', fallbackError);
+      if (typeof this.createFallbackCrystal === 'function') {
+        console.warn('[MAP] Attempting to create emergency fallback crystal due to error...');
+        try {
+          const fallbackCrystal = this.createFallbackCrystal(hex);
+          return fallbackCrystal;
+        } catch (fallbackError) {
+          console.error('[MAP] Even fallback crystal creation failed:', fallbackError.message);
+          return null;
+        }
       }
+      
+      return null;
+    } finally {
+      // Post-execution logging (always runs, even after errors)
+      console.log(`[MAP] END trySpawnCrystalShard for hex at (${hex?.userData?.q}, ${hex?.userData?.r})`);
     }
   }
   
