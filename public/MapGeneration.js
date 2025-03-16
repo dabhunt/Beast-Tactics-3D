@@ -4,13 +4,32 @@
  * including biome distribution, crystal shard spawning, and related functionality.
  */
 
+// Try to import FBXLoader if available
+let FBXLoader;
+try {
+  import('three/addons/loaders/FBXLoader.js')
+    .then(module => {
+      FBXLoader = module.FBXLoader;
+      console.log('[MAP] FBXLoader imported successfully');
+    })
+    .catch(error => {
+      console.warn('[MAP] Failed to import FBXLoader:', error);
+    });
+} catch (e) {
+  console.warn('[MAP] Error setting up FBXLoader import:', e);
+}
+
 // Track loading status of resources
-let textureLoadingTracker = {
+// Export this so game.js can access it for debugging
+export let textureLoadingTracker = {
   total: 0,
   loaded: 0,
   failed: 0,
   textures: {},
 };
+
+// Debug log to track initialization
+console.log('[MAP] Initialized textureLoadingTracker:', textureLoadingTracker);
 
 // Debug flag for verbose logging
 const DEBUG = true;
@@ -86,15 +105,87 @@ export class MapGenerator {
     this.initGeometryAndMaterials();
     
     // Reset tracking for texture loading
-    textureLoadingTracker = {
-      total: this.elementTypes.length,
-      loaded: 0,
-      failed: 0,
-      textures: {},
-    };
+    // IMPORTANT: We're modifying the exported textureLoadingTracker
+    // This ensures game.js sees the updated values
+    textureLoadingTracker.total = this.elementTypes.length;
+    textureLoadingTracker.loaded = 0;
+    textureLoadingTracker.failed = 0;
+    textureLoadingTracker.textures = {};
+    console.log('[MAP] Reset textureLoadingTracker:', textureLoadingTracker);
+    
+    // Define crystal-related methods to avoid 'not a function' errors
+    this.initCrystalMethods();
     
     // Load textures
     this.loadTextures();
+  }
+  
+  /**
+   * Initialize crystal-related methods to ensure they're properly bound to the class instance
+   * This prevents 'not a function' errors that can occur with conditional method definitions
+   */
+  initCrystalMethods() {
+    console.log('[MAP] Initializing crystal methods');
+    
+    // Method to load crystal texture
+    this.loadCrystalTexture = () => {
+      console.log('[MAP] Setting up crystal texture loading');
+      this.crystalTexture = new this.THREE.TextureLoader().load(
+        this.config.crystalTexturePath,
+        (texture) => {
+          console.log('[MAP] Crystal texture loaded successfully');
+          this.crystalTextureLoaded = true;
+        },
+        undefined,
+        (error) => {
+          console.error('[MAP] Error loading crystal texture:', error);
+        }
+      );
+    };
+    
+    // Method to create a simple fallback crystal when model loading fails
+    this.createFallbackCrystal = (hex) => {
+      console.log('[MAP] Creating fallback crystal geometry for hex:', hex.userData);
+      
+      try {
+        // Create a simple crystal geometry
+        const geometry = new this.THREE.ConeGeometry(0.3, 0.6, 6);
+        
+        // Create a purple material for the crystal
+        const material = new this.THREE.MeshPhongMaterial({
+          color: 0x9932CC,       // Purple color
+          shininess: 90,          // Very shiny
+          specular: 0xFFFFFF,     // White specular highlights
+          emissive: 0x4B0082,     // Slight indigo glow
+          emissiveIntensity: 0.3, // Moderate glow intensity
+        });
+        
+        // Create the crystal mesh
+        const crystal = new this.THREE.Mesh(geometry, material);
+        
+        // Position the crystal on top of the hexagon
+        crystal.position.set(
+          hex.position.x,
+          hex.position.y + this.config.hexHeight/2 + this.config.crystalHeightOffset,
+          hex.position.z
+        );
+        
+        // Add some random rotation for variety
+        crystal.rotation.y = Math.random() * Math.PI * 2;
+        crystal.rotation.x = Math.random() * 0.2;
+        
+        // Add to scene and associate with hex
+        this.scene.add(crystal);
+        hex.userData.crystal = crystal;
+        
+        // Log success
+        console.log(`[MAP] Fallback crystal placed on hex (${hex.userData.q}, ${hex.userData.r})`);
+      } catch (error) {
+        console.error('[MAP] Error creating fallback crystal:', error);
+      }
+    };
+    
+    console.log('[MAP] Crystal methods initialized');
   }
   
   /**
@@ -320,95 +411,181 @@ export class MapGenerator {
    * Try to spawn a crystal shard on a given hexagon based on probability
    * @param {Object} hex - The hexagon mesh to potentially spawn a crystal on
    */
+  /**
+   * Try to spawn a crystal shard on a given hexagon based on probability
+   * This method handles the entire crystal creation process, including:
+   * - Random chance determination
+   * - Model loading with fallbacks
+   * - Texture application
+   * - Positioning and scaling
+   * - Error handling at multiple levels
+   * 
+   * @param {Object} hex - The hexagon mesh to potentially spawn a crystal on
+   */
   trySpawnCrystalShard(hex) {
-    // Check if we should spawn a crystal based on probability
-    if (Math.random() < this.config.crystalSpawnChance) {
-      debugLog(`Spawning crystal shard on hex at (${hex.userData.q}, ${hex.userData.r})`);
+    try {
+      // Log the evaluation process for debugging
+      console.log(`[MAP] Evaluating crystal spawn for hex at (${hex.userData.q}, ${hex.userData.r})`);
+      
+      // First validate the hex is a valid object with necessary properties
+      if (!hex || !hex.userData || hex.userData.crystal) {
+        console.log(`[MAP] Skipping crystal spawn - invalid hex or crystal already exists`);
+        return;
+      }
+      
+      // Check if we should spawn a crystal based on probability
+      // Using >= ensures exactly the percentage chance specified (e.g. 0.2 = 20% chance)
+      if (Math.random() >= this.config.crystalSpawnChance) {
+        console.log(`[MAP] Crystal spawn skipped for hex at (${hex.userData.q}, ${hex.userData.r}) - random check failed`); 
+        return;
+      }
+      
+      console.log(`[MAP] Spawning crystal shard on hex at (${hex.userData.q}, ${hex.userData.r})`);
       
       // We'll lazily load the crystal model the first time we need it
+      // This avoids unnecessary loading if no crystals are spawned
       if (!this.crystalLoader) {
-        // Initialize loader
-        if (typeof this.THREE.FBXLoader === 'function') {
+        console.log('[MAP] Crystal loader not initialized yet, checking available loaders');
+        
+        // Check if FBXLoader is available from global import
+        if (typeof FBXLoader === 'function') {
+          console.log('[MAP] Using imported FBXLoader');
+          this.crystalLoader = new FBXLoader();
+          this.loadCrystalTexture();
+        }
+        // Check if it's available through THREE
+        else if (typeof this.THREE.FBXLoader === 'function') {
+          console.log('[MAP] Using THREE.FBXLoader');
           this.crystalLoader = new this.THREE.FBXLoader();
+          this.loadCrystalTexture();
+        } 
+        // Try alternative loader paths
+        else if (typeof window.FBXLoader === 'function') {
+          console.log('[MAP] Using window.FBXLoader');
+          this.crystalLoader = new window.FBXLoader();
+          this.loadCrystalTexture();
+        }
+        // If no FBXLoader is available, create a fallback crystal
+        else {
+          console.warn('[MAP] FBXLoader not available! Creating fallback crystal.');
           
-          // Load texture for the crystal
-          this.crystalTexture = new this.THREE.TextureLoader().load(
-            this.config.crystalTexturePath,
-            (texture) => {
-              debugLog('Crystal texture loaded successfully');
-              this.crystalTextureLoaded = true;
-            },
-            undefined,
-            (error) => {
-              console.error('Error loading crystal texture:', error);
+          // Verify that createFallbackCrystal exists
+          if (typeof this.createFallbackCrystal !== 'function') {
+            console.error('[MAP] Critical error: createFallbackCrystal is not defined!');
+            // If somehow the method wasn't defined in initCrystalMethods, we'll call it again
+            this.initCrystalMethods();
+            
+            // Double-check after initialization
+            if (typeof this.createFallbackCrystal !== 'function') {
+              console.error('[MAP] Failed to define createFallbackCrystal method!');
+              return; // Can't proceed without a proper method
             }
-          );
-        } else {
-          console.error('FBXLoader not available! Cannot load crystal model.');
+          }
+          
+          this.createFallbackCrystal(hex);
           return;
         }
       }
       
-      // Load the crystal model
+      // Now load the crystal model
+      // FBXLoader.load takes a URL, success callback, progress callback, and error callback
       this.crystalLoader.load(
-        // Model path
+        // Model path - using the path from config allows easy customization
         this.config.crystalModelPath,
         
-        // onLoad callback
+        // onLoad callback - called when model is successfully loaded
         (object) => {
-          debugLog('Crystal model loaded successfully');
-          
-          // Scale down the crystal
-          object.scale.set(
-            this.config.crystalScaleFactor,
-            this.config.crystalScaleFactor,
-            this.config.crystalScaleFactor
-          );
-          
-          // Position the crystal on top of the hexagon
-          object.position.set(
-            hex.position.x,
-            hex.position.y + this.config.hexHeight/2 + this.config.crystalHeightOffset,
-            hex.position.z
-          );
-          
-          // Apply texture if loaded
-          if (this.crystalTextureLoaded && this.crystalTexture) {
-            object.traverse((child) => {
-              if (child.isMesh) {
-                child.material.map = this.crystalTexture;
-                child.material.needsUpdate = true;
-              }
-            });
+          try {
+            console.log('[MAP] Crystal model loaded successfully');
+            
+            // Scale down the crystal to an appropriate size
+            // We use the scaleFactor from config to allow easy adjustment
+            object.scale.set(
+              this.config.crystalScaleFactor,
+              this.config.crystalScaleFactor,
+              this.config.crystalScaleFactor
+            );
+            
+            // Position the crystal on top of the hexagon
+            // We add height to position it on the surface plus a small offset
+            object.position.set(
+              hex.position.x,
+              hex.position.y + this.config.hexHeight/2 + this.config.crystalHeightOffset,
+              hex.position.z
+            );
+            
+            // Apply texture if available - makes the crystal look better
+            if (this.crystalTextureLoaded && this.crystalTexture) {
+              console.log('[MAP] Applying texture to crystal');
+              // We need to traverse the object hierarchy to apply textures
+              // to all meshes within the model
+              object.traverse((child) => {
+                if (child.isMesh) {
+                  child.material.map = this.crystalTexture;
+                  child.material.needsUpdate = true;
+                }
+              });
+            }
+            
+            // Add to scene and associate with hex for future reference
+            this.scene.add(object);
+            hex.userData.crystal = object;
+            
+            console.log(`[MAP] Crystal placed on hex at (${hex.userData.q}, ${hex.userData.r})`);
+          } catch (modelError) {
+            console.error('[MAP] Error processing loaded crystal model:', modelError);
+            console.error('[MAP] Error details:', modelError.message);
+            console.error('[MAP] Stack trace:', modelError.stack);
+            // Try to use fallback crystal if model processing fails
+            if (typeof this.createFallbackCrystal === 'function') {
+              console.log('[MAP] Attempting fallback crystal after model processing error');
+              this.createFallbackCrystal(hex);
+            }
           }
-          
-          // Add to scene and associate with hex
-          this.scene.add(object);
-          hex.userData.crystal = object;
-          
-          // Log success
-          debugLog(`Crystal shard placed on hex (${hex.userData.q}, ${hex.userData.r})`);
         },
         
-        // onProgress callback
+        // onProgress callback - useful for loading indicators
         (xhr) => {
-          console.log(`Crystal model loading: ${(xhr.loaded / xhr.total * 100).toFixed(2)}%`);
+          if (xhr.lengthComputable) {
+            const percentComplete = xhr.loaded / xhr.total * 100;
+            console.log(`[MAP] Crystal model ${percentComplete.toFixed(2)}% loaded`);
+          }
         },
         
-        // onError callback
+        // onError callback - called when loading fails
         (error) => {
-          console.error('Error loading crystal model:', error);
+          console.error('[MAP] Error loading crystal model:', error);
+          console.error('[MAP] Model path attempted:', this.config.crystalModelPath);
+          // Try to use fallback crystal if model loading fails
+          if (typeof this.createFallbackCrystal === 'function') {
+            console.log('[MAP] Creating fallback crystal due to model load error');
+            this.createFallbackCrystal(hex);
+          }
         }
       );
+    } catch (error) {
+      console.error('[MAP] Critical error in trySpawnCrystalShard:', error);
+      console.error('[MAP] Error details:', error.message);
+      console.error('[MAP] Stack trace:', error.stack);
+      // Don't attempt to use createFallbackCrystal here as it might be the source of the error
     }
   }
   
   /**
-   * Generate the entire hexagon grid
-   * @param {number} horizontalSpacing - Horizontal spacing between hexagons
-   * @param {number} verticalFactor - Vertical spacing factor
+   * Generate the entire hexagon grid with the specified spacing parameters
+   * This is the main map generation function that creates all hexagons and their properties
+   * 
+   * @param {number} horizontalSpacing - Horizontal spacing between hexagons (default: 1.5)
+   * @param {number} verticalFactor - Vertical spacing factor (default: 1.0)
    */
   generateHexagonGrid(horizontalSpacing = 1.5, verticalFactor = 1.0) {
+    console.log('[MAP] Starting hexagon grid generation with params:', {
+      horizontalSpacing,
+      verticalFactor,
+      configSpacing: this.config.horizontalSpacing,
+      configVertical: this.config.verticalFactor,
+      gridRadius: this.config.gridRadius
+    });
     horizontalSpacing = horizontalSpacing || this.config.horizontalSpacing;
     verticalFactor = verticalFactor || this.config.verticalFactor;
     
@@ -460,13 +637,13 @@ export class MapGenerator {
           elementDistribution[hex.userData.element]++;
         }
         
-        // Track crystal statistics
+        // Track crystal statistics for post-generation reporting
         crystalStats.total++;
         if (hex.userData.crystal) {
           crystalStats.spawned++;
         }
         
-        // Log progress every 20 hexagons
+        // Log progress every 20 hexagons to show generation status
         if (this.hexCount % 20 === 0) {
           debugLog(`Created ${this.hexCount} hexagons so far...`);
         }
@@ -542,6 +719,7 @@ export class MapGenerator {
 }
 
 // Export element types as a constant for other modules to use
+// This allows other modules to reference these without duplicating the values
 export const ELEMENT_TYPES = [
   'Combat',
   'Corrosion',
