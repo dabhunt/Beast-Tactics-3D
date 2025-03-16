@@ -103,9 +103,10 @@ export class Beast {
     
     // Shadow properties
     this.shadow = null;
-    this.shadowSize = 0.8 * this.scale; // Shadow size relative to beast scale
-    this.shadowOpacity = 0.6; // Default shadow opacity
-    this.shadowHeight = 0.05; // Height above ground level to prevent z-fighting with hexagons
+    this.shadowSize = 0.9 * this.scale; // Slightly larger shadow size for better visibility
+    this.shadowOpacity = 0.7; // Increased opacity for better visibility
+    this.shadowHeight = 0.1; // Increased height offset to ensure visibility above hexagons
+    this.shadowBlur = 0.2; // Softness factor for shadow edges
     
     // Load animated texture based on beast type
     this.loadAnimatedTexture();
@@ -923,17 +924,28 @@ export class Beast {
         this.group.position.z =
           startPos.z + (newPosition.z - startPos.z) * easeOut;
           
-        // Update shadow position and scale during movement animation
+        // Enhanced shadow updates during movement animation
         if (this.shadow) {
-          // Update shadow with the current height
+          // Get the current beast height for shadow calculations
           const currentHeight = this.group.position.y;
+          
+          // Update shadow with enhanced positioning and effects
           this._updateShadow(currentHeight);
           
-          if (DEBUG && Math.random() < 0.05) { // Occasionally log shadow updates during animation
-            console.log('[BEAST] Shadow updated during animation:', {
+          // Occasionally validate shadow is appearing correctly during animation
+          if (DEBUG && Math.random() < 0.05) {
+            // Log comprehensive shadow state for debugging
+            console.log('[BEAST] Enhanced shadow updated during animation:', {
               height: currentHeight,
               position: this.shadow.position.clone(),
-              visible: this.shadow.visible
+              worldPosition: (() => {
+                const wp = new THREE.Vector3();
+                this.shadow.getWorldPosition(wp);
+                return wp;
+              })(),
+              visible: this.shadow.visible,
+              opacity: this.shadow.material.opacity,
+              renderOrder: this.shadow.renderOrder
             });
           }
         }
@@ -963,46 +975,65 @@ export class Beast {
    * Create a circular shadow beneath the beast
    * @private
    */
+  /**
+   * Creates a shadow mesh for the beast
+   * Enhanced with better visibility, proper depth handling, and blur effects
+   * @private
+   */
   _createShadow() {
     try {
-      console.log('[BEAST] Creating shadow for beast');
+      console.log('[BEAST] Creating enhanced shadow for beast');
       
-      // Create a circular plane for the shadow - slightly larger for better visibility
-      const shadowGeometry = new THREE.CircleGeometry(this.shadowSize, 32);
+      // Create a circular plane for the shadow with more segments for smoother edges
+      const shadowGeometry = new THREE.CircleGeometry(this.shadowSize, 64);
       
-      // Create a material for the shadow with higher opacity for better visibility
-      // Using MeshBasicMaterial with transparency for better performance
+      // Create a material for the shadow with improved properties for visibility
       const shadowMaterial = new THREE.MeshBasicMaterial({
         color: 0x000000,  // Black color for shadow
         transparent: true, // Enable transparency
         opacity: this.shadowOpacity,
-        depthWrite: false, // Don't write to depth buffer to avoid z-fighting
+        depthWrite: false, // Don't write to depth buffer
+        depthTest: true,   // But still test against depth buffer
         side: THREE.DoubleSide, // Visible from both sides
-        // Optional: Add slight fog effect for smoother shadow edges
-        fog: true
+        fog: true,        // Allow fog effects
+        alphaTest: 0.01   // Slight alpha test to improve edge quality
       });
       
       // Create the shadow mesh
       this.shadow = new THREE.Mesh(shadowGeometry, shadowMaterial);
       
-      // Position the shadow below the beast
-      // Rotate it to lie flat on the ground (default circle is in XY plane)
+      // Rotate to lie flat on the ground (default circle is in XY plane)
       this.shadow.rotation.x = -Math.PI / 2;
       
-      // Set a specific renderOrder to ensure shadow renders above terrain
-      this.shadow.renderOrder = 2; // Higher value renders later (on top)
+      // Set very high renderOrder to ensure shadow always renders on top of terrain
+      this.shadow.renderOrder = 5; // Higher value = rendered later = appears on top
       
-      // Give the shadow a separate name for debugging
-      this.shadow.name = 'beast-shadow';
+      // Set up high resolution shadow buffer for better quality
+      if (this.shadow.material) {
+        this.shadow.material.precision = 'highp';
+      }
       
-      // Initially position the shadow on the ground with the height offset to be visible above hexagons
+      // Increase shadow's receive shadow capability (if used)
+      this.shadow.receiveShadow = false; // Don't receive shadows from other objects
+      this.shadow.castShadow = false;    // Don't cast shadow itself
+      
+      // Log shadow creation details
+      console.log('[BEAST] Shadow created with enhanced visibility properties:', {
+        size: this.shadowSize,
+        opacity: this.shadowOpacity,
+        height: this.shadowHeight,
+        renderOrder: this.shadow.renderOrder
+      });
+      
+      // Give shadow a name for debugging
+      this.shadow.name = 'beast-enhanced-shadow';
+      
+      // Initially position the shadow with proper height offset
       const height = this.group.position.y;
       this._updateShadow(height);
       
-      // Make shadow a direct child of the scene to prevent parent transformations
-      // First, store a reference to the shadow's parent beast
+      // Save beast reference and add to group
       this.shadow.beastReference = this;
-      // Add the shadow to our group
       this.group.add(this.shadow);
       
       console.log('[BEAST] Shadow created successfully with properties:', {
@@ -1022,6 +1053,12 @@ export class Beast {
    * @param {number} height - Height of beast above ground
    * @private
    */
+  /**
+   * Updates the shadow position, scale, and appearance based on beast height
+   * Enhanced with better height handling and visual properties
+   * @param {number} height - Current height of the beast above ground
+   * @private
+   */
   _updateShadow(height) {
     try {
       if (!this.shadow) {
@@ -1029,39 +1066,64 @@ export class Beast {
         return;
       }
       
-      // Position shadow slightly above the ground (y=shadowHeight) directly beneath beast
-      // This positioning prevents z-fighting with the ground hexagons
+      // Get current world position of the beast group
+      const worldPos = new THREE.Vector3();
+      this.group.getWorldPosition(worldPos);
+      
+      // Position shadow directly beneath beast but elevated above ground
+      // The shadowHeight property prevents z-fighting with hexagons
       this.shadow.position.set(0, -height + this.shadowHeight, 0);
       
-      // Scale shadow based on height (shadow gets smaller as beast goes higher)
-      // Calculate a scaling factor based on height - with minimum size to ensure visibility
-      const heightFactor = Math.max(0.6, 1 - (height * 0.2));
-      this.shadow.scale.set(heightFactor, heightFactor, 1);
+      // Enhanced shadow scaling based on height with better curve
+      // As beast goes higher, shadow gets smaller and more transparent
+      let heightFactor;
+      if (height <= 0.5) {
+        // For low heights, maintain larger shadow
+        heightFactor = Math.max(0.7, 1 - (height * 0.15));
+      } else {
+        // For higher elevations, scale down more dramatically
+        heightFactor = Math.max(0.5, 1 - (height * 0.25));
+      }
       
-      // Adjust opacity based on height (more transparent when higher) but maintain minimum opacity
+      // Apply the scale to make shadow smaller with height
+      this.shadow.scale.set(heightFactor * 1.1, heightFactor * 1.1, 1);
+      
+      // Update material properties if it exists
       if (this.shadow.material) {
-        // Calculate opacity with minimum threshold to ensure shadow always visible
-        const minOpacity = 0.4;
-        this.shadow.material.opacity = Math.max(minOpacity, this.shadowOpacity * heightFactor);
+        // Enhanced opacity calculation with better minimum threshold
+        const minOpacity = 0.45; // Slightly higher minimum opacity
+        const calculatedOpacity = Math.max(minOpacity, this.shadowOpacity * (1 - (height * 0.15)));
         
-        // Mark material as needing update for opacity change to take effect
+        // Apply the calculated opacity
+        this.shadow.material.opacity = calculatedOpacity;
+        
+        // Mark material for update to ensure changes take effect
         this.shadow.material.needsUpdate = true;
       }
       
-      // Validate shadow is rendering properly
-      this.shadow.visible = true; // Ensure shadow visibility is enabled
+      // Ensure shadow visibility is enabled
+      this.shadow.visible = true;
       
-      if (DEBUG && Math.random() < 0.01) { // Occasionally log shadow updates
-        console.log('[BEAST] Shadow updated:', {
+      // Log detailed shadow state for debugging (occasionally)
+      if (DEBUG && Math.random() < 0.01) {
+        console.log('[BEAST] Enhanced shadow updated:', {
+          beastWorldPos: worldPos.clone(),
           height: height,
+          shadowPos: this.shadow.position.clone(),
           scaleFactor: heightFactor,
-          position: this.shadow.position.clone(),
-          opacity: this.shadow.material.opacity
+          opacity: this.shadow.material.opacity,
+          renderOrder: this.shadow.renderOrder,
+          heightOffset: this.shadowHeight,
+          visible: this.shadow.visible
         });
       }
       
     } catch (err) {
-      console.error('[BEAST] Error updating shadow:', err);
+      console.error('[BEAST] Error updating shadow:', err, {
+        hasShadow: !!this.shadow,
+        beastHeight: height,
+        shadowHeight: this.shadowHeight
+      });
     }
   }
 
