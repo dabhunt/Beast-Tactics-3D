@@ -240,7 +240,7 @@ export class MapGenerator {
               emissive: 0x330066,         // Deep purple glow
               emissiveIntensity: 0.6,     // Stronger glow
               transparent: true,          // Enable transparency
-              opacity: 0.8,               // Slight transparency
+              opacity: 0.8,               // Set to 80% opacity (semi-translucent)
               reflectivity: 1.0           // Maximum reflectivity
             });
             console.log('[MAP] Successfully created MeshPhysicalMaterial for crystal');
@@ -258,7 +258,7 @@ export class MapGenerator {
             emissive: 0x4B0082,         // Indigo glow
             emissiveIntensity: 0.6,     // Increased glow intensity (from 0.3)
             transparent: true,          // Enable transparency
-            opacity: 0.8                // Slight transparency
+            opacity: 0.8                // Set to 80% opacity (semi-translucent)
           });
           console.log('[MAP] Created enhanced MeshPhongMaterial for crystal');
         }
@@ -275,10 +275,19 @@ export class MapGenerator {
         );
         console.log(`[MAP] Positioned crystal at: ${crystal.position.x.toFixed(2)}, ${crystal.position.y.toFixed(2)}, ${crystal.position.z.toFixed(2)}`);
         
-        // Add some random rotation for variety
+        // Apply full 360-degree rotation on Y axis while preserving bottom alignment
+        // We use Euler rotation order 'YXZ' to ensure Y rotation happens first, then X and Z
+        crystal.rotation.order = 'YXZ';
+        
+        // Full 360-degree rotation around Y axis
         crystal.rotation.y = Math.random() * Math.PI * 2;
-        crystal.rotation.x = Math.random() * 0.3 - 0.15; // Allow slight tilt in both directions
-        crystal.rotation.z = Math.random() * 0.1;
+        
+        // Apply slight tilt but keep bottom mostly aligned with hexagon
+        // Limiting X rotation to small range to maintain bottom alignment
+        crystal.rotation.x = (Math.random() * 0.3 - 0.15); // Small tilt range (-0.15 to 0.15 radians)
+        crystal.rotation.z = (Math.random() * 0.2 - 0.1);  // Small Z tilt for natural look
+        
+        console.log(`[MAP] Applied crystal rotation with bottom alignment: Y:${crystal.rotation.y.toFixed(2)}, X:${crystal.rotation.x.toFixed(2)}, Z:${crystal.rotation.z.toFixed(2)} radians`);
         console.log(`[MAP] Applied random rotation: ${crystal.rotation.x.toFixed(2)}, ${crystal.rotation.y.toFixed(2)}, ${crystal.rotation.z.toFixed(2)}`);
         
         // Add to scene and associate with hex
@@ -680,7 +689,7 @@ export class MapGenerator {
           emissive: 0x330066,         // Purple glow
           emissiveIntensity: 0.7,     // Strong glow
           transparent: true,          // Enable transparency
-          opacity: 0.8                // Slightly more opaque
+          opacity: 0.8                // 80% opacity (semi-translucent)
         });
         
         // Log material creation
@@ -708,10 +717,18 @@ export class MapGenerator {
           calculatedOffset: (0.35 + randomOffset).toFixed(2)
         });
         
-        // Random rotation and slight tilt for variety
+        // Apply full 360-degree rotation while preserving bottom alignment
+        crystal.rotation.order = 'YXZ'; // Change rotation order to ensure Y happens first
+        
+        // Full 360-degree rotation around Y axis
         crystal.rotation.y = Math.random() * Math.PI * 2;
-        crystal.rotation.x = (Math.random() - 0.5) * 0.5;
-        crystal.rotation.z = (Math.random() - 0.5) * 0.2; // Add some z-axis rotation
+        
+        // Small X and Z rotations to maintain bottom alignment with hex
+        crystal.rotation.x = (Math.random() - 0.5) * 0.25; // Reduced tilt range for better alignment
+        crystal.rotation.z = (Math.random() - 0.5) * 0.15; // Smaller Z rotation
+        
+        // Log the applied rotation
+        console.log(`[MAP] Applied emergency crystal rotation: Y:${crystal.rotation.y.toFixed(2)}, X:${crystal.rotation.x.toFixed(2)}, Z:${crystal.rotation.z.toFixed(2)} radians`);
         
         // Add to scene and hex's userData
         this.scene.add(crystal);
@@ -760,12 +777,31 @@ export class MapGenerator {
               this.config.crystalScaleFactor
             );
             
-            // Position the crystal on top of the hexagon
+            // Position the crystal on top of the hexagon with slight randomization
+            const randomPositionOffset = (Math.random() - 0.5) * 0.1; // Small random offset for natural variation
             object.position.set(
-              hex.position.x,
-              hex.position.y + this.config.hexHeight/2 + this.config.crystalHeightOffset,
-              hex.position.z
+              hex.position.x + (Math.random() - 0.5) * 0.1,
+              hex.position.y + this.config.hexHeight/2 + this.config.crystalHeightOffset + randomPositionOffset,
+              hex.position.z + (Math.random() - 0.5) * 0.1
             );
+            
+            console.log(`[MAP] Positioned loaded crystal model at: ${object.position.x.toFixed(2)}, ${object.position.y.toFixed(2)}, ${object.position.z.toFixed(2)}`);
+            
+            // When we load a model, default rotation is needed to account for coordinate system differences
+            // Standard FBX orientation fix for Y-up coordinate system
+            object.rotation.x = -Math.PI / 2;
+            
+            // Apply random 360-degree rotation around Y-axis while preserving bottom alignment
+            // We use rotation order to ensure the proper sequence of rotations
+            object.rotation.order = 'XZY'; // Apply X first (standard orientation fix), then Z, then Y for the 360 spin
+            
+            // Apply full 360-degree Y rotation (after the X rotation that fixed orientation)
+            object.rotation.y = Math.random() * Math.PI * 2; // Full 360-degree rotation
+            
+            // Apply a very small random Z rotation for natural variation, keeping bottom aligned
+            object.rotation.z = (Math.random() - 0.5) * 0.1; // Very small Z tilt
+            
+            console.log(`[MAP] Applied loaded crystal rotation: X:${object.rotation.x.toFixed(2)}, Y:${object.rotation.y.toFixed(2)}, Z:${object.rotation.z.toFixed(2)} radians`);
             
             // Apply enhanced materials and textures to make the crystal look better
             console.log('[MAP] Applying enhanced materials to loaded crystal model');
@@ -803,7 +839,7 @@ export class MapGenerator {
                       emissive: new this.THREE.Color(0x330066),  // Purple glow
                       emissiveIntensity: 0.8,       // Strong glow
                       transparent: true,            // Enable transparency
-                      opacity: 0.9                  // Slight transparency
+                      opacity: 0.8                  // 80% opacity (semi-translucent)
                     });
                     
                     // Replace the original material
@@ -824,9 +860,9 @@ export class MapGenerator {
                     child.material.emissive = new this.THREE.Color(0x330066);
                     child.material.emissiveIntensity = 0.8;
                     
-                    // Make it transparent if possible
+                    // Make it transparent if possible with 80% opacity
                     child.material.transparent = true;
-                    child.material.opacity = 0.9;
+                    child.material.opacity = 0.8; // Set to 80% opacity (semi-translucent)
                   }
                   
                   // Force material update
