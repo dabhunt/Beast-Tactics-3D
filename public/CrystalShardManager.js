@@ -504,23 +504,63 @@ export class CrystalShardManager {
    * Initialize the particle effect system
    * @private
    */
+  /**
+   * Initialize the particle effect system 
+   * Sets up the CrystalParticleEffect class and configures it
+   * @private
+   */
   _initializeParticleSystem() {
-    console.log('[CRYSTAL] Initializing particle effect system');
+    console.log('[CRYSTAL] Initializing enhanced particle effect system with detailed logging');
     
     try {
-      // Create new particle effect manager with our configuration
+      // Only initialize if THREE.js is available
+      if (!this.THREE) {
+        console.warn('[CRYSTAL] Cannot initialize particle system: THREE.js not available');
+        return;
+      }
+      
+      console.log('[CRYSTAL] Particle system configuration:', {
+        particleCount: this.config.particleCount,
+        particleSize: this.config.particleSize,
+        particleColor: '#' + this.config.particleColor.toString(16).padStart(6, '0'),
+        emissionRate: this.config.emissionRate,
+        lifetimeRange: [this.config.particleMinLifetime, this.config.particleMaxLifetime],
+        spread: this.config.particleSpread,
+        speedMultiplier: this.config.particleSpeedMultiplier
+      });
+      
+      // Initialize last update time for smooth first update
+      this.particleLastUpdate = Date.now();
+      
+      // Create new particle effect manager with our expanded configuration
       this.particleEffect = new CrystalParticleEffect(this.THREE, this.scene, {
         particleCount: this.config.particleCount,
         particleSize: this.config.particleSize,
         particleColor: this.config.particleColor,
         minLifetime: this.config.particleMinLifetime,
         maxLifetime: this.config.particleMaxLifetime,
-        emissionRate: this.config.emissionRate
+        emissionRate: this.config.emissionRate,
+        // Add enhanced velocity parameters for more movement
+        minVelocity: 0.05,  // Increased for more visible movement
+        maxVelocity: 0.15,  // Increased for more visible movement
+        emitterRadius: 0.3, // Wider emission radius
+        glowIntensity: 2.0, // Increased glow
+        // Add new configuration parameters
+        particleSpread: this.config.particleSpread || 0.3,
+        particleSpeedMultiplier: this.config.particleSpeedMultiplier || 1.5
       });
       
       console.log('[CRYSTAL] Particle effect system initialized successfully');
+      
+      // Immediately force an update to ensure it's working properly
+      setTimeout(() => {
+        this.updateParticles(0.1); // Force a large delta time for first update
+        console.log('[CRYSTAL] Forced initial particle update to test movement');
+      }, 50);
+      
     } catch (error) {
       console.error('[CRYSTAL] Failed to initialize particle effect system:', error);
+      console.debug('Error details:', error.stack || error);
       this.config.enableParticles = false; // Disable particles on error
     }
   }
@@ -540,28 +580,101 @@ export class CrystalShardManager {
     try {
       // Create particles for this crystal
       this.particleEffect.createParticlesForCrystal(crystal, crystal.position);
-      console.log('[CRYSTAL] Successfully added particles to crystal');
+      
+      // Add shader-based glow effect to the crystal
+      this._addShaderGlowEffect(crystal);
+      
+      console.log('[CRYSTAL] Successfully added particles and glow effect to crystal');
     } catch (error) {
       console.error('[CRYSTAL] Error adding particles to crystal:', error);
+      console.debug('Crystal data:', {
+        position: crystal.position,
+        uuid: crystal.uuid,
+        type: crystal.type
+      });
     }
   }
   
   /**
    * Update all crystal particle effects
    * Should be called in the animation loop
+   * @param {number} forceDelta - Optional: Force a specific delta time value
    */
-  updateParticles() {
-    if (!this.config.enableParticles || !this.particleEffect) {
+  updateParticles(forceDelta) {
+    // Early exit checks with detailed logging
+    if (!this.config.enableParticles) {
+      if (Math.random() < 0.001) console.log('[CRYSTAL] Particles disabled in config');
+      return;
+    }
+    
+    if (!this.particleEffect) {
+      console.warn('[CRYSTAL] Particle effect system not initialized, but updateParticles was called');
       return;
     }
     
     // Calculate delta time for smooth animation
     const now = Date.now();
-    const deltaTime = (now - this.particleLastUpdate) / 1000; // Convert to seconds
+    let deltaTime;
+    
+    if (forceDelta !== undefined) {
+      // Use forced delta time if provided (useful for debugging)
+      deltaTime = forceDelta;
+      console.log(`[CRYSTAL] Using forced delta time: ${deltaTime.toFixed(4)}s`);
+    } else {
+      // Calculate natural delta time
+      deltaTime = (now - this.particleLastUpdate) / 1000; // Convert to seconds
+      
+      // Sanity check on delta time to avoid animation issues
+      if (deltaTime > 1.0) {
+        console.warn(`[CRYSTAL] Delta time too large: ${deltaTime.toFixed(4)}s, capping at 0.1s`);
+        deltaTime = 0.1; // Cap at reasonable value to prevent huge jumps
+      } else if (deltaTime <= 0) {
+        console.warn(`[CRYSTAL] Invalid delta time: ${deltaTime.toFixed(6)}s, using 0.016s`);
+        deltaTime = 0.016; // Default to ~60fps
+      }
+      
+      // Periodic logging of delta time (very infrequently)
+      if (Math.random() < 0.002) {
+        console.log(`[CRYSTAL] Particle update with deltaTime: ${deltaTime.toFixed(4)}s`);
+      }
+    }
+    
+    // Store last update time for next frame
     this.particleLastUpdate = now;
     
-    // Update particle animations
-    this.particleEffect.update(deltaTime);
+    // Ensure particles exist to update before calling
+    if (this.particleEffect.particleSystems.length === 0) {
+      if (Math.random() < 0.01) console.log('[CRYSTAL] No particle systems to update');
+      return;
+    }
+    
+    // Update particle animations with clear logging
+    try {
+      // Force a delta time if particles seem stuck
+      if (this._particlesStuckCounter === undefined) this._particlesStuckCounter = 0;
+      
+      // After 10 frames, if particles seem stuck, boost with larger delta
+      if (deltaTime < 0.005 && this._particlesStuckCounter++ > 10) {
+        console.log('[CRYSTAL] Particles may be stuck, boosting animation with larger delta');
+        deltaTime = 0.05;
+        this._particlesStuckCounter = 0;
+      }
+      
+      // Log periodic particle system stats
+      if (Math.random() < 0.005) {
+        console.log(`[CRYSTAL] Updating ${this.particleEffect.particleSystems.length} particle systems`);
+      }
+      
+      // Do the actual update
+      this.particleEffect.update(deltaTime);
+    } catch (err) {
+      console.error('[CRYSTAL] Error updating particle effects:', err);
+      console.debug('Particle effect state:', {
+        particleSystems: this.particleEffect.particleSystems.length,
+        deltaTime: deltaTime,
+        lastUpdateTime: this.particleLastUpdate
+      });
+    }
   }
   
   /**
@@ -828,6 +941,205 @@ export class CrystalShardManager {
       console.error("[CRYSTAL] Error details:", error.message);
       console.error("[CRYSTAL] Error stack:", error.stack);
       return null;
+    }
+  }
+  /**
+   * Adds a shader-based glow effect to a crystal
+   * Uses custom shader material to create animated glow effect
+   * @param {Object} crystal - The crystal mesh to add glow effect to
+   * @private
+   */
+  _addShaderGlowEffect(crystal) {
+    if (!crystal || !this.THREE) {
+      console.warn('[CRYSTAL] Cannot add shader glow: invalid crystal or THREE not available');
+      return;
+    }
+
+    // Don't attempt to add shader if it's already been added
+    if (crystal.userData.hasShaderGlow) {
+      console.log('[CRYSTAL] Crystal already has shader glow effect');
+      return;
+    }
+
+    try {
+      console.log('[CRYSTAL] Adding shader-based glow effect to crystal');
+      
+      // Clone the crystal geometry for the glow mesh
+      let glowGeometry;
+      
+      if (crystal.geometry) {
+        // Use the crystal's own geometry if available
+        glowGeometry = crystal.geometry.clone();
+      } else if (crystal.children && crystal.children.length > 0) {
+        // For FBX models, find the first mesh child with geometry
+        let meshWithGeometry = null;
+        crystal.traverse(child => {
+          if (child.isMesh && child.geometry && !meshWithGeometry) {
+            meshWithGeometry = child;
+          }
+        });
+
+        if (meshWithGeometry) {
+          console.log('[CRYSTAL] Using geometry from child mesh for glow effect');
+          glowGeometry = meshWithGeometry.geometry.clone();
+        } else {
+          // Fallback to a simple octahedron (crystal-like shape)
+          console.log('[CRYSTAL] Using fallback geometry for glow effect');
+          glowGeometry = new this.THREE.OctahedronGeometry(0.5, 1);
+        }
+      } else {
+        // Fallback to a simple octahedron (crystal-like shape)
+        console.log('[CRYSTAL] Using fallback geometry for glow effect');
+        glowGeometry = new this.THREE.OctahedronGeometry(0.5, 1);
+      }
+      
+      // Create pulse animation shader material
+      const glowMaterial = new this.THREE.ShaderMaterial({
+        uniforms: {
+          // Base color of the glow
+          glowColor: { value: new this.THREE.Color(0x9932CC) },
+          // Pulse animation progress (0.0 to 1.0)
+          pulsePhase: { value: 0.0 },
+          // Intensity of the glow effect
+          glowIntensity: { value: 1.5 },
+          // Original model position for distance calculations
+          viewVector: { value: new this.THREE.Vector3() },
+        },
+        vertexShader: `
+          uniform vec3 viewVector;
+          uniform float pulsePhase;
+          varying float intensity;
+          void main() {
+            // Add subtle vertex movement based on pulse phase
+            vec3 vNormal = normalize(normal);
+            vec3 animated_position = position + vNormal * 0.02 * sin(pulsePhase * 6.0);
+            vec4 worldPosition = modelMatrix * vec4(animated_position, 1.0);
+            
+            // Calculate view intensity for fade effect
+            vec3 viewDirection = normalize(viewVector - worldPosition.xyz);
+            intensity = pow(abs(dot(vNormal, viewDirection)), 1.5);
+            
+            // Standard projection
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(animated_position, 1.0);
+          }
+        `,
+        fragmentShader: `
+          uniform vec3 glowColor;
+          uniform float pulsePhase;
+          uniform float glowIntensity;
+          varying float intensity;
+          void main() {
+            // Create pulsing intensity based on animation phase
+            float pulseMultiplier = 0.7 + 0.3 * sin(pulsePhase * 3.14159 * 2.0);
+            
+            // Apply color with variable intensity
+            float finalIntensity = intensity * glowIntensity * pulseMultiplier;
+            gl_FragColor = vec4(glowColor, finalIntensity * 0.4);
+          }
+        `,
+        side: this.THREE.FrontSide,
+        transparent: true,
+        depthWrite: false,
+        blending: this.THREE.AdditiveBlending,
+      });
+      
+      // Create the glow mesh
+      const glowMesh = new this.THREE.Mesh(glowGeometry, glowMaterial);
+      
+      // Make glow slightly bigger than the original crystal
+      glowMesh.scale.multiplyScalar(1.15);
+      
+      // Set initial position to match the crystal
+      glowMesh.position.copy(crystal.position);
+      if (crystal.quaternion) {
+        glowMesh.quaternion.copy(crystal.quaternion);
+      }
+      
+      // Add the glow mesh to the scene
+      this.scene.add(glowMesh);
+      
+      // Store references for animation
+      crystal.userData.hasShaderGlow = true;
+      crystal.userData.glowMesh = glowMesh;
+      crystal.userData.glowAnimationPhase = 0;
+      
+      console.log('[CRYSTAL] Successfully added shader glow effect to crystal');
+      
+      // Add update function to be called in animation loop
+      if (!this._updateGlowEffects) {
+        // Define the update method for all glow effects
+        this._updateGlowEffects = (deltaTime) => {
+          try {
+            // Update all crystal glow effects
+            this.activeCrystals.forEach(crystal => {
+              if (crystal.userData.hasShaderGlow && crystal.userData.glowMesh) {
+                const glowMesh = crystal.userData.glowMesh;
+                
+                // Update animation phase (0.0 to 1.0 loop)
+                if (crystal.userData.glowAnimationPhase === undefined) {
+                  crystal.userData.glowAnimationPhase = 0;
+                }
+                
+                // Increment phase based on delta time (complete cycle in about 3 seconds)
+                crystal.userData.glowAnimationPhase += deltaTime * 0.3;
+                if (crystal.userData.glowAnimationPhase > 1.0) {
+                  crystal.userData.glowAnimationPhase -= 1.0;
+                }
+                
+                // Periodic debug logging
+                if (Math.random() < 0.001) {
+                  console.log(`[CRYSTAL] Updating glow effect phase: ${crystal.userData.glowAnimationPhase.toFixed(2)}`);
+                }
+                
+                // Update shader uniforms
+                if (glowMesh.material && glowMesh.material.uniforms) {
+                  // Update pulse phase
+                  glowMesh.material.uniforms.pulsePhase.value = crystal.userData.glowAnimationPhase;
+                  
+                  // Update view vector (camera position for view-dependent effects)
+                  if (this.camera) {
+                    glowMesh.material.uniforms.viewVector.value.copy(this.camera.position);
+                  }
+                }
+                
+                // Ensure the glow stays with the crystal if it moves
+                glowMesh.position.copy(crystal.position);
+                if (crystal.quaternion) {
+                  glowMesh.quaternion.copy(crystal.quaternion);
+                }
+              }
+            });
+          } catch (err) {
+            console.error('[CRYSTAL] Error updating glow effects:', err);
+            console.debug('Error details:', err.stack || err);
+          }
+        };
+        
+        // Extend updateParticles to also update glow effects
+        const originalUpdateParticles = this.updateParticles;
+        this.updateParticles = function(forceDelta) {
+          // First call the original method
+          originalUpdateParticles.call(this, forceDelta);
+          
+          // Then update glow effects with the same delta time
+          const now = Date.now();
+          const deltaTime = (forceDelta !== undefined) ? forceDelta : (now - this.particleLastUpdate) / 1000;
+          
+          // Apply appropriate bounds to deltaTime
+          const boundedDelta = Math.min(Math.max(deltaTime, 0.001), 0.1);
+          
+          // Update all glow effects
+          if (Math.random() < 0.002) {
+            console.log(`[CRYSTAL] Updating glow effects with delta: ${boundedDelta.toFixed(4)}s`);
+          }
+          this._updateGlowEffects(boundedDelta);
+        };
+        
+        console.log('[CRYSTAL] Glow effect animation system initialized');
+      }
+    } catch (error) {
+      console.error('[CRYSTAL] Error adding shader glow effect:', error);
+      console.debug('Error details:', error.stack || error);
     }
   }
 }
