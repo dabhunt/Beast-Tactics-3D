@@ -545,6 +545,15 @@ export class CrystalShardManager {
             hex.position.z
           );
           
+          // Apply randomized 360-degree rotation on Y-axis only (keeps base on hexagon)
+          const randomYRotation = Math.random() * Math.PI * 2; // Random angle between 0 and 2π
+          fbx.rotation.y = randomYRotation;
+          
+          debugLog("Applied random Y-axis rotation to crystal:", {
+            hexPosition: [hex.position.x, hex.position.y, hex.position.z],
+            rotationY: randomYRotation
+          });
+          
           // Add to the scene and associate with hex
           this.scene.add(fbx);
           hex.userData.crystal = fbx;
@@ -686,12 +695,16 @@ export class CrystalShardManager {
         hex.position.z,
       );
 
-      // Add random rotation for variety
-      crystal.rotation.y = Math.random() * Math.PI * 2;
+      // Add random rotation for variety (full 360 degrees on Y-axis only)
+      const randomYRotation = Math.random() * Math.PI * 2; // Random angle between 0 and 2π
+      crystal.rotation.y = randomYRotation;
       
-      // Add slight random tilt
-      crystal.rotation.x = (Math.random() - 0.5) * 0.2;
-      crystal.rotation.z = (Math.random() - 0.5) * 0.2;
+      debugLog("Applied random Y-axis rotation to fallback crystal:", {
+        hexPosition: [hex.position.x, hex.position.y, hex.position.z],
+        rotationY: randomYRotation
+      });
+      
+      // We're no longer adding slight random tilt to keep base flat on hexagon
 
       // Add to scene and associate with hex
       this.scene.add(crystal);
