@@ -259,12 +259,18 @@ export class CrystalShardManager {
     this._initializingLoader = true;
     debugLog("Starting new initialization process");
 
-    // If we already have a loader, just return success
-    if (this.crystalLoader) {
-      debugLog("Crystal loader already initialized", { source: this._crystalLoaderSource });
+    // If we already have a loader, verify it has the load method before returning success
+    if (this.crystalLoader && typeof this.crystalLoader.load === 'function') {
+      debugLog("Crystal loader already initialized and has load method", { source: this._crystalLoaderSource });
       this._initializingLoader = false;
       return true;
-    }
+    } else if (this.crystalLoader) {
+      debugLog("WARNING: Crystal loader exists but doesn't have load method, reinitializing", { 
+        source: this._crystalLoaderSource,
+        type: typeof this.crystalLoader,
+        methods: this.crystalLoader ? Object.keys(this.crystalLoader) : 'null'
+      });
+      this.crystalLoader = null; // Reset invalid loader
 
     try {
       // ===== STEP 1: Check if FBXLoader is already ready =====
@@ -274,9 +280,13 @@ export class CrystalShardManager {
         debugLog("FBXLoader is already ready, retrieving instance");
         
         try {
-          // Get the loader from our handler
-          this.crystalLoader = await getFBXLoader();
-          this._crystalLoaderSource = "fbx-handler-ready";
+          // Get the loader class from our handler
+          const LoaderClass = await getFBXLoader();
+          
+          // Instantiate it - getFBXLoader returns the constructor, not an instance
+          debugLog("Instantiating FBXLoader from constructor");
+          this.crystalLoader = new LoaderClass();
+          this._crystalLoaderSource = "fbx-handler-ready-instance";
           this._fbxLoaderSuccess = true;
           
           debugLog("Successfully obtained FBXLoader immediately", {
@@ -338,10 +348,19 @@ export class CrystalShardManager {
               clearInterval(checkLoaderInterval);
               debugLog("FBXLoader became ready during wait");
               
-              // Try to get the loader
-              getFBXLoader().then(loader => {
-                debugLog("Successfully retrieved FBXLoader after waiting");
-                resolve({ success: true, loader });
+              // Try to get the loader constructor
+              getFBXLoader().then(LoaderClass => {
+                debugLog("Successfully retrieved FBXLoader constructor after waiting");
+                
+                try {
+                  // Instantiate the loader class
+                  const loaderInstance = new LoaderClass();
+                  debugLog("Successfully instantiated FBXLoader");
+                  resolve({ success: true, loader: loaderInstance });
+                } catch (instantiationError) {
+                  debugLog("Error instantiating FBXLoader", { error: instantiationError.message });
+                  resolve({ success: false, reason: "instantiation-error", error: instantiationError });
+                }
               }).catch(err => {
                 debugLog("Error getting FBXLoader after it became ready", {
                   error: err.message
@@ -363,10 +382,10 @@ export class CrystalShardManager {
         reason: result?.reason || "normal"
       });
       
-      // If we got a loader, save it
+      // If we got a loader instance, save it
       if (result?.success && result?.loader) {
         this.crystalLoader = result.loader;
-        this._crystalLoaderSource = "fbx-handler-wait";
+        this._crystalLoaderSource = "fbx-handler-wait-instance";
         this._fbxLoaderSuccess = true;
         debugLog("Successfully obtained FBXLoader from wait process");
         this._initializingLoader = false;
@@ -442,8 +461,8 @@ export class CrystalShardManager {
    * @private
    */
   /**
-   * Initialize the particle effect system 
-   * Sets up the CrystalParticleEffect class and configures it
+   * Initialize the particle effect system.
+   * Sets up the CrystalParticleEffect class and configures it.
    * @private
    */
   _initializeParticleSystem() {
@@ -503,7 +522,7 @@ export class CrystalShardManager {
   }
   
   /**
-   * Add sparkle particle effects to a crystal
+   * Add sparkle particle effects to a crystal.
    * @param {Object} crystal - The crystal to add particles to
    * @private
    */
@@ -675,7 +694,7 @@ export class CrystalShardManager {
     const hexPosition = hex.position 
       ? [hex.position.x, hex.position.y, hex.position.z] 
       : "undefined position";
-    debugLog(`Hex position:`, hexPosition);
+    debugLog("Hex position:", hexPosition);
     
     // Load the model
     this.crystalLoader.load(
@@ -1203,5 +1222,5 @@ export class CrystalShardManager {
   }
 }
 
-// Export an instance for global access if needed
+// Export the class for external use
 export default CrystalShardManager;
