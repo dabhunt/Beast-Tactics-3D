@@ -4,6 +4,7 @@ import { DebugMenu } from "./tools/diagnostics/DebugMenu.js";
 import { Beast } from './beast.js';
 // Import the new MapGenerator module and the textureLoadingTracker
 import { MapGenerator, ELEMENT_TYPES, textureLoadingTracker } from './MapGeneration.js';
+import { initCrystalParticleDebugger } from '../debug/CrystalParticleDebugger.js';
 // Import debug logging system with renamed functions to avoid conflicts with local functions
 import { debugLog as moduleDebugLog, debugWarn as moduleDebugWarn, debugError as moduleDebugError } from "./tools/diagnostics/DebugFlags.js";
 
@@ -718,6 +719,15 @@ function setupScene() {
   
   // Make mapGenerator available globally for diagnostics
   window.mapGenerator = mapGenerator;
+  
+  // Initialize crystal particle debugger when in development mode
+  try {
+    console.log('[GAME] Initializing Crystal Particle Debugger for development...');
+    initCrystalParticleDebugger(mapGenerator);
+  } catch (error) {
+    console.error('[GAME] Error initializing Crystal Particle Debugger:', error);
+    console.debug('[GAME] Crystal debugger stack trace:', error.stack);
+  }
 
   // Initialize the debug menu after all components are created
   debugLog("Initializing debug menu...");

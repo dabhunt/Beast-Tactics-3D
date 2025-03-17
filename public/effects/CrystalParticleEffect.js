@@ -306,10 +306,6 @@ export class CrystalParticleEffect {
     }
     
     /**
-     * Update all particle systems
-     * @param {number} deltaTime - Time elapsed since last update in seconds
-     */
-    /**
      * Update all particle systems for animation
      * @param {number} deltaTime - Time elapsed since last update in seconds
      */
@@ -326,15 +322,22 @@ export class CrystalParticleEffect {
             deltaTime = (now - this.lastUpdateTime) / 1000;
             this.lastUpdateTime = now;
             
-            // Still validate it's reasonable
-            if (deltaTime > 0.1) deltaTime = 0.016; // Cap at ~60fps for large jumps
+            // Still validate it's reasonable - cap at ~60fps for large jumps
+            if (deltaTime > 0.1) deltaTime = 0.016; 
         } else {
             // Track last update time
             this.lastUpdateTime = Date.now();
         }
         
-        // Log performance metrics periodically
-        if (Math.random() < 0.005) { // Reduced to log less frequently (every ~200 frames)
+        // Force a minimum frame rate for smooth animation
+        // This guarantees animation runs at minimum 30fps equivalent
+        const minimumFpsEquivalent = 1/30; // 33.33ms
+        if (deltaTime > minimumFpsEquivalent) {
+            deltaTime = minimumFpsEquivalent;
+        }
+        
+        // Log performance metrics periodically (once every few seconds)
+        if (Math.random() < 0.002) { 
             console.log(`[CRYSTAL-PARTICLES] Updating ${this.particleSystems.length} particle systems`, {
                 deltaTime: deltaTime.toFixed(4) + 's',
                 fps: (1/deltaTime).toFixed(1),
@@ -385,84 +388,74 @@ export class CrystalParticleEffect {
                 positions[posIdx + 1] += velocities[posIdx + 1] * deltaTime;
                 positions[posIdx + 2] += velocities[posIdx + 2] * deltaTime;
                 
-                // Apply some damping to velocity (slow down over time)
-                velocities[posIdx] *= 0.99;
-                velocities[posIdx + 1] *= 0.99;
-                velocities[posIdx + 2] *= 0.99;
-                
-                // Add a more dynamic animation system based on particle lifetime
-                const lifeStage = lifetimes[lifeIdx] / lifetimes[lifeIdx + 1]; // 0-1 range representing life progress
+                // Get the crystal reference
                 const crystal = system.userData.crystal;
                 
+                // Particle drifting behavior - always move away from crystal
                 if (crystal && crystal.position) {
                     // Calculate vector from crystal center to particle
                     const dx = positions[posIdx] - crystal.position.x;
                     const dy = positions[posIdx + 1] - crystal.position.y;
                     const dz = positions[posIdx + 2] - crystal.position.z;
-                    const distanceFromCenter = Math.sqrt(dx*dx + dz*dz);
                     
-                    // Get direction to center for creating attractive/repulsive forces
-                    let dirX = 0, dirZ = 0;
-                    if (distanceFromCenter > 0.001) {
-                        dirX = dx / distanceFromCenter;
-                        dirZ = dz / distanceFromCenter;
-                    }
+                    // Calculate distance from crystal center
+                    const distSq = dx*dx + dy*dy + dz*dz;
+                    const dist = Math.sqrt(distSq);
                     
-                    // Different behavior based on particle lifetime stage
-                    if (lifeStage < 0.3) {
-                        // PHASE 1: Initial expansion/burst phase
-                        // Accelerate outward from crystal
-                        const burstFactor = 2.0 * deltaTime * (1 - lifeStage/0.3);
-                        velocities[posIdx] += dirX * burstFactor;
-                        velocities[posIdx + 2] += dirZ * burstFactor;
-                    } 
-                    else if (lifeStage < 0.7) {
-                        // PHASE 2: Orbital/swirling phase
-                        // Calculate angle and apply orbital motion
-                        const angle = Math.atan2(dz, dx);
-                        const orbitalFactor = 3.0 * deltaTime;
-                        
-                        // Orbital velocity perpendicular to radius
-                        positions[posIdx] += Math.cos(angle + Math.PI/2) * orbitalFactor * distanceFromCenter;
-                        positions[posIdx + 2] += Math.sin(angle + Math.PI/2) * orbitalFactor * distanceFromCenter;
-                    }
-                    else {
-                        // PHASE 3: Return to crystal/fade phase
-                        // Slowly drift back toward crystal center
-                        const attractFactor = deltaTime * 0.8 * (lifeStage - 0.7) / 0.3;
-                        positions[posIdx] -= dirX * attractFactor * distanceFromCenter;
-                        positions[posIdx + 2] -= dirZ * attractFactor * distanceFromCenter;
-                    }
+                    // Normalize direction vector
+                    const dirX = dist > 0.001 ? dx / dist : 0;
+                    const dirY = dist > 0.001 ? dy / dist : 0;
+                    const dirZ = dist > 0.001 ? dz / dist : 0;
+                    
+                    // Apply a very gentle outward drift based on life stage
+                    // Early life: faster drift, Late life: slower drift
+                    const driftFactor = deltaTime * (1.0 - lifeRatio) * 0.3;
+                    
+                    velocities[posIdx] += dirX * driftFactor;
+                    velocities[posIdx + 1] += dirY * driftFactor;
+                    velocities[posIdx + 2] += dirZ * driftFactor;
+                    
+                    // Add slight upward tendency
+                    velocities[posIdx + 1] += deltaTime * 0.1;
+                    
+                    // Apply damping - stronger damping as particle ages
+                    // This creates a natural slowing effect as particles drift outward
+                    const dampingFactor = 0.98 - (lifeRatio * 0.07); // 0.98 to 0.91 based on life
+                    velocities[posIdx] *= dampingFactor;
+                    velocities[posIdx + 1] *= dampingFactor;
+                    velocities[posIdx + 2] *= dampingFactor;
                 }
                 
-                // Add randomized sparkle effect that increases based on life stage
-                // More sparkle/jitter as the particle ages
-                const sparkleIntensity = 0.3 + lifeStage * 0.7; // Increases over lifetime
-                const jitterAmount = deltaTime * sparkleIntensity * 0.5;
+                // Add subtle randomized sparkle/jitter effect
+                const sparkleIntensity = 0.05 + lifeRatio * 0.15; // Increases slightly over lifetime
+                const jitterAmount = deltaTime * sparkleIntensity;
                 
                 positions[posIdx] += (Math.random() - 0.5) * jitterAmount;
                 positions[posIdx + 1] += (Math.random() - 0.5) * jitterAmount;
                 positions[posIdx + 2] += (Math.random() - 0.5) * jitterAmount;
                 
-                // Enhanced size/opacity animation over lifetime
-                // Calculate opacity based on lifetime with a sharper curve
+                // Size and opacity animation
                 let opacity = 1.0;
                 let sizeScale = 1.0;
                 
-                if (lifeRatio < 0.15) {
-                    // Quick fade in with size burst
-                    opacity = Math.pow(lifeRatio / 0.15, 0.7); // Faster fade in with power curve
-                    sizeScale = 0.5 + Math.pow(lifeRatio / 0.15, 0.5) * 1.5; // Grow from 50% to 200%
+                if (lifeRatio < 0.1) {
+                    // Quick fade in with size increase
+                    opacity = Math.pow(lifeRatio / 0.1, 0.5); // Faster fade in with power curve
+                    sizeScale = 0.5 + Math.pow(lifeRatio / 0.1, 0.5) * 1.5; // 0.5x to 2.0x size
                 } 
-                else if (lifeRatio > 0.85) {
-                    // Slower fade out with size reduction
-                    opacity = Math.pow(1.0 - ((lifeRatio - 0.85) / 0.15), 0.7);
-                    sizeScale = 1.0 + (1.0 - Math.pow((lifeRatio - 0.85) / 0.15, 2)) * 0.5; // Shrink from 150% to 100%
+                else if (lifeRatio > 0.7) {
+                    // Gradual fade out - longer fade out period
+                    // This is the key change for requirement #2 - the fade out effect
+                    opacity = Math.pow(1.0 - ((lifeRatio - 0.7) / 0.3), 1.2); // Sharper fade curve
+                    
+                    // Apply size change during fade - slightly shrink particles as they fade
+                    const fadeProgress = (lifeRatio - 0.7) / 0.3; // 0-1 during fade period
+                    sizeScale = 1.0 - fadeProgress * 0.3; // Gradually reduce to 70% size during fade
                 }
                 else {
-                    // Middle life - pulsate size slightly for sparkle effect
-                    const pulseFreq = 5.0; // Higher gives more rapid pulsation
-                    const pulseAmp = 0.3;  // Size variation in pulsation
+                    // Middle life - subtle pulsation
+                    const pulseFreq = 3.0; // Frequency of pulsation
+                    const pulseAmp = 0.2;  // Size variation amplitude
                     sizeScale = 1.0 + Math.sin(lifeRatio * Math.PI * pulseFreq) * pulseAmp;
                 }
                 
@@ -473,17 +466,14 @@ export class CrystalParticleEffect {
                 needsUpdate = true;
             }
             
-            // Update the buffers if needed
-            if (needsUpdate) {
-                system.geometry.attributes.position.needsUpdate = true;
-                system.geometry.attributes.lifetime.needsUpdate = true;
-                system.geometry.attributes.delay.needsUpdate = true;
-                system.geometry.attributes.size.needsUpdate = true;
-            }
+            // Update the buffers if needed - always mark as needsUpdate to ensure smooth animation
+            system.geometry.attributes.position.needsUpdate = true;
+            system.geometry.attributes.lifetime.needsUpdate = true;
+            system.geometry.attributes.delay.needsUpdate = true;
+            system.geometry.attributes.size.needsUpdate = true;
         }
     }
-    
-    /**
+       /**
      * Reset a particle to its initial state
      * @private
      */
@@ -497,14 +487,25 @@ export class CrystalParticleEffect {
         
         const crystalPos = crystal.position;
         
+        // Only log occasional particle resets to avoid console flooding
+        if (Math.random() < 0.001) {
+            console.log('[CRYSTAL-PARTICLES] Resetting particle', {
+                index,
+                crystalPos: { x: crystalPos.x, y: crystalPos.y, z: crystalPos.z },
+                timestamp: new Date().toISOString()
+            });
+        }
+        
         // Get configuration from crystal if available
         const spreadMultiplier = crystal.userData.particleSpread || this.config.particleSpread || 0.3;
         const speedMultiplier = crystal.userData.particleSpeedMultiplier || this.config.particleSpeedMultiplier || 1.0;
         
-        // Distribute particles in a full sphere around the crystal for more coverage
+        // Keep particles closer to crystal source at start for better drifting effect
         const phi = Math.random() * Math.PI * 2; // Horizontal angle (full circle)
         const theta = Math.random() * Math.PI;   // Vertical angle (hemisphere)
-        const radius = Math.random() * this.config.emitterRadius * spreadMultiplier;
+        
+        // Start particles closer to crystal surface for better drifting effect
+        const radius = Math.random() * this.config.emitterRadius * spreadMultiplier * 0.6;
         
         // Calculate position using spherical coordinates for better distribution
         const posIdx = index * 3;
@@ -512,60 +513,40 @@ export class CrystalParticleEffect {
         positions[posIdx + 1] = crystalPos.y + Math.cos(theta) * radius; // Vertical distribution
         positions[posIdx + 2] = crystalPos.z + Math.sin(theta) * Math.sin(phi) * radius;
         
-        // Randomize starting positions more dramatically
-        if (Math.random() < 0.3) {
-            // 30% of particles start further out
-            positions[posIdx] += (Math.random() - 0.5) * radius * 0.5;
-            positions[posIdx + 2] += (Math.random() - 0.5) * radius * 0.5;
-        }
-        
-        // Create more varied and dynamic velocities
+        // Create more varied and dynamic velocities - slower overall for better drifting
         const baseSpeed = (this.config.minVelocity + Math.random() * 
-                         (this.config.maxVelocity - this.config.minVelocity)) * speedMultiplier;
+                         (this.config.maxVelocity - this.config.minVelocity)) * speedMultiplier * 0.5;
         
-        // Different velocity patterns for visual variety
-        const pattern = Math.random();
+        // Make all particles drift outward from crystal with slight randomization
+        const dx = positions[posIdx] - crystalPos.x;
+        const dy = positions[posIdx + 1] - crystalPos.y;
+        const dz = positions[posIdx + 2] - crystalPos.z;
         
-        if (pattern < 0.33) {
-            // Pattern 1: Mostly upward motion
-            velocities[posIdx] = (Math.random() - 0.5) * baseSpeed * 0.5;
-            velocities[posIdx + 1] = baseSpeed * (0.8 + Math.random() * 0.4); // Stronger upward
-            velocities[posIdx + 2] = (Math.random() - 0.5) * baseSpeed * 0.5;
-        } 
-        else if (pattern < 0.66) {
-            // Pattern 2: Orbital/spiral motion
-            const angle = Math.atan2(
-                positions[posIdx + 2] - crystalPos.z,
-                positions[posIdx] - crystalPos.x
-            );
-            velocities[posIdx] = Math.cos(angle + Math.PI/2) * baseSpeed * 0.8;
-            velocities[posIdx + 1] = (Math.random() - 0.3) * baseSpeed * 0.4; // Slight vertical
-            velocities[posIdx + 2] = Math.sin(angle + Math.PI/2) * baseSpeed * 0.8;
-        }
-        else {
-            // Pattern 3: Explosive outward
-            const dx = positions[posIdx] - crystalPos.x;
-            const dy = positions[posIdx + 1] - crystalPos.y;
-            const dz = positions[posIdx + 2] - crystalPos.z;
-            
-            // Normalize the direction vector
-            const dist = Math.sqrt(dx*dx + dy*dy + dz*dz) || 0.001; // Avoid division by zero
-            
-            velocities[posIdx] = (dx / dist) * baseSpeed * 1.2;
-            velocities[posIdx + 1] = (dy / dist) * baseSpeed * 1.2;
-            velocities[posIdx + 2] = (dz / dist) * baseSpeed * 1.2;
-        }
+        // Normalize the direction vector
+        const dist = Math.sqrt(dx*dx + dy*dy + dz*dz) || 0.001; // Avoid division by zero
         
-        // Reset lifetime
+        // Create outward drifting velocity with small random variations
+        velocities[posIdx] = (dx / dist) * baseSpeed + (Math.random() - 0.5) * baseSpeed * 0.3;
+        velocities[posIdx + 1] = (dy / dist) * baseSpeed + (Math.random() - 0.5) * baseSpeed * 0.3;
+        velocities[posIdx + 2] = (dz / dist) * baseSpeed + (Math.random() - 0.5) * baseSpeed * 0.3;
+        
+        // Add slight upward tendency for better visual appeal
+        velocities[posIdx + 1] += baseSpeed * 0.3;
+        
+        // Reset lifetime - longer lifetimes for better drifting effect
         const lifeIdx = index * 2;
         lifetimes[lifeIdx] = 0;
-        lifetimes[lifeIdx + 1] = this.config.minLifetime + Math.random() * (this.config.maxLifetime - this.config.minLifetime);
         
-        // Small random delay for staggered emission
-        delays[index] = Math.random() * 0.5;
+        // Increase max lifetime to allow particles to drift further
+        const minLifetime = this.config.minLifetime * 1.5; // 50% longer minimum lifetime
+        const maxLifetime = this.config.maxLifetime * 2.0; // 100% longer maximum lifetime
+        lifetimes[lifeIdx + 1] = minLifetime + Math.random() * (maxLifetime - minLifetime);
         
-        // Random size
-        sizes[index] = this.config.particleSize * (0.7 + Math.random() * 0.6);
+        // Smaller random delay for more constant particle flow
+        delays[index] = Math.random() * 0.2;
+        
+        // Random size with much wider variation (0.5x to 2x range as requested)
+        sizes[index] = this.config.particleSize * (0.5 + Math.random() * 1.5);
     }
     
     /**
