@@ -38,6 +38,9 @@ export class DebugMenu {
       grid: {}
     };
     
+    // Flag to track if log viewer is initialized
+    this.logViewerInitialized = false;
+    
     // Default material values
     this.materialDefaults = {
       shininess: 70,
@@ -69,6 +72,9 @@ export class DebugMenu {
 
     // Create the UI
     this._createUI();
+    
+    // Initialize log viewer
+    this.initLogViewer();
 
     console.log("[DEBUG] Debug menu initialized");
   }
@@ -256,7 +262,8 @@ export class DebugMenu {
       { id: "lighting", label: "Lighting" },
       { id: "grid", label: "Grid" },
       { id: "camera", label: "Camera" },
-      { id: "arrow", label: "Arrow Debugger" }, // Add Arrow Debugger tab
+      { id: "arrow", label: "Arrow Debugger" },
+      { id: "logs", label: "Logs" }, // Add Logs tab
     ];
 
     // Create content areas for each tab
@@ -804,6 +811,48 @@ export class DebugMenu {
         });
     } catch (err) {
       console.error("[DEBUG] Error initializing arrow debugger:", err);
+    }
+  }
+  
+  /**
+   * Initialize the Log Viewer tab
+   */
+  initLogViewer() {
+    console.log("[DEBUG] Initializing Log Viewer");
+
+    try {
+      // Load LogViewer dynamically as ES module
+      import('./LogViewer.js')
+        .then(module => {
+          // Create container for log viewer
+          const container = this.tabContents["logs"];
+
+          // Initialize log viewer
+          if (container) {
+            // Use the imported LogViewer class from the module
+            this.logViewer = new module.LogViewer(container);
+            console.log("[DEBUG] Log viewer initialized successfully");
+          } else {
+            console.error("[DEBUG] Log viewer container not found");
+          }
+        })
+        .catch(error => {
+          console.log("[DEBUG] Failed to load LogViewer module:", error);
+
+          // Show error message in the tab
+          const container = this.tabContents["logs"];
+          if (container) {
+            container.innerHTML = `
+              <div style="color: red; padding: 20px;">
+                <h3>Error Loading Log Viewer</h3>
+                <p>${error.message}</p>
+                <pre>${error.stack}</pre>
+              </div>
+            `;
+          }
+        });
+    } catch (err) {
+      console.error("[DEBUG] Error initializing log viewer:", err);
     }
   }
 
