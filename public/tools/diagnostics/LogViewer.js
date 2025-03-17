@@ -328,8 +328,18 @@ export class LogViewer {
         try {
           // Custom replacer function to handle circular references and THREE.js objects
           const safeReplacer = (key, value) => {
+            // Catch null/undefined early
+            if (value === null || value === undefined) {
+              return value;
+            }
+            
             // Handle special THREE.js object types
-            if (value && typeof value === 'object') {
+            if (typeof value === 'object') {
+              // Explicitly detect Scene objects which have known serialization issues
+              if (value.isScene || (value.type === 'Scene' && value.uuid)) {
+                return '[THREE.Scene]';
+              }
+              
               // Check for known THREE.js classes by properties
               if (
                 (value.isObject3D || value.isGeometry || value.isMaterial || value.isBufferGeometry) ||
@@ -340,6 +350,11 @@ export class LogViewer {
                 (value.fov && value.aspect)
               ) {
                 return `[THREE.${value.type || 'Object'}]`;
+              }
+              
+              // Handle collections of THREE.js objects (like children arrays)
+              if (Array.isArray(value) && value.length > 0 && value[0] && value[0].isObject3D) {
+                return `[Array of ${value.length} THREE objects]`;
               }
               
               // Handle HTML elements
@@ -357,7 +372,18 @@ export class LogViewer {
           };
           
           // Try to stringify the data with our custom replacer
-          const safeJsonString = JSON.stringify(log.data, safeReplacer, 2);
+          let safeJsonString;
+          try {
+            safeJsonString = JSON.stringify(log.data, safeReplacer, 2);
+          } catch (err) {
+            console.warn('[LOG-VIEWER] Failed to stringify log data:', err);
+            // Fallback to a simpler representation
+            safeJsonString = JSON.stringify({
+              stringifyError: err.message,
+              dataType: typeof log.data,
+              dataPreview: 'Cannot serialize object - may contain circular references'
+            });
+          }
           logElement.title = safeJsonString;
           logElement.style.cursor = 'pointer';
           logElement.style.textDecoration = 'underline dotted';
