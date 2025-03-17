@@ -3,19 +3,34 @@
  * Modified for Beast-Tactics-3D to work with local THREE.js structure
  */
 
+// Import THREE components directly - this is safer than relying on a global THREE
+import {
+    Euler,
+    FileLoader,
+    Group,
+    Loader,
+    LoaderUtils,
+    Matrix4,
+    Quaternion,
+    QuaternionKeyframeTrack,
+    Vector3,
+    Vector4,
+    VectorKeyframeTrack
+} from '/libs/three/three.module.js';
+
 // Create a global export for standalone usage
 let FBXLoader;
 
-// Check if we're in a module environment and import dependencies accordingly
-const isModule = typeof THREE === 'undefined';
+// We'll treat everything as a module now that we're explicitly importing
+const isModule = true;
 
 // Track load errors for debugging
 const loadErrors = [];
 
 // Log load status to help with debugging
-console.log('[FBXLoader] Initializing with environment check:', { isModule });
+console.log('[FBXLoader] Initializing with explicit THREE imports');
 
-// Setup dependencies either from THREE global or from imports
+// Setup dependencies to use imports
 let dependencies;
 
 try {
@@ -4134,6 +4149,8 @@ function getData( polygonVertexIndex, polygonIndex, vertexIndex, infoObject ) {
 
 }
 
+// Create reusable objects for transformations
+// Ensure Euler and Vector3 are available from imports
 const tempEuler = new Euler();
 const tempVec = new Vector3();
 

@@ -5,8 +5,15 @@
  * and provides various methods for loading the loader in different
  * environments (ES modules, script tags, etc.)
  * 
+ * This handler implements multiple fallback strategies and provides
+ * detailed error diagnostics for debugging loading issues.
+ * 
  * For Beast-Tactics-3D project
  */
+
+// Import THREE directly to ensure we have access to its components
+// This should be a relative import to wherever three.module.js is located
+import * as THREE from '/libs/three/three.module.js';
 
 // Enhanced debug logging
 const DEBUG = true;
@@ -56,10 +63,13 @@ async function loadDependencies() {
     debugLog('Loading FBXLoader dependencies');
     
     // Define the dependencies we need to load
+    // Use absolute paths from the root to avoid path resolution issues
     const dependencies = [
-        { path: '../libs/fflate.module.js', name: 'fflate' },
-        { path: '../curves/NURBSCurve.js', name: 'NURBSCurve' }
+        { path: '/libs/three/addons/libs/fflate.module.js', name: 'fflate' },
+        { path: '/libs/three/addons/curves/NURBSCurve.js', name: 'NURBSCurve' }
     ];
+    
+    debugLog('Using absolute paths for dependencies', dependencies);
     
     const results = [];
     
@@ -154,7 +164,39 @@ async function loadFBXLoader() {
     // Method 3: Try ES module import
     try {
         debugLog('Attempting to load FBXLoader as ES module');
-        const module = await import('./FBXLoader.js');
+        // Try multiple paths for more reliable loading
+        // Ensure absolute paths start with server root
+        const paths = [
+            '/libs/three/addons/loaders/FBXLoader.js',    // Absolute path from server root - primary choice
+            './FBXLoader.js',                            // Current directory relative path - backup
+            '../loaders/FBXLoader.js',                   // Another relative option
+            '/public/libs/three/addons/loaders/FBXLoader.js' // Alternative with /public prefix
+        ];
+        
+        debugLog('Attempting ES module import with paths:', paths);
+        
+        // Try each path until one works
+        let moduleLoaded = null;
+        let lastError = null;
+        
+        for (const path of paths) {
+            try {
+                debugLog(`Trying ES module import from: ${path}`);
+                const module = await import(path);
+                moduleLoaded = module;
+                debugLog(`Successfully loaded from ${path}`);
+                break;
+            } catch (err) {
+                debugLog(`Failed to load from ${path}:`, err.message);
+                lastError = err;
+            }
+        }
+        
+        if (!moduleLoaded) {
+            throw lastError || new Error('All ES module import paths failed');
+        }
+        
+        const module = moduleLoaded;
         
         debugLog('FBXLoader module loaded:', { moduleKeys: Object.keys(module) });
         
@@ -184,12 +226,48 @@ async function loadFBXLoader() {
         
         const scriptPromise = new Promise((resolve, reject) => {
             const script = document.createElement('script');
-            script.src = './FBXLoader.js';
+            // Try multiple paths for script loading to increase success chances
+            const paths = [
+                '/libs/three/addons/loaders/FBXLoader.js',    // Absolute path - most reliable
+                '/libs/three/FBXLoader.js',                  // Alternative location
+                './FBXLoader.js',                            // Relative path - less reliable
+                '/public/libs/three/addons/loaders/FBXLoader.js', // Alternative with /public prefix
+                `${window.location.origin}/libs/three/addons/loaders/FBXLoader.js` // Full URL with origin
+            ];
+            
+            debugLog('Script tag will try these paths:', paths);
+            script.src = paths[0]; // Start with the most reliable path
+            
+            // Add crossorigin attribute to avoid CORS issues
+            script.crossOrigin = 'anonymous';
             script.onload = () => {
+                debugLog('Script loaded, checking for FBXLoader definition');
+                
+                // Check for FBXLoader in different possible locations
                 if (typeof window.FBXLoader === 'function') {
+                    debugLog('Found FBXLoader on window global');
+                    resolve(true);
+                } else if (typeof THREE.FBXLoader === 'function') {
+                    debugLog('Found FBXLoader on THREE namespace');
+                    // Make it globally available as well
+                    window.FBXLoader = THREE.FBXLoader;
                     resolve(true);
                 } else {
-                    reject(new Error('Script loaded but FBXLoader not found'));
+                    // Check if the script might have added exports to require or define
+                    // (for AMD or CommonJS support)
+                    const possibleLocations = [
+                        'window.FBXLoader',
+                        'THREE.FBXLoader', 
+                        'window.THREE && window.THREE.FBXLoader'
+                    ];
+                    
+                    debugLog('FBXLoader not found in expected locations', {
+                        checked: possibleLocations,
+                        windowKeys: Object.keys(window).filter(k => k.includes('FBX') || k.includes('Loader')),
+                        threeKeys: typeof THREE === 'object' ? Object.keys(THREE).filter(k => k.includes('FBX') || k.includes('Loader')) : 'THREE not available'
+                    });
+                    
+                    reject(new Error('Script loaded but FBXLoader not found in any expected location'));
                 }
             };
             script.onerror = () => reject(new Error('Script load error'));
@@ -207,8 +285,11 @@ async function loadFBXLoader() {
     // Method 5: Create stub as last resort
     debugLog('All loading methods failed, creating stub implementation', { methodsAttempted: methods });
     
+    // Make sure THREE is defined before creating stub
+    const THREE = window.THREE || {};
+    
     // Create a warning stub that won't break the application
-    window.FBXLoader = class FBXLoaderStub {
+    const FBXLoaderStub = class FBXLoaderStub {
         constructor() {
             console.warn('[FBX-HANDLER] Using FBXLoader stub - real loader failed to load');
         }
@@ -218,8 +299,26 @@ async function loadFBXLoader() {
             console.warn(warning);
             
             // Create empty group as fallback
-            const emptyGroup = typeof THREE !== 'undefined' && THREE.Group ? 
-                new THREE.Group() : { type: 'Group', children: [] };
+            // Use THREE.Group if available, otherwise create a compatible object
+            let emptyGroup;
+            try {
+                if (typeof THREE !== 'undefined' && THREE.Group) {
+                    emptyGroup = new THREE.Group();
+                    emptyGroup.name = 'FBXLoader-Stub-Group';
+                } else {
+                    emptyGroup = { 
+                        type: 'Group', 
+                        name: 'FBXLoader-Stub-Group',
+                        children: [],
+                        position: { x: 0, y: 0, z: 0 },
+                        rotation: { x: 0, y: 0, z: 0 },
+                        scale: { x: 1, y: 1, z: 1 }
+                    };
+                }
+            } catch (err) {
+                console.error('[FBX-HANDLER] Error creating fallback group:', err);
+                emptyGroup = { type: 'Group', children: [] };
+            }
                 
             // Call error callback if provided, otherwise call load with empty group
             if (typeof onError === 'function') {
