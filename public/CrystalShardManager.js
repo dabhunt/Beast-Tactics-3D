@@ -716,7 +716,6 @@ export class CrystalShardManager {
         lastUpdateTime: this.particleLastUpdate
       });
     }
-    }
   }
   
   /**
