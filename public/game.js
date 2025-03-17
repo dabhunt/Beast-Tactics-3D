@@ -1141,6 +1141,21 @@ function setupScene() {
         console.error('[GAME] Error updating animation debugger:', err);
       }
     }
+    
+    // Update crystal particle effects if available
+    if (mapGenerator && mapGenerator.crystalManager) {
+      try {
+        // Update sparkling particle effects on crystal shards
+        mapGenerator.crystalManager.updateParticles();
+        
+        // Log update periodically
+        if (frameCount % 600 === 0) { // Log every ~10 seconds at 60fps
+          console.log('[CRYSTAL] Updated particle effects');
+        }
+      } catch (err) {
+        console.error('[GAME] Error updating crystal particles:', err);
+      }
+    }
   }
   
   // Track last frame time for delta calculation

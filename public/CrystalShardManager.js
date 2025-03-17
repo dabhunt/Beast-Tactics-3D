@@ -2,7 +2,11 @@
  * CrystalShardManager.js
  * Responsible for managing crystal shard loading, placement, and visualization
  * Extracted from MapGeneration.js to improve modularity
+ * Includes sparkling particle effects for visual enhancement
  */
+
+// Import the particle effect system
+import { CrystalParticleEffect } from "./effects/CrystalParticleEffect.js";
 
 // Try to import FBXLoader if available
 let FBXLoader;
@@ -232,7 +236,16 @@ export class CrystalShardManager {
       crystalScaleFactor: 0.005, // Size of the crystal
       crystalModelPath: "/assets/Purple_Crystal_Shard.fbx",
       crystalTexturePath: "/assets/Purple_Crystal_Shard_texture.png",
-      ...config // Override defaults with provided config
+      
+      // Particle effect configuration
+      enableParticles: true,       // Whether to enable particle effects
+      particleCount: 15,           // Number of particles per crystal
+      particleSize: 0.04,          // Size of each particle
+      particleColor: 0xFFFFFF,     // Color of particles (default: white sparkles)
+      emissionRate: 0.3,           // Particles emitted per second
+      particleMinLifetime: 1.0,    // Minimum lifetime in seconds
+      particleMaxLifetime: 2.5,    // Maximum lifetime in seconds
+      ...config                    // Override defaults with provided config
     };
     
     this.crystalLoader = null;
@@ -243,7 +256,17 @@ export class CrystalShardManager {
     this._crystalLoaderSource = "none";
     this._initializingLoader = false;
     
+    // Particle effect system
+    this.particleEffect = null;
+    this.particleLastUpdate = Date.now();
+    this.activeCrystals = [];      // Track all active crystals
+    
     debugLog("Crystal Shard Manager initialized with config:", this.config);
+    
+    // Initialize particle effect system if enabled
+    if (this.config.enableParticles) {
+      this._initializeParticleSystem();
+    }
     
     // Load crystal texture
     this.loadCrystalTexture();
@@ -475,6 +498,70 @@ export class CrystalShardManager {
   }
   
   /**
+   * Initialize the particle effect system
+   * @private
+   */
+  _initializeParticleSystem() {
+    console.log('[CRYSTAL] Initializing particle effect system');
+    
+    try {
+      // Create new particle effect manager with our configuration
+      this.particleEffect = new CrystalParticleEffect(this.THREE, this.scene, {
+        particleCount: this.config.particleCount,
+        particleSize: this.config.particleSize,
+        particleColor: this.config.particleColor,
+        minLifetime: this.config.particleMinLifetime,
+        maxLifetime: this.config.particleMaxLifetime,
+        emissionRate: this.config.emissionRate
+      });
+      
+      console.log('[CRYSTAL] Particle effect system initialized successfully');
+    } catch (error) {
+      console.error('[CRYSTAL] Failed to initialize particle effect system:', error);
+      this.config.enableParticles = false; // Disable particles on error
+    }
+  }
+  
+  /**
+   * Add sparkle particle effects to a crystal
+   * @param {Object} crystal - The crystal to add particles to
+   * @private
+   */
+  _addParticlesToCrystal(crystal) {
+    if (!this.config.enableParticles || !this.particleEffect || !crystal) {
+      return;
+    }
+    
+    debugLog("Adding particles to crystal at position:", crystal.position);
+    
+    try {
+      // Create particles for this crystal
+      this.particleEffect.createParticlesForCrystal(crystal, crystal.position);
+      console.log('[CRYSTAL] Successfully added particles to crystal');
+    } catch (error) {
+      console.error('[CRYSTAL] Error adding particles to crystal:', error);
+    }
+  }
+  
+  /**
+   * Update all crystal particle effects
+   * Should be called in the animation loop
+   */
+  updateParticles() {
+    if (!this.config.enableParticles || !this.particleEffect) {
+      return;
+    }
+    
+    // Calculate delta time for smooth animation
+    const now = Date.now();
+    const deltaTime = (now - this.particleLastUpdate) / 1000; // Convert to seconds
+    this.particleLastUpdate = now;
+    
+    // Update particle animations
+    this.particleEffect.update(deltaTime);
+  }
+  
+  /**
    * Load a crystal model for a specific hex using the FBXLoader
    * @param {Object} hex - The hexagon to place the crystal on
    */
@@ -557,6 +644,12 @@ export class CrystalShardManager {
           // Add to the scene and associate with hex
           this.scene.add(fbx);
           hex.userData.crystal = fbx;
+          
+          // Track this crystal for animations and particles
+          this.activeCrystals.push(fbx);
+          
+          // Add sparkle particle effects
+          this._addParticlesToCrystal(fbx);
           
           console.log(
             `[CRYSTAL] Crystal successfully placed on hex (${hex.userData.q}, ${hex.userData.r})`,
@@ -709,6 +802,12 @@ export class CrystalShardManager {
       // Add to scene and associate with hex
       this.scene.add(crystal);
       hex.userData.crystal = crystal;
+      
+      // Track this crystal for animations and particles
+      this.activeCrystals.push(crystal);
+      
+      // Add sparkle particle effects
+      this._addParticlesToCrystal(crystal);
 
       // Log success with crystal details
       console.log(
