@@ -1145,15 +1145,31 @@ function setupScene() {
     // Update crystal particle effects if available
     if (mapGenerator && mapGenerator.crystalManager) {
       try {
-        // Update sparkling particle effects on crystal shards
-        mapGenerator.crystalManager.updateParticles();
+        // Calculate proper delta time for smooth animations
+        const now = performance.now();
+        const deltaTime = (now - lastFrameTime) / 1000; // Convert to seconds
+        
+        // Ensure crystal manager has reference to the camera for view-dependent effects
+        if (!mapGenerator.crystalManager.camera && camera) {
+          mapGenerator.crystalManager.camera = camera;
+          console.log('[CRYSTAL] Provided camera reference to crystal manager for shader effects');
+        }
+        
+        // Update sparkling particle effects and glow shaders on crystal shards
+        // Pass deltaTime explicitly for more accurate movement
+        mapGenerator.crystalManager.updateParticles(deltaTime);
         
         // Log update periodically
-        if (frameCount % 600 === 0) { // Log every ~10 seconds at 60fps
-          console.log('[CRYSTAL] Updated particle effects');
+        if (frameCount % 300 === 0) { // Log every ~5 seconds at 60fps
+          console.log('[CRYSTAL] Updated particle and glow effects', {
+            deltaTime: deltaTime.toFixed(4) + 's',
+            frameCount: frameCount,
+            hasCamera: mapGenerator.crystalManager.camera ? true : false
+          });
         }
       } catch (err) {
         console.error('[GAME] Error updating crystal particles:', err);
+        console.debug('Error details:', err.stack || err);
       }
     }
   }

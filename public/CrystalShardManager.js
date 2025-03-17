@@ -1030,11 +1030,15 @@ export class CrystalShardManager {
           varying float intensity;
           void main() {
             // Create pulsing intensity based on animation phase
-            float pulseMultiplier = 0.7 + 0.3 * sin(pulsePhase * 3.14159 * 2.0);
+            // Enhanced pulsing for more dramatic effect
+            float pulseMultiplier = 0.6 + 0.4 * sin(pulsePhase * 3.14159 * 2.0);
             
-            // Apply color with variable intensity
-            float finalIntensity = intensity * glowIntensity * pulseMultiplier;
-            gl_FragColor = vec4(glowColor, finalIntensity * 0.4);
+            // Apply color with variable intensity and custom shimmer effect
+            float wobble = sin(pulsePhase * 20.0) * 0.05; // Fast subtle wobble
+            float finalIntensity = (intensity + wobble) * glowIntensity * pulseMultiplier;
+            
+            // Apply color with adjusted alpha for better visibility
+            gl_FragColor = vec4(glowColor, finalIntensity * 0.6);
           }
         `,
         side: this.THREE.FrontSide,
@@ -1046,8 +1050,63 @@ export class CrystalShardManager {
       // Create the glow mesh
       const glowMesh = new this.THREE.Mesh(glowGeometry, glowMaterial);
       
-      // Make glow slightly bigger than the original crystal
-      glowMesh.scale.multiplyScalar(1.15);
+      // Scale the glow effect appropriately based on crystal type
+      if (crystal.type === 'Group' || crystal.children?.length > 0) {
+        // FBX model or complex model - calculate appropriate scale
+        console.log('[CRYSTAL] Applying glow to complex crystal model');
+        
+        // For complex models, we need to determine the appropriate scale
+        let boundingBox = new this.THREE.Box3();
+        let hasMesh = false;
+        
+        // Calculate bounding box to get appropriate scale
+        crystal.traverse(child => {
+          if (child.isMesh) {
+            boundingBox.expandByObject(child);
+            hasMesh = true;
+          }
+        });
+        
+        if (hasMesh) {
+          // Get the size of the crystal
+          const size = new this.THREE.Vector3();
+          boundingBox.getSize(size);
+          
+          // Calculate average dimension and apply scale based on that
+          const avgDimension = (size.x + size.y + size.z) / 3;
+          console.log(`[CRYSTAL] Crystal average dimension: ${avgDimension.toFixed(3)}`);
+          
+          // Apply appropriate scale based on the original size
+          if (avgDimension > 0) {
+            // Make glow mesh 10% larger than the crystal
+            glowMesh.scale.set(
+              crystal.scale.x * 1.1,
+              crystal.scale.y * 1.1,
+              crystal.scale.z * 1.1
+            );
+          } else {
+            // Fallback for cases where we can't determine size
+            glowMesh.scale.copy(crystal.scale);
+            glowMesh.scale.multiplyScalar(1.1);
+          }
+        } else {
+          // If no meshes found, use the crystal's scale directly
+          glowMesh.scale.copy(crystal.scale);
+          glowMesh.scale.multiplyScalar(1.1);
+        }
+      } else {
+        // Simple crystal - apply a standard scale multiplier
+        // Make glow 12% bigger than the original crystal
+        glowMesh.scale.copy(crystal.scale || new this.THREE.Vector3(1, 1, 1));
+        glowMesh.scale.multiplyScalar(1.12);
+      }
+      
+      // Log the determined scale for debugging
+      console.log('[CRYSTAL] Applied glow scale:', { 
+        x: glowMesh.scale.x.toFixed(3), 
+        y: glowMesh.scale.y.toFixed(3), 
+        z: glowMesh.scale.z.toFixed(3) 
+      });
       
       // Set initial position to match the crystal
       glowMesh.position.copy(crystal.position);
@@ -1096,9 +1155,31 @@ export class CrystalShardManager {
                   // Update pulse phase
                   glowMesh.material.uniforms.pulsePhase.value = crystal.userData.glowAnimationPhase;
                   
+                  // Enhanced visual effect: gradually change glow intensity
+                  // Varies between 1.0 and 2.0 for more dramatic pulsing
+                  const cyclicalIntensity = 1.0 + Math.sin(crystal.userData.glowAnimationPhase * Math.PI * 2) * 0.5;
+                  glowMesh.material.uniforms.glowIntensity.value = cyclicalIntensity;
+                  
                   // Update view vector (camera position for view-dependent effects)
                   if (this.camera) {
                     glowMesh.material.uniforms.viewVector.value.copy(this.camera.position);
+                    
+                    // Periodic logging to confirm camera position is being used
+                    if (Math.random() < 0.001) {
+                      console.log('[CRYSTAL] Using camera for view-dependent glow effect', {
+                        cameraPosition: this.camera.position.toArray().map(v => v.toFixed(2)),
+                        glowPhase: crystal.userData.glowAnimationPhase.toFixed(2),
+                        glowIntensity: cyclicalIntensity.toFixed(2)
+                      });
+                    }
+                  } else {
+                    // If no camera available, use a default view vector
+                    // This ensures the effect still works without a camera reference
+                    glowMesh.material.uniforms.viewVector.value.set(0, 0, 5);
+                    
+                    if (Math.random() < 0.01) {
+                      console.warn('[CRYSTAL] No camera reference for view-dependent effects');
+                    }
                   }
                 }
                 
