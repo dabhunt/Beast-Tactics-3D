@@ -108,6 +108,10 @@ export class CrystalShardManager {
     this._crystalLoaderSource = "none";
     this._initializingLoader = false;
     
+    // Class-level promise for tracking loader initialization
+    this._fbxLoaderPromise = null;
+    this._fbxLoaderSuccess = false;
+    
     // Particle effect system
     this.particleEffect = null;
     this.particleLastUpdate = Date.now();
@@ -218,132 +222,216 @@ export class CrystalShardManager {
   
   /**
    * Initialize the crystal loader if it doesn't exist
-   * Attempts to find a valid FBXLoader from multiple sources
+   * Uses the enhanced FBXLoader.handler.js to manage loading
    *
    * @returns {Promise<boolean>} - Returns true if loader was initialized successfully
    */
   async initializeCrystalLoader() {
-    // Prevent multiple initializations with tracking
+    // Start with detailed debug logging
+    debugLog("Starting crystal loader initialization", {
+      alreadyInitializing: this._initializingLoader,
+      alreadyLoaded: this.crystalLoader !== null,
+      loaderSource: this._crystalLoaderSource
+    });
+    
+    // Prevent multiple initializations by tracking state
     if (this._initializingLoader) {
-      console.log(
-        "[CRYSTAL] Another initialization is already in progress, waiting...",
-      );
+      debugLog("Another initialization already in progress, waiting for it to complete");
+      
       // Wait for the current initialization to complete before returning
       await new Promise((resolve) => {
         const checkInterval = setInterval(() => {
           if (!this._initializingLoader) {
             clearInterval(checkInterval);
+            debugLog("Previous initialization completed, continuing");
             resolve();
           }
         }, 100);
       });
-      console.log("[CRYSTAL] Previous initialization completed, reusing loader");
-      return;
+      
+      // Return the result of the previous initialization
+      const result = this.crystalLoader !== null;
+      debugLog("Using result from previous initialization", { successful: result });
+      return result;
     }
     
+    // Set flag to prevent concurrent initializations
     this._initializingLoader = true;
+    debugLog("Starting new initialization process");
 
-    // Cache the source of our crystal loader for diagnostics
-    this._crystalLoaderSource = "none";
-
+    // If we already have a loader, just return success
     if (this.crystalLoader) {
-      console.log(
-        "[CRYSTAL] Crystal loader already initialized from:",
-        this._crystalLoaderSource,
-      );
+      debugLog("Crystal loader already initialized", { source: this._crystalLoaderSource });
       this._initializingLoader = false;
-      return true; // Already initialized
+      return true;
     }
 
-    console.log(
-      "[CRYSTAL] Crystal loader not initialized yet, checking available loaders",
-    );
-
     try {
-      // Wait for any pending FBXLoader import to complete
-      if (fbxLoaderPromise && !fbxLoaderSuccess) {
-        console.log("[CRYSTAL] Waiting for FBXLoader import to complete...");
+      // ===== STEP 1: Check if FBXLoader is already ready =====
+      debugLog("STEP 1: Checking if FBXLoader is ready via handler");
+      
+      if (isFBXLoaderReady()) {
+        debugLog("FBXLoader is already ready, retrieving instance");
+        
         try {
-          await fbxLoaderPromise;
-          console.log(
-            "[CRYSTAL] FBXLoader import completed, success status:",
-            fbxLoaderSuccess,
-          );
-        } catch (err) {
-          console.warn("[CRYSTAL] Error waiting for FBXLoader import:", err);
-          window._fbxLoaderErrors.push({
-            type: "await-error",
-            error: err.toString(),
+          // Get the loader from our handler
+          this.crystalLoader = await getFBXLoader();
+          this._crystalLoaderSource = "fbx-handler-ready";
+          this._fbxLoaderSuccess = true;
+          
+          debugLog("Successfully obtained FBXLoader immediately", {
+            loader: this.crystalLoader ? "valid" : "null",
+            source: this._crystalLoaderSource
+          });
+          
+          this._initializingLoader = false;
+          return true;
+        } catch (immediateError) {
+          // Log but continue to next step if this fails
+          debugLog("Error getting FBXLoader despite ready status", {
+            error: immediateError.message,
+            stack: immediateError.stack?.split('\n')[0] || 'No stack'
           });
         }
       }
-
-      // Check if FBXLoader is available from global import
-      if (typeof FBXLoader === "function") {
-        console.log("[CRYSTAL] Using imported FBXLoader (global variable)");
-        this.crystalLoader = new FBXLoader();
-        this._crystalLoaderSource = "global-import";
-        this._initializingLoader = false;
-        return true;
+      
+      // ===== STEP 2: Wait for handler to initialize loader =====
+      debugLog("STEP 2: FBXLoader not immediately ready, setting up wait process");
+      
+      // Create new promise only if we don't already have one
+      if (!this._fbxLoaderPromise) {
+        debugLog("Creating new loader wait promise");
+        
+        this._fbxLoaderPromise = new Promise(async (resolve) => {
+          // Set timeout constraints
+          const maxWaitTime = 8000; // 8 seconds max wait
+          const startTime = Date.now();
+          let attemptCount = 0;
+          
+          const checkLoaderInterval = setInterval(() => {
+            attemptCount++;
+            const elapsed = Date.now() - startTime;
+            
+            // Log each check attempt
+            if (attemptCount % 4 === 0) { // Log every 4th attempt to avoid spam
+              debugLog("Checking FBXLoader readiness", {
+                attempt: attemptCount,
+                elapsed: `${elapsed}ms`,
+                maxWait: `${maxWaitTime}ms`,
+                timeRemaining: `${Math.max(0, maxWaitTime - elapsed)}ms`
+              });
+            }
+            
+            // Check for timeout
+            if (elapsed > maxWaitTime) {
+              clearInterval(checkLoaderInterval);
+              debugLog("Timeout waiting for FBXLoader", { 
+                attemptsMade: attemptCount,
+                elapsedMs: elapsed 
+              });
+              resolve({ success: false, reason: "timeout" });
+              return;
+            }
+            
+            // Check if loader is ready now
+            if (isFBXLoaderReady()) {
+              clearInterval(checkLoaderInterval);
+              debugLog("FBXLoader became ready during wait");
+              
+              // Try to get the loader
+              getFBXLoader().then(loader => {
+                debugLog("Successfully retrieved FBXLoader after waiting");
+                resolve({ success: true, loader });
+              }).catch(err => {
+                debugLog("Error getting FBXLoader after it became ready", {
+                  error: err.message
+                });
+                resolve({ success: false, reason: "get-error", error: err });
+              });
+            }
+          }, 500); // Check every 500ms
+        });
       }
-
-      // Check if it's available through THREE
-      if (this.THREE && typeof this.THREE.FBXLoader === "function") {
-        console.log("[CRYSTAL] Using THREE.FBXLoader");
-        this.crystalLoader = new this.THREE.FBXLoader();
-        this._crystalLoaderSource = "three-object";
-        this._initializingLoader = false;
-        return true;
-      }
-
-      // Try window global
-      if (typeof window.FBXLoader === "function") {
-        console.log("[CRYSTAL] Using window.FBXLoader");
-        this.crystalLoader = new window.FBXLoader();
-        this._crystalLoaderSource = "window-global";
-        this._initializingLoader = false;
-        return true;
-      }
-
-      // Try one more direct script loading as last resort
-      console.log("[CRYSTAL] Last resort: Adding FBXLoader script directly...");
-      await new Promise((resolve) => {
-        const script = document.createElement("script");
-        script.src = "/libs/three/addons/loaders/FBXLoader.js";
-        script.onload = () => {
-          console.log(
-            "[CRYSTAL] Direct script load succeeded, checking for FBXLoader...",
-          );
-          resolve();
-        };
-        script.onerror = (e) => {
-          console.warn("[CRYSTAL] Direct script load failed:", e);
-          window._fbxLoaderErrors.push({
-            type: "direct-script-error",
-            error: e.toString(),
-          });
-          resolve();
-        };
-        document.head.appendChild(script);
+      
+      // Wait for the promise to resolve
+      debugLog("Waiting for loader promise to resolve");
+      const result = await this._fbxLoaderPromise;
+      
+      // Process the result
+      debugLog("Loader wait process completed", { 
+        success: result?.success,
+        reason: result?.reason || "normal"
       });
-
-      // Check after direct script loading
-      if (typeof window.FBXLoader === "function") {
-        console.log("[CRYSTAL] SUCCESS: Got FBXLoader after direct script load");
-        this.crystalLoader = new window.FBXLoader();
-        this._crystalLoaderSource = "direct-script";
+      
+      // If we got a loader, save it
+      if (result?.success && result?.loader) {
+        this.crystalLoader = result.loader;
+        this._crystalLoaderSource = "fbx-handler-wait";
+        this._fbxLoaderSuccess = true;
+        debugLog("Successfully obtained FBXLoader from wait process");
         this._initializingLoader = false;
         return true;
       }
-
-      // If we get here, no FBXLoader is available
-      console.warn(
-        "[CRYSTAL] No FBXLoader available after all attempts, will use fallback crystals",
-      );
+      
+      // ===== STEP 3: Try fallback methods =====
+      debugLog("STEP 3: Trying fallback loader acquisition methods");
+      
+      // Try basic global checks
+      const availabilityChecks = [
+        { name: "global-FBXLoader", check: () => typeof FBXLoader === "function", create: () => new FBXLoader() },
+        { name: "THREE.FBXLoader", check: () => this.THREE && typeof this.THREE.FBXLoader === "function", create: () => new this.THREE.FBXLoader() },
+        { name: "window.FBXLoader", check: () => typeof window.FBXLoader === "function", create: () => new window.FBXLoader() }
+      ];
+      
+      // Try each fallback method
+      for (const method of availabilityChecks) {
+        debugLog(`Checking for ${method.name}`);
+        
+        if (method.check()) {
+          debugLog(`Found ${method.name}, creating loader instance`);
+          
+          try {
+            this.crystalLoader = method.create();
+            this._crystalLoaderSource = method.name;
+            this._fbxLoaderSuccess = true;
+            
+            debugLog(`Successfully created loader from ${method.name}`);
+            this._initializingLoader = false;
+            return true;
+          } catch (fallbackError) {
+            debugLog(`Error creating loader from ${method.name}`, {
+              error: fallbackError.message 
+            });
+            // Continue to next method
+          }
+        }
+      }
+      
+      // If we get here, we failed to initialize the loader
+      debugLog("All loader initialization methods failed", {
+        attempts: "handler-ready → handler-wait → global → THREE → window"
+      });
+      
       this._initializingLoader = false;
       return false;
     } catch (error) {
-      console.error("[CRYSTAL] Error initializing crystal loader:", error);
+      // Handle unexpected errors during initialization
+      console.error("[CRYSTAL] Critical error initializing crystal loader:", error);
+      console.error("[CRYSTAL] Error details:", {
+        message: error.message,
+        stack: error.stack,
+        loaderSource: this._crystalLoaderSource
+      });
+      
+      // Track errors for diagnostics
+      window._crystalShardErrors = window._crystalShardErrors || [];
+      window._crystalShardErrors.push({
+        timestamp: new Date().toISOString(),
+        phase: "loader-initialization",
+        error: error.message,
+        stack: error.stack
+      });
+      
       this._initializingLoader = false;
       return false;
     }
