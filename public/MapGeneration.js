@@ -1,13 +1,16 @@
 /**
  * MapGeneration.js
  * Responsible for generating and managing the hexagonal grid map system
- * including biome distribution. Crystal shard functionality has been moved to CrystalShardManager.js
+ * including biome distribution, terrain models, and crystal shard functionality
  */
 
 // Import the CrystalShardManager for handling shard-related functionality
 import { CrystalShardManager } from './CrystalShardManager.js';
 
-// FBXLoader handling now moved to CrystalShardManager.js
+// Import the BiomeModelManager for handling 3D models for biome tiles
+import { BiomeModelManager } from './BiomeModelManager.js';
+
+// FBXLoader handling moved to dedicated manager classes
 
 // Track loading status of resources
 // Export this so game.js can access it for debugging
@@ -113,6 +116,15 @@ export class MapGenerator {
       crystalTexturePath: this.config.crystalTexturePath
     });
     console.log("[MAP] CrystalShardManager initialized successfully");
+    
+    // Initialize the Biome Model Manager for handling 3D models for biome tiles
+    console.log("[MAP] Setting up BiomeModelManager...");
+    this.biomeModelManager = new BiomeModelManager(scene, THREE, {
+      modelBasePath: "./assets/BiomeTiles/Models/",
+      modelHeightOffset: 0.3, // Height above the hexagon
+      modelScaleFactor: 0.01  // Size scaling factor for models
+    });
+    console.log("[MAP] BiomeModelManager initialized successfully");
 
     // Load textures
     this.loadTextures();
@@ -401,9 +413,34 @@ export class MapGenerator {
 
     // Add to scene
     this.scene.add(hex);
+    this.hexagons.push(hex);
+    this.hexCount++;
 
     // Spawn crystal shard with configured probability
     this.trySpawnCrystalShard(hex);
+    
+    // Load and place a 3D biome model if available
+    if (this.biomeModelManager) {
+      console.log(`[MAP] Attempting to load biome model for hex (${q},${r}) with element: ${hex.userData.element}`);
+      
+      // Load the biome model asynchronously
+      this.biomeModelManager.loadBiomeModel(hex)
+        .then(success => {
+          if (success) {
+            console.log(`[MAP] Successfully loaded biome model for ${hex.userData.element} hex at (${q},${r})`);
+            
+            // If we were successful, check if we got a biomeName and store it
+            if (hex.userData.biomeName) {
+              console.log(`[MAP] Biome name for ${hex.userData.element} element is: ${hex.userData.biomeName}`);
+            }
+          } else {
+            console.log(`[MAP] No biome model available for ${hex.userData.element} hex at (${q},${r})`);
+          }
+        })
+        .catch(error => {
+          console.error(`[MAP] Error loading biome model for ${hex.userData.element} hex at (${q},${r}):`, error);
+        });
+    }
 
     return hex;
   }
