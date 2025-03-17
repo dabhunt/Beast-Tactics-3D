@@ -519,7 +519,7 @@ export class CrystalShardManager {
                 // Create a material with the texture
                 const material = new this.THREE.MeshPhongMaterial({
                   map: this.crystalTexture,
-                  shininess: 100,
+                  shininess: 30,
                   specular: 0xffffff,
                   emissive: 0x330066,
                   emissiveIntensity: 0.5,

@@ -2,6 +2,10 @@
  * Debug menu for Beast Tactics
  * Provides real-time control of rendering parameters and game settings
  */
+
+// Import the debug flags manager
+import debugFlags, { enableDebug, disableDebug, toggleDebug, getAllDebugFlags, setDebugFlags } from './DebugFlags.js';
+
 /**
  * Debug Menu for Beast Tactics
  * Provides real-time control of rendering parameters and game settings
@@ -235,6 +239,7 @@ export class DebugMenu {
     this._createLightingControls();
     this._createGridControls();
     this._createCameraControls();
+    this._createDebugFlagsControls(); // Add debug flags controls
 
     // Add to document
     document.body.appendChild(this.container);
@@ -263,7 +268,8 @@ export class DebugMenu {
       { id: "grid", label: "Grid" },
       { id: "camera", label: "Camera" },
       { id: "arrow", label: "Arrow Debugger" },
-      { id: "logs", label: "Logs" }, // Add Logs tab
+      { id: "logs", label: "Logs" },
+      { id: "debugflags", label: "Debug Flags" }, // Add Debug Flags tab
     ];
 
     // Create content areas for each tab
@@ -867,6 +873,174 @@ export class DebugMenu {
     } else {
       console.log("[DEBUG] Arrow Debugger not initialized yet, will initialize it");
       this.initArrowDebugger(beast);
+    }
+  }
+  
+  /**
+   * Creates controls for enabling/disabling various debug flag categories
+   * This allows users to control which types of debug logs are shown
+   * @private
+   */
+  _createDebugFlagsControls() {
+    console.log("[DEBUG] Creating debug flags controls");
+    
+    try {
+      // Get the container for this tab
+      const container = this.tabContents["debugflags"];
+      if (!container) {
+        console.error("[DEBUG] Debug flags container not found");
+        return;
+      }
+      
+      // Add a description
+      const description = document.createElement("p");
+      description.textContent = "Toggle debug logging for specific categories to improve performance.";
+      description.style.marginBottom = "15px";
+      container.appendChild(description);
+      
+      // Add a warning about performance
+      const performanceWarning = document.createElement("p");
+      performanceWarning.innerHTML = "<strong>Warning:</strong> Enabling MOUSE, HOVER, or RAYCASTER logs may significantly impact performance.";
+      performanceWarning.style.color = "#ff9800";
+      performanceWarning.style.marginBottom = "15px";
+      container.appendChild(performanceWarning);
+      
+      // Create a grid for the toggle switches
+      const grid = document.createElement("div");
+      grid.style.display = "grid";
+      grid.style.gridTemplateColumns = "repeat(2, 1fr)";
+      grid.style.gap = "10px";
+      container.appendChild(grid);
+      
+      // Get all available debug flags
+      const allFlags = getAllDebugFlags();
+      
+      // Create toggle for each debug category
+      Object.keys(allFlags).forEach(category => {
+        // Create container for this flag
+        const flagContainer = document.createElement("div");
+        flagContainer.style.display = "flex";
+        flagContainer.style.alignItems = "center";
+        flagContainer.style.padding = "5px";
+        flagContainer.style.border = "1px solid #444";
+        flagContainer.style.borderRadius = "4px";
+        
+        // Create a checkbox
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.id = `debug-flag-${category}`;
+        checkbox.checked = allFlags[category];
+        checkbox.style.marginRight = "10px";
+        
+        // High-frequency log categories get special styling
+        if (['MOUSE', 'HOVER', 'RAYCASTER'].includes(category)) {
+          flagContainer.style.backgroundColor = "rgba(255, 152, 0, 0.2)";
+        }
+        
+        // Add change handler
+        checkbox.addEventListener("change", () => {
+          console.log(`[DEBUG] ${checkbox.checked ? 'Enabling' : 'Disabling'} ${category} debug logs`);
+          if (checkbox.checked) {
+            enableDebug(category);
+          } else {
+            disableDebug(category);
+          }
+        });
+        
+        // Create label
+        const label = document.createElement("label");
+        label.htmlFor = `debug-flag-${category}`;
+        label.textContent = category;
+        label.style.flexGrow = "1";
+        
+        // Add to container
+        flagContainer.appendChild(checkbox);
+        flagContainer.appendChild(label);
+        grid.appendChild(flagContainer);
+      });
+      
+      // Add buttons for quick actions
+      const buttonsContainer = document.createElement("div");
+      buttonsContainer.style.marginTop = "20px";
+      buttonsContainer.style.display = "flex";
+      buttonsContainer.style.justifyContent = "space-between";
+      container.appendChild(buttonsContainer);
+      
+      // Enable all button
+      const enableAllBtn = document.createElement("button");
+      enableAllBtn.textContent = "Enable All";
+      enableAllBtn.style.padding = "5px 10px";
+      enableAllBtn.style.background = "#2a2a2a";
+      enableAllBtn.style.color = "white";
+      enableAllBtn.style.border = "1px solid #555";
+      enableAllBtn.style.borderRadius = "4px";
+      enableAllBtn.style.cursor = "pointer";
+      enableAllBtn.addEventListener("click", () => {
+        console.log("[DEBUG] Enabling all debug logs");
+        Object.keys(allFlags).forEach(category => {
+          enableDebug(category);
+          const checkbox = document.getElementById(`debug-flag-${category}`);
+          if (checkbox) checkbox.checked = true;
+        });
+      });
+      buttonsContainer.appendChild(enableAllBtn);
+      
+      // Disable all button
+      const disableAllBtn = document.createElement("button");
+      disableAllBtn.textContent = "Disable All";
+      disableAllBtn.style.padding = "5px 10px";
+      disableAllBtn.style.background = "#2a2a2a";
+      disableAllBtn.style.color = "white";
+      disableAllBtn.style.border = "1px solid #555";
+      disableAllBtn.style.borderRadius = "4px";
+      disableAllBtn.style.cursor = "pointer";
+      disableAllBtn.addEventListener("click", () => {
+        console.log("[DEBUG] Disabling all debug logs");
+        Object.keys(allFlags).forEach(category => {
+          // Keep DEBUG category enabled for the debug menu's own logs
+          if (category !== 'DEBUG') {
+            disableDebug(category);
+            const checkbox = document.getElementById(`debug-flag-${category}`);
+            if (checkbox) checkbox.checked = false;
+          }
+        });
+      });
+      buttonsContainer.appendChild(disableAllBtn);
+      
+      // Only essential button (keep just the core logs, disable the noisy ones)
+      const essentialOnlyBtn = document.createElement("button");
+      essentialOnlyBtn.textContent = "Essential Only";
+      essentialOnlyBtn.style.padding = "5px 10px";
+      essentialOnlyBtn.style.background = "#2a2a2a";
+      essentialOnlyBtn.style.color = "white";
+      essentialOnlyBtn.style.border = "1px solid #555";
+      essentialOnlyBtn.style.borderRadius = "4px";
+      essentialOnlyBtn.style.cursor = "pointer";
+      essentialOnlyBtn.addEventListener("click", () => {
+        console.log("[DEBUG] Setting essential debug logs only");
+        
+        // Define which categories are essential
+        const essential = ['DEBUG', 'LOG_VIEWER', 'MAP', 'BEAST', 'BATTLE'];
+        
+        // Update all flags based on whether they're in the essential list
+        Object.keys(allFlags).forEach(category => {
+          const isEssential = essential.includes(category);
+          if (isEssential) {
+            enableDebug(category);
+            const checkbox = document.getElementById(`debug-flag-${category}`);
+            if (checkbox) checkbox.checked = true;
+          } else {
+            disableDebug(category);
+            const checkbox = document.getElementById(`debug-flag-${category}`);
+            if (checkbox) checkbox.checked = false;
+          }
+        });
+      });
+      buttonsContainer.appendChild(essentialOnlyBtn);
+      
+      console.log("[DEBUG] Debug flags controls initialized successfully");
+    } catch (error) {
+      console.error("[DEBUG] Error creating debug flags controls:", error);
     }
   }
 

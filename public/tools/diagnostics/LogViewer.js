@@ -333,28 +333,53 @@ export class LogViewer {
               return value;
             }
             
-            // Handle special THREE.js object types
-            if (typeof value === 'object') {
+            // Handle functions directly, regardless of parent
+            if (typeof value === 'function') {
+              return '[Function]';
+            }
+            
+            // Handle primitive values directly
+            if (typeof value !== 'object' || value === null) {
+              return value;
+            }
+            
+            // Begin handling objects
+            try {
+              // Handle Beast objects which have complex nesting
+              if (value.type && ['Fire', 'Water', 'Earth', 'Wind', 'Electric', 'Plant', 'Metal', 'Dark', 'Light', 'Combat', 'Spirit', 'Corrosion'].includes(value.type)) {
+                if (value.scene || value.camera || value.position) {
+                  return `[Beast: ${value.type || 'Unknown'}]`;
+                }
+              }
+              
               // Explicitly detect Scene objects which have known serialization issues
               if (value.isScene || (value.type === 'Scene' && value.uuid)) {
                 return '[THREE.Scene]';
               }
               
+              // Handle all cameras
+              if (value.isCamera || (value.fov && value.aspect)) {
+                return `[THREE.${value.type || 'Camera'}]`;
+              }
+              
               // Check for known THREE.js classes by properties
               if (
-                (value.isObject3D || value.isGeometry || value.isMaterial || value.isBufferGeometry) ||
+                value.isObject3D || value.isGeometry || value.isMaterial || value.isBufferGeometry ||
                 (value.uuid && value.type && (value.matrix || value.color || value.layers)) ||
-                // Check if it's a mesh, light, or camera
                 (value.geometry && value.material) ||
-                (value.intensity && value.shadow) ||
-                (value.fov && value.aspect)
+                (value.intensity && value.shadow)
               ) {
                 return `[THREE.${value.type || 'Object'}]`;
               }
               
               // Handle collections of THREE.js objects (like children arrays)
-              if (Array.isArray(value) && value.length > 0 && value[0] && value[0].isObject3D) {
-                return `[Array of ${value.length} THREE objects]`;
+              if (Array.isArray(value)) {
+                if (value.length > 0 && value[0] && value[0].isObject3D) {
+                  return `[Array of ${value.length} THREE objects]`;
+                }
+                
+                // Keep arrays but with safely replaced contents
+                return value;
               }
               
               // Handle HTML elements
@@ -362,27 +387,72 @@ export class LogViewer {
                 return `[HTML ${value.tagName} Element]`;
               }
               
-              // Handle functions
-              if (typeof value === 'function') {
-                return '[Function]';
+              // Handle various special object types that cannot be stringified
+              if (value instanceof Map) {
+                return `[Map with ${value.size} entries]`;
               }
+              
+              if (value instanceof Set) {
+                return `[Set with ${value.size} entries]`;
+              }
+              
+              if (value instanceof WeakMap || value instanceof WeakSet) {
+                return `[${value.constructor.name}]`;
+              }
+            } catch (error) {
+              // If any error occurs during property access, return a safe string
+              return `[Complex Object: ${typeof value}]`;
             }
             
+            // For regular objects, continue normal JSON traversal
             return value;
           };
           
           // Try to stringify the data with our custom replacer
           let safeJsonString;
           try {
-            safeJsonString = JSON.stringify(log.data, safeReplacer, 2);
+            // First attempt: Try to stringify with a depth limit to avoid deep recursion
+            let processedData = log.data;
+            
+            // If data is an object, create a safe copy with limited depth
+            if (typeof log.data === 'object' && log.data !== null) {
+              // Helper function to clone with depth limit
+              const cloneWithDepthLimit = (obj, depth = 3) => {
+                if (depth <= 0) return '[Nested Object]';
+                if (typeof obj !== 'object' || obj === null) return obj;
+                
+                if (Array.isArray(obj)) {
+                  return obj.map(item => cloneWithDepthLimit(item, depth - 1));
+                }
+                
+                const result = {};
+                for (const key in obj) {
+                  try {
+                    if (Object.prototype.hasOwnProperty.call(obj, key)) {
+                      result[key] = cloneWithDepthLimit(obj[key], depth - 1);
+                    }
+                  } catch (e) {
+                    result[key] = '[Inaccessible Property]';
+                  }
+                }
+                return result;
+              };
+              
+              processedData = cloneWithDepthLimit(log.data);
+            }
+            
+            safeJsonString = JSON.stringify(processedData, safeReplacer, 2);
           } catch (err) {
             console.warn('[LOG-VIEWER] Failed to stringify log data:', err);
-            // Fallback to a simpler representation
+            // Log the name of the object constructor to help with debugging
+            const constructorName = log.data && log.data.constructor ? log.data.constructor.name : 'Unknown';
+            // Fallback to a simpler representation with more details
             safeJsonString = JSON.stringify({
               stringifyError: err.message,
               dataType: typeof log.data,
-              dataPreview: 'Cannot serialize object - may contain circular references'
-            });
+              constructorName: constructorName,
+              dataPreview: 'Cannot serialize object - may contain circular references or complex properties'
+            }, null, 2);
           }
           logElement.title = safeJsonString;
           logElement.style.cursor = 'pointer';

@@ -4,6 +4,8 @@ import { DebugMenu } from "./tools/diagnostics/DebugMenu.js";
 import { Beast } from './beast.js';
 // Import the new MapGenerator module and the textureLoadingTracker
 import { MapGenerator, ELEMENT_TYPES, textureLoadingTracker } from './MapGeneration.js';
+// Import debug logging system with renamed functions to avoid conflicts with local functions
+import { debugLog as moduleDebugLog, debugWarn as moduleDebugWarn, debugError as moduleDebugError } from "./tools/diagnostics/DebugFlags.js";
 
 // Log the imported textureLoadingTracker to verify it's properly loaded
 console.log('[GAME] Imported textureLoadingTracker:', textureLoadingTracker);
@@ -112,15 +114,25 @@ const logger = createLogger('game.js', DEBUG);
 
 /**
  * Enhanced logging function that only logs in debug mode
- * Maintaining compatibility with existing code
+ * Integrates with DebugFlags module for controlled logging
  * @param {string} message - Log message
  * @param {Object} data - Optional data to log
  */
 function debugLog(message, data = null) {
-  if (data) {
-    logger.debug(message, data);
+  // Extract module name from message if it follows the [MODULE] pattern
+  const moduleMatch = message.match(/^\[(\w+)\]/); 
+  
+  if (moduleMatch) {
+    // If we have a module tag in the message like [HOVER], use DebugFlags system
+    const moduleName = moduleMatch[1];
+    moduleDebugLog(moduleName, message.replace(`[${moduleName}] `, ''), data);
   } else {
-    logger.debug(message);
+    // Otherwise use the standard logger (maintains compatibility)
+    if (data) {
+      logger.debug(message, data);
+    } else {
+      logger.debug(message);
+    }
   }
 }
 
@@ -230,7 +242,7 @@ function setupScene() {
     const mouse = new THREE.Vector2();
 
     // Create stroke material for hover effect using LineMaterial for thicker lines with gold animation
-    console.log('[HOVER] Creating stroke material with LineMaterial for gold animated effect');
+    moduleDebugLog('HOVER', 'Creating stroke material with LineMaterial for gold animated effect');
     
     // Base values for stroke effect
     const BASE_STROKE_WIDTH = 10;   // Thicker line as requested
@@ -260,7 +272,7 @@ function setupScene() {
       // renderOrder should be applied to the mesh, not the material
     });
     
-    console.log('[HOVER] LineMaterial created with enhanced settings:', {
+    moduleDebugLog('HOVER', 'LineMaterial created with enhanced settings:', {
       linewidth: BASE_STROKE_WIDTH,
       opacity: 0.8,
       type: 'LineMaterial',
@@ -271,11 +283,11 @@ function setupScene() {
     
     // Add resize handler to update resolution when window size changes
     window.addEventListener('resize', () => {
-      console.log('[HOVER] Updating LineMaterial resolution on resize');
+      moduleDebugLog('HOVER', 'Updating LineMaterial resolution on resize');
       strokeMaterial.resolution.set(window.innerWidth, window.innerHeight);
     });
     
-    console.log('[HOVER] LineMaterial created successfully:', { 
+    moduleDebugLog('HOVER', 'LineMaterial created successfully:', { 
       material: strokeMaterial,
       materialType: strokeMaterial.type,
       linewidth: strokeMaterial.linewidth,
@@ -285,13 +297,13 @@ function setupScene() {
 
     // Initialize mouse position vector outside event handler
     const mousePos = new THREE.Vector2();
-    console.log('[MOUSE] Initialized mouse position vector:', mousePos);
+    moduleDebugLog('MOUSE', 'Initialized mouse position vector:', mousePos);
     
     // Function to animate the hover effect with gold wave
     function animateHoverEffect() {
       // Only run if animation is active and we have a hover stroke
       if (!hoverAnimationActive || !currentHoverStroke) {
-        //console.log('[HOVER-ANIM] Animation inactive or no hover stroke');
+        //moduleDebugLog('HOVER', 'Animation inactive or no hover stroke');
         return;
       }
       
@@ -341,7 +353,7 @@ function setupScene() {
             
             // Log vertex count periodically to verify connections
             // if (elapsed % 300 === 0) { // Every ~5 seconds
-            //   console.log(`[HOVER-ANIM] Vertex data check:`, {
+            //   moduleDebugLog('HOVER', `Animation vertex data check:`, {
             //     vertexCount: currentHoverStroke.geometry.attributes.position.count,
             //     colorCount: currentHoverStroke.geometry.attributes.color.count,
             //     expectedVertices: hexPointCount + 1
@@ -396,7 +408,7 @@ function setupScene() {
 
     // Handle mouse move for hex hover
     window.addEventListener('mousemove', (event) => {
-      console.log('[MOUSE] Mouse move event:', { 
+      moduleDebugLog('MOUSE', 'Mouse move event:', { 
         clientX: event.clientX, 
         clientY: event.clientY 
       });
@@ -405,13 +417,13 @@ function setupScene() {
       mousePos.x = (event.clientX / window.innerWidth) * 2 - 1;
       mousePos.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
-      console.log('[MOUSE] Updated normalized coordinates:', { 
+      moduleDebugLog('MOUSE', 'Updated normalized coordinates:', { 
         x: mousePos.x, 
         y: mousePos.y 
       });
 
       // Log before raycasting to ensure variables are defined
-      console.log('[RAYCASTER] Preparing to find intersects', {
+      moduleDebugLog('RAYCASTER', 'Preparing to find intersects', {
         raycasterDefined: !!raycaster,
       hexagonsDefined: !!hexagons,
       hexagonsCount: hexagons ? hexagons.length : 0
@@ -427,7 +439,7 @@ function setupScene() {
     }
     
     // Debug camera and scene state for troubleshooting ray intersection issues
-    console.log('[RAYCASTER] Camera state:', {
+    moduleDebugLog('RAYCASTER', 'Camera state:', {
       position: [camera.position.x.toFixed(2), camera.position.y.toFixed(2), camera.position.z.toFixed(2)],
       rotation: [camera.rotation.x.toFixed(2), camera.rotation.y.toFixed(2), camera.rotation.z.toFixed(2)],
       near: camera.near,
@@ -446,7 +458,7 @@ function setupScene() {
       
       // If no intersections are found, try with the entire scene as fallback
       if (intersects.length === 0) {
-        console.log('[RAYCASTER] No direct intersections found, trying with scene objects');
+        moduleDebugLog('RAYCASTER', 'No direct intersections found, trying with scene objects');
         const sceneIntersects = raycaster.intersectObjects(scene.children, recursive);
         
         // Filter scene intersects to only include hexagons
@@ -462,7 +474,7 @@ function setupScene() {
       }
       
       // Log after raycasting to confirm execution
-      console.log('[RAYCASTER] Intersects found:', {
+      moduleDebugLog('RAYCASTER', 'Intersects found:', {
         intersectCount: intersects.length,
         firstIntersect: intersects.length > 0 ? {
           distance: intersects[0].distance.toFixed(2),
@@ -485,7 +497,7 @@ function setupScene() {
 
     // If we were hovering a hex, remove its stroke
     if (window.hoveredHex) {
-      console.log('[HOVER] Clearing previous hover effect', {
+      moduleDebugLog('HOVER', 'Clearing previous hover effect', {
         hexExists: !!window.hoveredHex,
         hasMaterial: !!window.hoveredHex.material,
         hasUserData: window.hoveredHex.material ? !!window.hoveredHex.material.userData : false
@@ -500,9 +512,9 @@ function setupScene() {
             window.hoveredHex.material.userData.strokeMesh = null;
             window.hoveredHex.material.userData.strokeMaterial = null;
           }
-          console.log('[HOVER] Successfully removed stroke mesh');
+          moduleDebugLog('HOVER', 'Successfully removed stroke mesh');
         } else {
-          console.log('[HOVER] No stroke mesh found to remove');
+          moduleDebugLog('HOVER', 'No stroke mesh found to remove');
         }
       } catch (err) {
         console.error('[HOVER] Error removing stroke mesh:', err);
@@ -516,7 +528,7 @@ function setupScene() {
     if (intersects.length > 0) {
       try {
         const hex = intersects[0].object;
-        console.log('[HOVER] Setting new hover on hex:', {
+        moduleDebugLog('HOVER', 'Setting new hover on hex:', {
           hexExists: !!hex,
           hasMaterial: !!hex?.material,
           hasUserData: !!hex?.material?.userData,
@@ -540,7 +552,7 @@ function setupScene() {
         // Store as global reference for inspection
         window.hoveredHex = hex;
         
-        console.log(`[HOVER] Hovering hex of type: ${hex.userData.element}`, {
+        moduleDebugLog('HOVER', `Hovering hex of type: ${hex.userData.element}`, {
           position: [hex.position.x.toFixed(2), hex.position.y.toFixed(2), hex.position.z.toFixed(2)],
           rotation: [hex.rotation.x.toFixed(2), hex.rotation.y.toFixed(2), hex.rotation.z.toFixed(2)],
           timestamp: new Date().toISOString()
@@ -568,7 +580,7 @@ function setupScene() {
             // This guarantees perfect closure with no visible seam
             x = firstX; 
             z = firstZ;
-            console.log('[HOVER] Closing loop with exact coordinates match');
+            moduleDebugLog('HOVER', 'Closing loop with exact coordinates match');
           } else {
             const angle = (i / hexPointCount) * Math.PI * 2;
             x = radius * Math.cos(angle);
@@ -586,7 +598,7 @@ function setupScene() {
         }
         
         // Log first and last points to verify perfect closure
-        console.log('[HOVER] Hexagon stroke points verification:', {
+        moduleDebugLog('HOVER', 'Hexagon stroke points verification:', {
           pointCount: hexPoints.length,
           firstPoint: hexPoints[0],
           lastPoint: hexPoints[hexPoints.length-1],
@@ -594,7 +606,7 @@ function setupScene() {
                      hexPoints[0].z === hexPoints[hexPoints.length-1].z
         });
         
-        console.log(`[HOVER] Created ${positions.length / 3} vertices for hexagon stroke`);
+        moduleDebugLog('HOVER', `Created ${positions.length / 3} vertices for hexagon stroke`);
         
         // Generate initial gold colors
         const colors = [];
@@ -610,10 +622,10 @@ function setupScene() {
         strokeGeometry.setPositions(positions);
         strokeGeometry.setColors(colors); // Add initial colors for animation
         
-        console.log('[HOVER] LineGeometry created successfully with points:', positions.length / 3);
+        moduleDebugLog('HOVER', 'LineGeometry created successfully with points:', positions.length / 3);
         
         // Create stroke mesh with material
-        console.log('[HOVER] Creating stroke mesh with Line2');
+        moduleDebugLog('HOVER', 'Creating stroke mesh with Line2');
         
         // Create the stroke mesh with our geometry and material
         const strokeMesh = new Line2(strokeGeometry, strokeMaterial);
@@ -623,7 +635,7 @@ function setupScene() {
         const hexRotationY = hex.rotation.y || 0;
         strokeMesh.rotation.y = hexRotationY;
         
-        console.log(`[HOVER] Using hex rotation: ${hexRotationY.toFixed(4)} radians`);
+        moduleDebugLog('HOVER', `Using hex rotation: ${hexRotationY.toFixed(4)} radians`);
         
         // Position higher above hex to avoid z-fighting
         strokeMesh.position.y = 0.05;
@@ -647,7 +659,7 @@ function setupScene() {
         hoverAnimationActive = true;
         hoverAnimationFrame = requestAnimationFrame(animateHoverEffect);
         
-        console.log('[HOVER] Successfully created and attached animated gold stroke mesh');
+        moduleDebugLog('HOVER', 'Successfully created and attached animated gold stroke mesh');
       } catch (err) {
         console.error('[HOVER] Error creating hover effect:', err);
       }
@@ -774,7 +786,7 @@ function setupScene() {
           
           // Debug logging - runs once every 300 frames to avoid console spam
           if (frameCount % 300 === 0) {
-            console.log('[HOVER] Animation state:', {
+            moduleDebugLog('HOVER', 'Animation state:', {
               hoveredHexExists: !!window.hoveredHex,
               hasMaterial: !!window.hoveredHex?.material,
               hasUserData: !!window.hoveredHex?.material?.userData,
