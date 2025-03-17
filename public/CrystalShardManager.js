@@ -238,13 +238,16 @@ export class CrystalShardManager {
       crystalTexturePath: "/assets/Purple_Crystal_Shard_texture.png",
       
       // Particle effect configuration
-      enableParticles: true,       // Whether to enable particle effects
-      particleCount: 15,           // Number of particles per crystal
-      particleSize: 0.04,          // Size of each particle
-      particleColor: 0xFFFFFF,     // Color of particles (default: white sparkles)
-      emissionRate: 0.3,           // Particles emitted per second
-      particleMinLifetime: 1.0,    // Minimum lifetime in seconds
-      particleMaxLifetime: 2.5,    // Maximum lifetime in seconds
+      enableParticles: true,           // Whether to enable particle effects
+      particleCount: 35,               // Number of particles per crystal (increased)
+      particleSize: 0.07,              // Size of each particle (increased)
+      particleColor: 0x9932CC,         // Color of particles (Dark Orchid - more visible purple)
+      emissionRate: 0.7,               // Particles emitted per second (increased)
+      particleMinLifetime: 1.5,        // Minimum lifetime in seconds
+      particleMaxLifetime: 3.0,        // Maximum lifetime in seconds
+      particleSpread: 0.3,             // How far particles spread from center
+      particleSpeedMultiplier: 1.5,    // Makes particles move faster
+      particleIntensity: 2.0,          // Overall intensity multiplier
       ...config                    // Override defaults with provided config
     };
     

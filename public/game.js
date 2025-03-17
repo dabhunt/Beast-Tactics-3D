@@ -559,7 +559,7 @@ function setupScene() {
         });
 
         // Create stroke geometry (hexagon outline) using LineGeometry
-        console.log('[HOVER] Creating stroke geometry with LineGeometry');
+        //console.log('[HOVER] Creating stroke geometry with LineGeometry');
         
         const radius = 0.95; // Slightly smaller than hex radius for inset effect
         const positions = [];
@@ -622,10 +622,10 @@ function setupScene() {
         strokeGeometry.setPositions(positions);
         strokeGeometry.setColors(colors); // Add initial colors for animation
         
-        moduleDebugLog('HOVER', 'LineGeometry created successfully with points:', positions.length / 3);
+        //moduleDebugLog('HOVER', 'LineGeometry created successfully with points:', positions.length / 3);
         
         // Create stroke mesh with material
-        moduleDebugLog('HOVER', 'Creating stroke mesh with Line2');
+        //moduleDebugLog('HOVER', 'Creating stroke mesh with Line2');
         
         // Create the stroke mesh with our geometry and material
         const strokeMesh = new Line2(strokeGeometry, strokeMaterial);
