@@ -1143,28 +1143,42 @@ function setupScene() {
     }
     
     // Update crystal particle effects if available
-    if (mapGenerator && mapGenerator.crystalManager) {
+    if (mapGenerator && mapGenerator.crystalShardManager) {
       try {
         // Calculate proper delta time for smooth animations
         const now = performance.now();
         const deltaTime = (now - lastFrameTime) / 1000; // Convert to seconds
         
+        // Log detailed debug info every 1000 frames
+        if (frameCount === 1 || frameCount % 1000 === 0) {
+          console.log('[CRYSTAL] Crystal manager debug info:', {
+            managerExists: !!mapGenerator.crystalShardManager,
+            hasParticleEffect: !!mapGenerator.crystalShardManager.particleEffect,
+            particleSystemsCount: mapGenerator.crystalShardManager.particleEffect ? 
+              mapGenerator.crystalShardManager.particleEffect.particleSystems.length : 0,
+            activeCrystalsCount: mapGenerator.crystalShardManager.activeCrystals ? 
+              mapGenerator.crystalShardManager.activeCrystals.length : 0,
+            hasCamera: !!mapGenerator.crystalShardManager.camera
+          });
+        }
+        
         // Ensure crystal manager has reference to the camera for view-dependent effects
-        if (!mapGenerator.crystalManager.camera && camera) {
-          mapGenerator.crystalManager.camera = camera;
+        if (!mapGenerator.crystalShardManager.camera && camera) {
+          mapGenerator.crystalShardManager.camera = camera;
           console.log('[CRYSTAL] Provided camera reference to crystal manager for shader effects');
         }
         
         // Update sparkling particle effects and glow shaders on crystal shards
         // Pass deltaTime explicitly for more accurate movement
-        mapGenerator.crystalManager.updateParticles(deltaTime);
+        mapGenerator.crystalShardManager.updateParticles(deltaTime);
         
-        // Log update periodically
+        // Log update periodically (less frequently to avoid console spam)
         if (frameCount % 300 === 0) { // Log every ~5 seconds at 60fps
           console.log('[CRYSTAL] Updated particle and glow effects', {
             deltaTime: deltaTime.toFixed(4) + 's',
             frameCount: frameCount,
-            hasCamera: mapGenerator.crystalManager.camera ? true : false
+            hasCamera: mapGenerator.crystalShardManager.camera ? true : false,
+            timestamp: new Date().toISOString()
           });
         }
       } catch (err) {
@@ -1175,7 +1189,7 @@ function setupScene() {
   }
   
   // Track last frame time for delta calculation
-  let lastFrameTime = null;
+  let lastFrameTime = performance.now();
 
   // Replace the animate function with our enhanced version
   animate = enhancedAnimate;
