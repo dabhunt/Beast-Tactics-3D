@@ -661,10 +661,26 @@ export class MapGenerator {
         options: shardOptions
       });
       
+      // Validate ShardManager before placement
+      if (!this.shardManager) {
+        console.error('[MAP] ShardManager not available for crystal placement');
+        return this.createFallbackCrystal(hex);
+      }
+
       // Delegate the actual shard creation and placement to the ShardManager
       // This is an async operation as it might need to load models and textures
       console.log(`[MAP] Calling ShardManager.placeShard...`);
-      const shard = await this.shardManager.placeShard(position, shardOptions);
+      let shard;
+      try {
+        shard = await this.shardManager.placeShard(position, shardOptions);
+        if (!shard) {
+          console.warn('[MAP] ShardManager returned null shard, using fallback');
+          return this.createFallbackCrystal(hex);
+        }
+      } catch (err) {
+        console.error('[MAP] Error in shard placement:', err);
+        return this.createFallbackCrystal(hex);
+      }
       
       // Check if shard creation was successful
       if (shard) {

@@ -60,11 +60,21 @@ class ShardManager {
     
     // Create a placeholder assetLoader if not provided
     if (!this.assetLoader) {
-      console.warn('[SHARDS] AssetLoader not provided - creating placeholder with logging');
+      console.warn('[SHARDS] AssetLoader not provided - creating placeholder with fallback geometry');
       this.assetLoader = {
         loadModel: async (path, options) => {
-          console.warn(`[SHARDS] Placeholder AssetLoader.loadModel called with: ${path}`);
-          return null; // Will trigger fallback shard creation
+          console.warn(`[SHARDS] Creating fallback geometry for: ${path}`);
+          // Create a simple geometry as fallback
+          const geometry = new this.THREE.ConeGeometry(0.2, 0.5, 6);
+          const material = new this.THREE.MeshStandardMaterial({
+            color: 0xff00ff,
+            emissive: 0x330066,
+            metalness: 0.9,
+            roughness: 0.1
+          });
+          const mesh = new this.THREE.Mesh(geometry, material);
+          mesh.userData = { isFallback: true };
+          return mesh;
         },
         cache: {
           models: new Map(),
