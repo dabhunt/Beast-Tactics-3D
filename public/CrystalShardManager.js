@@ -8,30 +8,17 @@
 // Import the particle effect system
 import { CrystalParticleEffect } from "./effects/CrystalParticleEffect.js";
 
-// Try to import FBXLoader if available
+// Import our enhanced FBXLoader handler
+import { getFBXLoader, isFBXLoaderReady } from "./libs/three/addons/loaders/FBXLoader.handler.js";
+
+// Reference to FBXLoader
 let FBXLoader;
-
-// Different possible paths to try for loading FBXLoader
-const FBXLOADER_PATHS = [
-  "three/addons/loaders/FBXLoader.js",
-  "./libs/three/addons/loaders/FBXLoader.js",
-  "/libs/three/addons/loaders/FBXLoader.js",
-];
-
-// Paths to try with script tag loading approach
-const FBXLOADER_SCRIPT_PATHS = ["/libs/three/addons/loaders/FBXLoader.js"];
-
-// Track if we've successfully loaded the FBXLoader
-let fbxLoaderPromise = null;
-let fbxLoaderSuccess = false;
-let fbxLoaderAttempts = 0;
-let scriptLoadAttempts = 0;
-
-// Create a global variable to track errors during loading
-window._fbxLoaderErrors = window._fbxLoaderErrors || [];
 
 // Debug flag for verbose logging
 const DEBUG = true;
+
+// Create a global variable to track errors during loading
+window._crystalShardErrors = window._crystalShardErrors || [];
 
 /**
  * Enhanced logging function that only logs in debug mode
@@ -48,169 +35,25 @@ function debugLog(message, data = null) {
 }
 
 /**
- * Try loading FBXLoader from different paths until successful using ES6 imports
- * @returns {Promise} - A promise that resolves when loader is found or all paths failed
+ * Log error with detailed diagnostics
+ * @param {string} context - Error context description 
+ * @param {Error} error - The error object
  */
-function attemptLoadFBXLoader() {
-  console.log(
-    `[CRYSTAL] Attempting to load FBXLoader via ES6 import (attempt ${fbxLoaderAttempts + 1}/${FBXLOADER_PATHS.length})`,
-  );
-
-  if (fbxLoaderAttempts >= FBXLOADER_PATHS.length) {
-    console.warn(
-      "[CRYSTAL] All FBXLoader ES6 import attempts failed, trying script tag approach",
-    );
-    return attemptLoadFBXLoaderViaScript();
-  }
-
-  const path = FBXLOADER_PATHS[fbxLoaderAttempts];
-  console.log(`[CRYSTAL] Trying to import FBXLoader from: ${path}`);
-
-  return import(path)
-    .then((module) => {
-      console.log(
-        "[CRYSTAL] Import succeeded, module contents:",
-        Object.keys(module),
-      );
-      // Check different ways the module might export FBXLoader
-      if (module.FBXLoader) {
-        FBXLoader = module.FBXLoader;
-        console.log(
-          "[CRYSTAL] FBXLoader imported successfully via module.FBXLoader",
-        );
-        window.FBXLoader = FBXLoader; // Make it available globally
-        fbxLoaderSuccess = true;
-        return true;
-      } else if (module.default && module.default.FBXLoader) {
-        FBXLoader = module.default.FBXLoader;
-        console.log(
-          "[CRYSTAL] FBXLoader imported successfully via module.default.FBXLoader",
-        );
-        window.FBXLoader = FBXLoader; // Make it available globally
-        fbxLoaderSuccess = true;
-        return true;
-      } else if (module.default && typeof module.default === "function") {
-        FBXLoader = module.default;
-        console.log("[CRYSTAL] Using module.default as FBXLoader");
-        window.FBXLoader = FBXLoader; // Make it available globally
-        fbxLoaderSuccess = true;
-        return true;
-      } else {
-        console.warn("[CRYSTAL] Module loaded but FBXLoader not found in:", module);
-        window._fbxLoaderErrors.push({
-          type: "module-structure",
-          module: Object.keys(module),
-        });
-        fbxLoaderAttempts++;
-        return attemptLoadFBXLoader(); // Try next path
-      }
-    })
-    .catch((error) => {
-      console.warn(`[CRYSTAL] Failed to import FBXLoader from ${path}:`, error);
-      window._fbxLoaderErrors.push({
-        type: "import-error",
-        path,
-        error: error.toString(),
-      });
-      fbxLoaderAttempts++;
-      return attemptLoadFBXLoader(); // Try next path recursively
-    });
-}
-
-/**
- * Try loading FBXLoader using script tags as a fallback approach
- * @returns {Promise} - A promise that resolves when loader is found or all paths failed
- */
-function attemptLoadFBXLoaderViaScript() {
-  if (scriptLoadAttempts >= FBXLOADER_SCRIPT_PATHS.length) {
-    console.error("[CRYSTAL] All script loading attempts failed");
-    window._fbxLoaderErrors.push({ type: "script-attempts-exhausted" });
-    return Promise.resolve(false);
-  }
-
-  const scriptPath = FBXLOADER_SCRIPT_PATHS[scriptLoadAttempts];
-  console.log(
-    `[CRYSTAL] Attempting to load FBXLoader via script tag from: ${scriptPath}`,
-  );
-
-  return new Promise((resolve) => {
-    const script = document.createElement("script");
-    script.src = scriptPath;
-    script.async = true;
-
-    script.onload = () => {
-      console.log(
-        "[CRYSTAL] Script loaded successfully, checking for FBXLoader...",
-      );
-
-      // Check if the script exposed FBXLoader globally
-      if (typeof window.FBXLoader === "function") {
-        console.log("[CRYSTAL] FBXLoader available on window object");
-        FBXLoader = window.FBXLoader;
-        fbxLoaderSuccess = true;
-        resolve(true);
-      } else if (typeof THREE.FBXLoader === "function") {
-        console.log("[CRYSTAL] FBXLoader available via THREE.FBXLoader");
-        FBXLoader = THREE.FBXLoader;
-        window.FBXLoader = FBXLoader; // Make it globally available
-        fbxLoaderSuccess = true;
-        resolve(true);
-      } else {
-        console.warn(
-          "[CRYSTAL] Script loaded but FBXLoader not found on window or THREE",
-        );
-        window._fbxLoaderErrors.push({
-          type: "script-no-fbxloader",
-          windowKeys: Object.keys(window).filter(
-            (k) => k.includes("FBX") || k.includes("Load"),
-          ),
-          threeKeys: THREE
-            ? Object.keys(THREE).filter(
-                (k) => k.includes("FBX") || k.includes("Load"),
-              )
-            : "THREE not available",
-        });
-        scriptLoadAttempts++;
-        resolve(attemptLoadFBXLoaderViaScript()); // Try next path
-      }
-    };
-
-    script.onerror = (error) => {
-      console.warn(`[CRYSTAL] Error loading script from ${scriptPath}:`, error);
-      window._fbxLoaderErrors.push({
-        type: "script-error",
-        path: scriptPath,
-        error: error.toString(),
-      });
-      scriptLoadAttempts++;
-      resolve(attemptLoadFBXLoaderViaScript()); // Try next path
-    };
-
-    document.head.appendChild(script);
+function logError(context, error) {
+  console.error(`[CRYSTAL] Error in ${context}:`, error);
+  
+  // Track errors for diagnostics
+  window._crystalShardErrors.push({
+    timestamp: new Date().toISOString(),
+    context,
+    message: error.message,
+    stack: error.stack,
   });
 }
 
-// Start the loading process
-try {
-  console.log(
-    "[CRYSTAL] Starting FBXLoader loading process with enhanced diagnostics",
-  );
-  fbxLoaderPromise = attemptLoadFBXLoader();
-
-  // Add a catch-all handler to help with debugging
-  fbxLoaderPromise.catch((error) => {
-    console.error("[CRYSTAL] Unhandled error in FBXLoader loading chain:", error);
-    window._fbxLoaderErrors.push({
-      type: "unhandled-promise-error",
-      error: error.toString(),
-    });
-    return false;
-  });
-} catch (e) {
-  console.warn("[CRYSTAL] Error setting up FBXLoader import:", e);
-  window._fbxLoaderErrors.push({ type: "setup-error", error: e.toString() });
-  fbxLoaderPromise = Promise.resolve(false);
-}
+// FBXLoader will be loaded through our enhanced handler module
+// No need for manual script or import loading anymore
+console.log("[CRYSTAL] Using enhanced FBXLoader.handler.js for loading");
 
 /**
  * Crystal Shard Manager class
