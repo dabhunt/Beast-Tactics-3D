@@ -596,84 +596,126 @@ export class CrystalShardManager {
   }
   
   /**
-   * Update all crystal particle effects
+   * Update all crystal particle effects and glow effects
    * Should be called in the animation loop
-   * @param {number} forceDelta - Optional: Force a specific delta time value
+   * @param {number} deltaTime - Time since last frame in seconds
    */
-  updateParticles(forceDelta) {
-    // Early exit checks with detailed logging
-    if (!this.config.enableParticles) {
-      if (Math.random() < 0.001) console.log('[CRYSTAL] Particles disabled in config');
-      return;
+  updateParticles(deltaTime) {
+    console.log('[CRYSTAL] updateParticles called', {
+      deltaTime: deltaTime !== undefined ? deltaTime.toFixed(4) + 's' : 'undefined',
+      hasParticleSystem: !!this.particleEffect,
+      timestamp: Date.now(),
+      particleSystemsCount: this.particleEffect ? this.particleEffect.particleSystems.length : 'no effect'
+    });
+    
+    // Ensure we have a valid deltaTime value
+    if (deltaTime === undefined) {
+      const now = Date.now();
+      deltaTime = (now - (this.particleLastUpdate || now)) / 1000; // Convert to seconds
+      
+      console.log(`[CRYSTAL] No deltaTime provided, calculated: ${deltaTime.toFixed(4)}s`);
+      
+      // Sanity check on calculated deltaTime
+      if (deltaTime > 0.1 || deltaTime <= 0) {
+        console.warn(`[CRYSTAL] Calculated deltaTime outside safe range: ${deltaTime.toFixed(4)}s, using fallback`);
+        deltaTime = 0.016; // ~60 fps
+      }
     }
     
-    if (!this.particleEffect) {
-      console.warn('[CRYSTAL] Particle effect system not initialized, but updateParticles was called');
-      return;
-    }
+    // Store current time for future calculations
+    this.particleLastUpdate = Date.now();
     
-    // Calculate delta time for smooth animation
-    const now = Date.now();
-    let deltaTime;
-    
-    if (forceDelta !== undefined) {
-      // Use forced delta time if provided (useful for debugging)
-      deltaTime = forceDelta;
-      console.log(`[CRYSTAL] Using forced delta time: ${deltaTime.toFixed(4)}s`);
+    // ===== PART 1: UPDATE PARTICLE EFFECTS =====
+    if (this.config.enableParticles && this.particleEffect) {
+      try {
+        console.log(`[CRYSTAL] Updating particle effects with deltaTime: ${deltaTime.toFixed(4)}s`);
+        
+        // Force a delta time if particles seem stuck
+        if (this._particlesStuckCounter === undefined) this._particlesStuckCounter = 0;
+        
+        // After 10 frames with small delta, boost with larger delta to help unstick
+        if (deltaTime < 0.005 && this._particlesStuckCounter++ > 10) {
+          console.log('[CRYSTAL] Particles may be stuck, boosting animation with larger delta');
+          deltaTime = 0.05;
+          this._particlesStuckCounter = 0;
+        }
+        
+        // Do the actual particle update - THIS IS CRITICAL FOR PARTICLE MOVEMENT
+        this.particleEffect.update(deltaTime);
+        
+        console.log(`[CRYSTAL] Updated ${this.particleEffect.particleSystems.length} particle systems`);
+      } catch (err) {
+        console.error('[CRYSTAL] Error updating particle effects:', err, err.stack);
+      }
     } else {
-      // Calculate natural delta time
-      deltaTime = (now - this.particleLastUpdate) / 1000; // Convert to seconds
-      
-      // Sanity check on delta time to avoid animation issues
-      if (deltaTime > 1.0) {
-        console.warn(`[CRYSTAL] Delta time too large: ${deltaTime.toFixed(4)}s, capping at 0.1s`);
-        deltaTime = 0.1; // Cap at reasonable value to prevent huge jumps
-      } else if (deltaTime <= 0) {
-        console.warn(`[CRYSTAL] Invalid delta time: ${deltaTime.toFixed(6)}s, using 0.016s`);
-        deltaTime = 0.016; // Default to ~60fps
-      }
-      
-      // Periodic logging of delta time (very infrequently)
-      if (Math.random() < 0.002) {
-        console.log(`[CRYSTAL] Particle update with deltaTime: ${deltaTime.toFixed(4)}s`);
-      }
+      if (Math.random() < 0.01) console.log('[CRYSTAL] Particles disabled or not initialized');
     }
     
-    // Store last update time for next frame
-    this.particleLastUpdate = now;
-    
-    // Ensure particles exist to update before calling
-    if (this.particleEffect.particleSystems.length === 0) {
-      if (Math.random() < 0.01) console.log('[CRYSTAL] No particle systems to update');
+    // ===== PART 2: UPDATE GLOW SHADER EFFECTS =====
+    // Only process if we have active crystals
+    if (!this.activeCrystals || this.activeCrystals.length === 0) {
+      if (Math.random() < 0.01) console.log('[CRYSTAL] No active crystals for glow update');
       return;
     }
     
-    // Update particle animations with clear logging
     try {
-      // Force a delta time if particles seem stuck
-      if (this._particlesStuckCounter === undefined) this._particlesStuckCounter = 0;
+      // Count how many crystals have glow effects
+      let glowCount = 0;
       
-      // After 10 frames, if particles seem stuck, boost with larger delta
-      if (deltaTime < 0.005 && this._particlesStuckCounter++ > 10) {
-        console.log('[CRYSTAL] Particles may be stuck, boosting animation with larger delta');
-        deltaTime = 0.05;
-        this._particlesStuckCounter = 0;
+      // Process each crystal that has a glow effect
+      this.activeCrystals.forEach(crystal => {
+        if (!crystal || !crystal.userData || !crystal.userData.hasShaderGlow) return;
+        
+        // Get the glow mesh if it exists
+        const glowMesh = crystal.userData.glowMesh;
+        if (!glowMesh) return;
+        
+        glowCount++;
+        
+        // Update animation phase (0.0 to 1.0 loop)
+        if (crystal.userData.glowAnimationPhase === undefined) {
+          crystal.userData.glowAnimationPhase = 0;
+        }
+        
+        // CRITICAL: Increment phase based on delta time (complete cycle in about 3 seconds)
+        // This is what makes the glow effect animate over time
+        crystal.userData.glowAnimationPhase += deltaTime * 0.3;
+        if (crystal.userData.glowAnimationPhase > 1.0) {
+          crystal.userData.glowAnimationPhase -= Math.floor(crystal.userData.glowAnimationPhase);
+        }
+        
+        // Update shader uniforms
+        if (glowMesh.material && glowMesh.material.uniforms) {
+          // Update pulse phase
+          glowMesh.material.uniforms.pulsePhase.value = crystal.userData.glowAnimationPhase;
+          
+          // Enhanced visual effect: gradually change glow intensity
+          // Varies between 1.0 and 2.0 for more dramatic pulsing
+          const cyclicalIntensity = 1.0 + Math.sin(crystal.userData.glowAnimationPhase * Math.PI * 2) * 0.5;
+          glowMesh.material.uniforms.glowIntensity.value = cyclicalIntensity;
+          
+          // Update view vector (camera position for view-dependent effects)
+          if (this.camera) {
+            glowMesh.material.uniforms.viewVector.value.copy(this.camera.position);
+          } else {
+            // Use a default view vector if no camera is available
+            glowMesh.material.uniforms.viewVector.value.set(0, 0, 5);
+          }
+        }
+      });
+      
+      // Log details periodically to confirm shader updates are happening
+      if (Math.random() < 0.01) {
+        console.log(`[CRYSTAL] Updated ${glowCount} crystal glow effects with deltaTime: ${deltaTime.toFixed(4)}s`);
       }
-      
-      // Log periodic particle system stats
-      if (Math.random() < 0.005) {
-        console.log(`[CRYSTAL] Updating ${this.particleEffect.particleSystems.length} particle systems`);
-      }
-      
-      // Do the actual update
-      this.particleEffect.update(deltaTime);
     } catch (err) {
-      console.error('[CRYSTAL] Error updating particle effects:', err);
+      console.error('[CRYSTAL] Error updating crystal glow effects:', err);
       console.debug('Particle effect state:', {
-        particleSystems: this.particleEffect.particleSystems.length,
+        particleSystems: this.particleEffect ? this.particleEffect.particleSystems.length : 0,
         deltaTime: deltaTime,
         lastUpdateTime: this.particleLastUpdate
       });
+    }
     }
   }
   
