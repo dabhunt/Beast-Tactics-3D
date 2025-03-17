@@ -184,8 +184,19 @@ export class DebugMenu {
 
     // Create button container
     const buttonContainer = document.createElement("div");
-
-    // Create maximize/minimize button
+    
+    // Create minimize button (collapses to just the header bar)
+    this.minimizeButton = document.createElement("button");
+    this.minimizeButton.textContent = "[ ▼ ]";
+    this.minimizeButton.style.background = "none";
+    this.minimizeButton.style.border = "1px solid #666";
+    this.minimizeButton.style.color = "white";
+    this.minimizeButton.style.padding = "2px 6px";
+    this.minimizeButton.style.cursor = "pointer";
+    this.minimizeButton.style.borderRadius = "3px";
+    this.minimizeButton.style.marginLeft = "5px";
+    
+    // Create maximize/expand button
     this.maximizeButton = document.createElement("button");
     this.maximizeButton.textContent = "[ + ]";
     this.maximizeButton.style.background = "none";
@@ -196,27 +207,50 @@ export class DebugMenu {
     this.maximizeButton.style.borderRadius = "3px";
     this.maximizeButton.style.marginLeft = "5px";
 
-    // Track expanded state
+    // Track UI states
     this.isExpanded = false;
+    this.isMinimized = false;
+    
+    // Add minimize functionality (collapses to just header)
+    this.minimizeButton.addEventListener("click", () => {
+      console.log("[DEBUG] Toggle debug menu minimization");
+      if (this.isMinimized) {
+        // Restore
+        this.contentArea.style.display = "block";
+        this.minimizeButton.textContent = "[ ▼ ]";
+        this.isMinimized = false;
+        console.log("[DEBUG] Debug menu restored from minimized state");
+      } else {
+        // Minimize - collapse to just the header
+        this.contentArea.style.display = "none";
+        this.minimizeButton.textContent = "[ ▲ ]";
+        this.isMinimized = true;
+        console.log("[DEBUG] Debug menu minimized to header only");
+      }
+    });
 
-    // Add maximize/minimize functionality
+    // Add maximize/expand functionality (expands width and height)
     this.maximizeButton.addEventListener("click", () => {
       console.log("[DEBUG] Toggle debug menu expansion");
       if (this.isExpanded) {
-        // Minimize
+        // Restore normal size
         this.container.style.width = "300px";
         this.container.style.maxHeight = "40vh";
         this.maximizeButton.textContent = "[ + ]";
         this.isExpanded = false;
+        console.log("[DEBUG] Debug menu restored to normal size");
       } else {
-        // Maximize
+        // Maximize to larger size
         this.container.style.width = "80vw";
         this.container.style.maxHeight = "80vh";
         this.maximizeButton.textContent = "[ - ]";
         this.isExpanded = true;
+        console.log("[DEBUG] Debug menu expanded to large size");
       }
     });
 
+    // Add buttons to the container
+    buttonContainer.appendChild(this.minimizeButton);
     buttonContainer.appendChild(this.maximizeButton);
     headerContainer.appendChild(buttonContainer);
     this.container.appendChild(headerContainer);

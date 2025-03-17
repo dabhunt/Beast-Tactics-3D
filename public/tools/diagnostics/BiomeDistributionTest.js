@@ -532,9 +532,9 @@ if (typeof THREE === 'undefined') {
   };
   
   // Chain the scripts loading in correct order
-  loadScript('https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.min.js')
-    .then(() => loadScript('https://cdn.jsdelivr.net/npm/three@0.162.0/examples/js/controls/OrbitControls.js'))
-    .then(() => loadScript('https://cdn.jsdelivr.net/npm/three@0.162.0/examples/js/loaders/FBXLoader.js'))
+  loadScript('/libs/three/three.min.js')
+    .then(() => loadScript('/libs/three/addons/controls/OrbitControls.js'))
+    .then(() => loadScript('/libs/three/addons/loaders/FBXLoader.js'))
     .then(() => {
       console.log('[BIOME-TEST] All THREE.js dependencies loaded successfully');
       createBiomeVisualization();

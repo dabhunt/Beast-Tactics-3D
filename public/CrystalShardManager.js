@@ -240,14 +240,20 @@ export class CrystalShardManager {
       // Particle effect configuration
       enableParticles: true,           // Whether to enable particle effects
       particleCount: 35,               // Number of particles per crystal (increased)
-      particleSize: 0.07,              // Size of each particle (increased)
+      particleSize: 0.09,              // Size of each particle (increased)
       particleColor: 0x9932CC,         // Color of particles (Dark Orchid - more visible purple)
       emissionRate: 0.7,               // Particles emitted per second (increased)
       particleMinLifetime: 1.5,        // Minimum lifetime in seconds
       particleMaxLifetime: 3.0,        // Maximum lifetime in seconds
-      particleSpread: 0.3,             // How far particles spread from center
+      particleSpread: 0.5,             // How far particles spread from center
       particleSpeedMultiplier: 1.5,    // Makes particles move faster
       particleIntensity: 2.0,          // Overall intensity multiplier
+      
+      // Glow effect configuration
+      enableGlowEffect: true,          // Whether to enable glow shader effects
+      glowIntensity: 1.5,              // Intensity of the crystal glow effect
+      glowSize: 1.2,                   // Size multiplier for the glow effect
+      glowColor: { r: 0.7, g: 0.3, b: 1.0 }, // RGB color components for the glow (purple)
       ...config                    // Override defaults with provided config
     };
     
@@ -541,13 +547,13 @@ export class CrystalShardManager {
         maxLifetime: this.config.particleMaxLifetime,
         emissionRate: this.config.emissionRate,
         // Add enhanced velocity parameters for more movement
-        minVelocity: 0.05,  // Increased for more visible movement
-        maxVelocity: 0.15,  // Increased for more visible movement
-        emitterRadius: 0.3, // Wider emission radius
+        minVelocity: 0.35,  // Increased for more visible movement
+        maxVelocity: 0.65,  // Increased for more visible movement
+        emitterRadius: 0.7, // Wider emission radius
         glowIntensity: 2.0, // Increased glow
         // Add new configuration parameters
-        particleSpread: this.config.particleSpread || 0.3,
-        particleSpeedMultiplier: this.config.particleSpeedMultiplier || 1.5
+        particleSpread: this.config.particleSpread || 0.8,
+        particleSpeedMultiplier: this.config.particleSpeedMultiplier || 2
       });
       
       console.log('[CRYSTAL] Particle effect system initialized successfully');

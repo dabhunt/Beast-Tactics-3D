@@ -4,7 +4,7 @@ import { DebugMenu } from "./tools/diagnostics/DebugMenu.js";
 import { Beast } from './beast.js';
 // Import the new MapGenerator module and the textureLoadingTracker
 import { MapGenerator, ELEMENT_TYPES, textureLoadingTracker } from './MapGeneration.js';
-import { initCrystalParticleDebugger } from '../debug/CrystalParticleDebugger.js';
+import { initCrystalParticleDebugger } from './debug/CrystalParticleDebugger.js';
 // Import debug logging system with renamed functions to avoid conflicts with local functions
 import { debugLog as moduleDebugLog, debugWarn as moduleDebugWarn, debugError as moduleDebugError } from "./tools/diagnostics/DebugFlags.js";
 

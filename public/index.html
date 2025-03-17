@@ -8,12 +8,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Beast Tactics</title>
     
-    <!-- Import map to resolve module specifiers -->
+    <!-- Import map to resolve module specifiers - using local THREE.js files -->
     <script type="importmap">
     {
       "imports": {
-        "three": "https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js",
-        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.162.0/examples/jsm/"
+        "three": "/libs/three/three.module.js",
+        "three/addons/": "/libs/three/addons/"
       }
     }
     </script>

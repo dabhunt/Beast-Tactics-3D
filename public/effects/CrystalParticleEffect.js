@@ -171,6 +171,7 @@ export class CrystalParticleEffect {
             const lifetimes = new Float32Array(particleCount * 2); // [current, max]
             const delays = new Float32Array(particleCount); // Staggered start times
             const sizes = new Float32Array(particleCount);
+            const colors = new Float32Array(particleCount * 4); // RGBA for each particle
             
             // Initialize particles with random values
             for (let i = 0; i < particleCount; i++) {
@@ -259,6 +260,26 @@ export class CrystalParticleEffect {
             particles.setAttribute('lifetime', new this.THREE.BufferAttribute(lifetimes, 2));
             particles.setAttribute('delay', new this.THREE.BufferAttribute(delays, 1));
             particles.setAttribute('size', new this.THREE.BufferAttribute(sizes, 1));
+            particles.setAttribute('color', new this.THREE.BufferAttribute(colors, 4));
+            
+            // Initialize all particles with default colors (white with full opacity)
+            for (let i = 0; i < particleCount; i++) {
+                const colorIdx = i * 4;
+                const color = new this.THREE.Color(this.config.particleColor);
+                
+                // Set RGB from the config color
+                colors[colorIdx] = color.r;     // R
+                colors[colorIdx + 1] = color.g; // G
+                colors[colorIdx + 2] = color.b; // B
+                colors[colorIdx + 3] = 0.0;     // A - start transparent
+                
+                console.log(`[CRYSTAL-PARTICLES] Particle ${i} initialized with color:`, {
+                    r: colors[colorIdx].toFixed(2),
+                    g: colors[colorIdx + 1].toFixed(2),
+                    b: colors[colorIdx + 2].toFixed(2),
+                    a: colors[colorIdx + 3].toFixed(2)
+                });
+            }
             
             // Get any additional configuration passed from CrystalShardManager
             const intensityMultiplier = crystal.userData.particleIntensity || 
@@ -269,17 +290,18 @@ export class CrystalParticleEffect {
             
             // Create material for the particles with enhanced sparkle and glow
             const material = new this.THREE.PointsMaterial({
-                color: this.config.particleColor,
                 size: this.config.particleSize,
                 transparent: true,
-                opacity: 1.0,                // Full opacity for stronger effect
-                alphaTest: 0.1,              // Helps with transparency rendering
+                alphaTest: 0.05,              // Helps with transparency rendering
                 depthWrite: false,           // Prevents particles from hiding each other
-                depthTest: true,             
+                depthTest: true,
+                vertexColors: true,          // Enable per-vertex coloring for opacity control
                 blending: this.THREE.AdditiveBlending, // Additive for bright glow when overlapping
                 map: this.particleTexture,
                 sizeAttenuation: true        // Size changes with distance for 3D effect
             });
+            
+            console.log('[CRYSTAL-PARTICLES] Created particle material with vertex colors enabled for opacity control');
             
             // Log the material configuration
             console.log('[CRYSTAL-PARTICLES] Particle material created with:', {
@@ -459,9 +481,16 @@ export class CrystalParticleEffect {
                     sizeScale = 1.0 + Math.sin(lifeRatio * Math.PI * pulseFreq) * pulseAmp;
                 }
                 
-                // Apply the size change with opacity simulation
+                // Apply the size change and store opacity value
                 const baseSize = sizes[j];
-                system.geometry.attributes.size.array[j] = baseSize * sizeScale * opacity;
+                system.geometry.attributes.size.array[j] = baseSize * sizeScale;
+                
+                // Store opacity in the color attribute (w component holds alpha)
+                const colorIdx = j * 4; // RGBA format
+                if (system.geometry.attributes.color && system.geometry.attributes.color.array) {
+                    system.geometry.attributes.color.array[colorIdx + 3] = opacity;
+                    system.geometry.attributes.color.needsUpdate = true;
+                }
                 
                 needsUpdate = true;
             }
@@ -471,6 +500,12 @@ export class CrystalParticleEffect {
             system.geometry.attributes.lifetime.needsUpdate = true;
             system.geometry.attributes.delay.needsUpdate = true;
             system.geometry.attributes.size.needsUpdate = true;
+            
+            // Make sure to update color attribute for opacity changes
+            if (system.geometry.attributes.color) {
+                system.geometry.attributes.color.needsUpdate = true;
+            }
+            system.geometry.attributes.color.needsUpdate = true;
         }
     }
        /**

@@ -3,7 +3,7 @@
  * Shows how to use the AnimatedSprite system in the Beast-Tactics-3D project
  */
 
-import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.module.js';
+import * as THREE from '/libs/three/three.module.js';
 
 // Debug settings
 const DEBUG = {
