@@ -74,11 +74,11 @@ export class CrystalShardManager {
     
     // Default configuration parameters
     this.config = {
-      crystalSpawnChance: 0.2, // 20% chance to spawn a crystal per hex
+      crystalSpawnChance: 0.3, // 30% chance to spawn a crystal per hex (increased for better visibility)
       crystalHeightOffset: 0.5, // Height above the hexagon
       crystalScaleFactor: 0.005, // Size of the crystal
-      crystalModelPath: "/assets/Purple_Crystal_Shard.fbx",
-      crystalTexturePath: "/assets/Purple_Crystal_Shard_texture.png",
+      crystalModelPath: "./assets/Purple_Crystal_Shard.fbx", // Fixed path with correct relative URL
+      crystalTexturePath: "./assets/Purple_Crystal_Shard_texture.png", // Fixed path with correct relative URL
       
       // Particle effect configuration
       enableParticles: true,           // Whether to enable particle effects
@@ -165,23 +165,42 @@ export class CrystalShardManager {
       );
 
       // First validate the hex is a valid object with necessary properties
-      if (!hex || !hex.userData || hex.userData.crystal) {
+      if (!hex || !hex.userData) {
         console.log(
-          `[CRYSTAL] Skipping crystal spawn - invalid hex or crystal already exists`,
+          `[CRYSTAL] Skipping crystal spawn - invalid hex structure`,
         );
-        return;
+        return null;
+      }
+      
+      // Check if crystal already exists on this hex
+      if (hex.userData.crystal) {
+        console.log(
+          `[CRYSTAL] Skipping crystal spawn - crystal already exists on hex (${hex.userData.q}, ${hex.userData.r})`,
+        );
+        return null;
       }
 
-      // OVERRIDE FOR DEBUGGING - Force crystal spawn on all hexes
+      // OVERRIDE FOR DEBUGGING - Force crystal spawn on specific hexes for testing
       const debugForceSpawn = false;
+      
+      // For debugging visibility, we'll log the random roll
+      const randomValue = Math.random();
+      const willSpawn = randomValue < this.config.crystalSpawnChance; // Note: Using < instead of >= for correct comparison
+      
+      console.log(
+        `[CRYSTAL] Spawn probability check: ${randomValue.toFixed(4)} vs threshold ${this.config.crystalSpawnChance.toFixed(4)} - ${willSpawn ? 'SPAWN' : 'NO SPAWN'}`
+      );
 
       // Check if we should spawn a crystal based on probability
-      if (!debugForceSpawn && Math.random() >= this.config.crystalSpawnChance) {
+      if (!debugForceSpawn && !willSpawn) {
         console.log(
           `[CRYSTAL] Crystal spawn skipped for hex at (${hex.userData.q}, ${hex.userData.r}) - random check failed`,
         );
-        return;
+        return null;
       }
+      
+      // Mark hex as having a crystal to prevent duplicates
+      hex.userData.crystal = true;
 
       console.log(
         `[CRYSTAL] Spawning crystal shard on hex at (${hex.userData.q}, ${hex.userData.r})`,
@@ -433,40 +452,38 @@ export class CrystalShardManager {
       
       this._initializingLoader = false;
       return false;
-    } catch (error) {
-      // Handle unexpected errors during initialization
-      console.error("[CRYSTAL] Critical error initializing crystal loader:", error);
-      console.error("[CRYSTAL] Error details:", {
-        message: error.message,
-        stack: error.stack,
-        loaderSource: this._crystalLoaderSource
-      });
-      
-      // Track errors for diagnostics
-      window._crystalShardErrors = window._crystalShardErrors || [];
-      window._crystalShardErrors.push({
-        timestamp: new Date().toISOString(),
-        phase: "loader-initialization",
-        error: error.message,
-        stack: error.stack
-      });
-      
-      this._initializingLoader = false;
-      return false;
+      } catch (error) {
+        // Handle unexpected errors during initialization
+        console.error("[CRYSTAL] Critical error initializing crystal loader:", error);
+        console.error("[CRYSTAL] Error details:", {
+          message: error.message,
+          stack: error.stack,
+          loaderSource: this._crystalLoaderSource
+        });
+        
+        // Track errors for diagnostics
+        window._crystalShardErrors = window._crystalShardErrors || [];
+        window._crystalShardErrors.push({
+          timestamp: new Date().toISOString(),
+          phase: "loader-initialization",
+          error: error.message,
+          stack: error.stack
+        });
+        
+        this._initializingLoader = false;
+        return false;
+      }
     }
   }
   
-  /**
-   * Initialize the particle effect system
-   * @private
-   */
   /**
    * Initialize the particle effect system.
    * Sets up the CrystalParticleEffect class and configures it.
    * @private
    */
+
   _initializeParticleSystem() {
-    console.log('[CRYSTAL] Initializing enhanced particle effect system with detailed logging');
+    console.log("[CRYSTAL] Initializing enhanced particle effect system with detailed logging");
     
     try {
       // Only initialize if THREE.js is available
@@ -475,7 +492,7 @@ export class CrystalShardManager {
         return;
       }
       
-      console.log('[CRYSTAL] Particle system configuration:', {
+      console.log("[CRYSTAL] Particle system configuration:", {
         particleCount: this.config.particleCount,
         particleSize: this.config.particleSize,
         particleColor: '#' + this.config.particleColor.toString(16).padStart(6, '0'),
@@ -679,13 +696,16 @@ export class CrystalShardManager {
    * @param {Object} hex - The hexagon to place the crystal on
    */
   loadCrystalModel(hex) {
+    console.log(`[CRYSTAL] Attempting to load crystal model for hex at (${hex.userData.q}, ${hex.userData.r})`);
+    console.log(`[CRYSTAL] Using model path: ${this.config.crystalModelPath}`);
+    
     // Ensure we have a loader
     if (!this.crystalLoader) {
       console.warn(
         "[CRYSTAL] No crystal loader available, using fallback crystal",
+        { hexPosition: hex.position }
       );
-      this.createFallbackCrystal(hex);
-      return;
+      return this.createFallbackCrystal(hex);
     }
     
     console.log(`[CRYSTAL] Loading crystal model for hex at (${hex.userData.q}, ${hex.userData.r})`);
@@ -697,17 +717,22 @@ export class CrystalShardManager {
     debugLog("Hex position:", hexPosition);
     
     // Load the model
-    this.crystalLoader.load(
-      this.config.crystalModelPath,
+    try {
+      console.log(`[CRYSTAL] Loading model from path: ${this.config.crystalModelPath}`);
       
-      // onLoad callback
-      (fbx) => {
-        console.log(
-          `[CRYSTAL] FBX model loaded successfully for hex (${hex.userData.q}, ${hex.userData.r})`,
-          {
-            childCount: fbx.children.length,
-          }
-        );
+      this.crystalLoader.load(
+        this.config.crystalModelPath,
+        
+        // onLoad callback
+        (fbx) => {
+          console.log(
+            `[CRYSTAL] FBX model loaded successfully for hex (${hex.userData.q}, ${hex.userData.r})`,
+            {
+              childCount: fbx?.children?.length || 0,
+              type: typeof fbx,
+              isObject3D: fbx?.isObject3D || false
+            }
+          );
         
         try {
           // Apply crystal texture if available
@@ -785,6 +810,10 @@ export class CrystalShardManager {
         this.createFallbackCrystal(hex);
       }
     );
+    } catch (err) {
+      console.error("[CRYSTAL] Exception during model loading attempt:", err);
+      return this.createFallbackCrystal(hex);
+    }
   }
   
   /**
@@ -1213,7 +1242,7 @@ export class CrystalShardManager {
           this._updateGlowEffects(boundedDelta);
         };
         
-        console.log('[CRYSTAL] Glow effect animation system initialized');
+        console.log("[CRYSTAL] Glow effect animation system initialized");
       }
     } catch (error) {
       console.error('[CRYSTAL] Error adding shader glow effect:', error);

@@ -5,6 +5,7 @@ import { Beast } from './beast.js';
 // Import the new MapGenerator module and the textureLoadingTracker
 import { MapGenerator, ELEMENT_TYPES, textureLoadingTracker } from './MapGeneration.js';
 import { initCrystalParticleDebugger } from './debug/CrystalParticleDebugger.js';
+import { initCrystalDebugger } from './debug/CrystalDebugger.js';
 // Import debug logging system with renamed functions to avoid conflicts with local functions
 import { debugLog as moduleDebugLog, debugWarn as moduleDebugWarn, debugError as moduleDebugError } from "./tools/diagnostics/DebugFlags.js";
 
@@ -724,8 +725,13 @@ function setupScene() {
   try {
     console.log('[GAME] Initializing Crystal Particle Debugger for development...');
     initCrystalParticleDebugger(mapGenerator);
+    
+    // Initialize the new comprehensive crystal debugger
+    console.log('[GAME] Initializing Crystal Debugger for comprehensive diagnostics...');
+    initCrystalDebugger(scene, THREE, mapGenerator.crystalShardManager);
+    console.log('[GAME] Crystal diagnostics tools initialized successfully');
   } catch (error) {
-    console.error('[GAME] Error initializing Crystal Particle Debugger:', error);
+    console.error('[GAME] Error initializing Crystal Debuggers:', error);
     console.debug('[GAME] Crystal debugger stack trace:', error.stack);
   }
 
