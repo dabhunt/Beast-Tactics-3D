@@ -1,66 +1,449 @@
 // Import Three.js and other modules using dynamic imports for better compatibility
+/**
+ * game.js - Main game entry point and initialization
+ * Handles module loading order and sharing a single THREE.js instance
+ */
+
+// Import essential game modules
 import { CameraManager } from "./camera.js";
 import { DebugMenu } from "./tools/diagnostics/DebugMenu.js";
 import { Beast } from './beast.js';
-// Import the new MapGenerator module and the textureLoadingTracker
 import { MapGenerator, ELEMENT_TYPES, textureLoadingTracker } from './MapGeneration.js';
 
-// Log the imported textureLoadingTracker to verify it's properly loaded
-console.log('[GAME] Imported textureLoadingTracker:', textureLoadingTracker);
-// Import Line2 and related modules for thicker lines
-import { Line2 } from 'three/addons/lines/Line2.js';
-import { LineGeometry } from 'three/addons/lines/LineGeometry.js';
-import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
+// Advanced debugging for module loading
+console.log('[GAME] Module importing started:', { 
+  timestamp: new Date().toISOString(),
+  moduleFormat: 'ES Modules'
+});
+
+// We'll track all loading issues for debugging
+window._moduleLoadingIssues = window._moduleLoadingIssues || [];
+
+// Global variables for critical game components
+let assetLoader, shardManager, scene;
 
 // Global THREE variable
 let THREE;
 
+// Track if scene is initialized
+let sceneInitialized = false;
+
 /**
  * Main game initialization function - called after all modules are loaded
+ * Sets up the scene and connects all initialized components
  */
 function initGame() {
   console.log("[GAME] Initializing game with loaded modules");
-  console.log("[GAME] THREE.js available:", !!THREE);
-  console.log("[GAME] Beast class available:", typeof Beast === 'function');
-  
-  // Debug log to verify Beast import was successful
-  console.log("[GAME] Imported Beast class successfully:", { 
-    beastClassAvailable: typeof Beast === 'function',
-    staticMethodsAvailable: typeof Beast.findRandomHexOfElement === 'function'
+
+  // Verify critical dependencies before proceeding
+  const dependencies = {
+    THREE: !!THREE && typeof THREE.Scene === 'function',
+    Beast: typeof Beast === 'function',
+    AssetLoader: !!assetLoader,
+    ShardManager: !!shardManager,
+    MapGenerator: typeof MapGenerator === 'function'
+  };
+
+  console.log("[GAME] Dependency availability check:", dependencies);
+
+  // Check for missing critical dependencies
+  const missingDeps = Object.entries(dependencies)
+    .filter(([_, available]) => !available)
+    .map(([name]) => name);
+
+  if (missingDeps.length > 0) {
+    console.error(`[GAME] Missing critical dependencies: ${missingDeps.join(', ')}`);
+    document.body.innerHTML += `
+      <div style="position:fixed; top:0; left:0; right:0; background:rgba(255,0,0,0.8); color:white; padding:20px; z-index:9999;">
+        <h2>Critical Dependencies Missing</h2>
+        <p>Missing: ${missingDeps.join(', ')}</p>
+        <p>Check the console for details (F12)</p>
+      </div>
+    `;
+    return; // Cannot continue with initialization
+  }
+
+  // Detailed log of THREE version and components for debugging
+  console.log("[GAME] THREE.js details:", { 
+    version: THREE.REVISION,
+    keyComponents: {
+      scene: !!THREE.Scene,
+      camera: !!THREE.PerspectiveCamera,
+      renderer: !!THREE.WebGLRenderer,
+      materials: !!THREE.MeshStandardMaterial
+    }
   });
-  
+
+  // Also log AssetLoader and ShardManager state
+  console.log("[GAME] AssetLoader state:", {
+    initialized: !!assetLoader,
+    hasLoaders: assetLoader ? Object.keys(assetLoader.loaders || {}).length > 0 : false,
+    fbxLoaderAvailable: assetLoader ? !!assetLoader.loaders.fbx : false,
+    cacheStatus: assetLoader && assetLoader.cache ? {
+      models: assetLoader.cache.models.size,
+      textures: assetLoader.cache.textures.size
+    } : 'unavailable'
+  });
+
+  console.log("[GAME] ShardManager state:", {
+    initialized: !!shardManager,
+    hasThree: shardManager ? !!shardManager.THREE : false,
+    hasAssetLoader: shardManager ? !!shardManager.assetLoader : false
+  });
+
   // Continue with game initialization
   setupScene();
 }
 
 /**
  * Load all required modules before starting the game
+ * This function handles the proper loading order to ensure dependencies
+ * are satisfied and only a single instance of THREE.js is used
  */
 async function loadModules() {
+  const startTime = performance.now();
+  console.log("[GAME] Starting module loading sequence", {
+    timestamp: new Date().toISOString(),
+    platform: navigator.platform,
+    userAgent: navigator.userAgent.substring(0, 50) + '...'
+  });
+
   try {
+    // STEP 1: Load THREE.js first since everything depends on it
     console.log("[GAME] Loading THREE.js module...");
-    const threeModule = await import("/libs/three/three.module.js");
-    // Assign the module to the global THREE variable
-    THREE = threeModule;
-    console.log("[GAME] THREE.js module loaded successfully");
-    
-    // Verify that Line2 and related modules are available globally
-    console.log("[GAME] Verifying Line2 and LineMaterial modules availability:", {
-      Line2Available: typeof Line2 === 'function',
-      LineGeometryAvailable: typeof LineGeometry === 'function',
-      LineMaterialAvailable: typeof LineMaterial === 'function'
-    });
-    
-    // Load SpriteMixer library
-    console.log("[GAME] Loading SpriteMixer library...");
-    await loadScript("/libs/SpriteMixer.js");
-    console.log("[GAME] SpriteMixer library loaded successfully");
-    
+    try {
+      // Use correct relative path to three.module.js from base URL
+      // The leading slash makes this an absolute path from the server root
+      // which is causing the 404 error
+      console.log("[GAME] Attempting to load THREE.js from correct path");
+      const threeModule = await import("./libs/three/three.module.js");
+
+      // Store THREE globally for consistent access
+      window.THREE = threeModule;
+      THREE = threeModule;
+
+      console.log("[GAME] THREE.js module loaded successfully", {
+        version: THREE.REVISION,
+        constructors: Object.keys(THREE).length
+      });
+
+      // Log some key constructors to verify THREE is loaded properly
+      console.log("[GAME] Validating THREE.js core components:", {
+        Scene: !!THREE.Scene,
+        PerspectiveCamera: !!THREE.PerspectiveCamera,
+        WebGLRenderer: !!THREE.WebGLRenderer,
+        BoxGeometry: !!THREE.BoxGeometry,
+        Mesh: !!THREE.Mesh
+      });
+
+      // STEP 1B: Load the THREE.js Line/Material addons that we need
+      // These are essential for hex grid rendering with thick lines
+      console.log("[GAME] Loading THREE.js line modules...");
+
+      try {
+        // Load the Line2, LineGeometry, and LineMaterial modules and attach to THREE
+        const lineModulePromises = [
+          // Use dynamic imports to load the modules with correct relative paths
+          // (without the leading slash which causes 404 errors)
+          import('./libs/three/addons/lines/Line2.js'),
+          import('./libs/three/addons/lines/LineGeometry.js'),
+          import('./libs/three/addons/lines/LineMaterial.js')
+        ];
+
+        console.log("[GAME] Attempting to load line modules from correct relative paths");
+
+        // Wait for all line modules to load
+        const [Line2Module, LineGeometryModule, LineMaterialModule] = await Promise.all(lineModulePromises);
+
+        // Don't try to modify THREE namespace directly as it might be frozen
+        // Instead check if our custom namespace is available (should be created by the modules)
+        console.log("[GAME] THREE.js line modules loaded, checking custom namespace", {
+          BeastTactics: typeof window.BeastTactics !== 'undefined',
+          THREEAddons: typeof window.BeastTactics?.THREEAddons !== 'undefined',
+          Line2: typeof window.BeastTactics?.THREEAddons?.Line2 !== 'undefined',
+          LineGeometry: typeof window.BeastTactics?.THREEAddons?.LineGeometry !== 'undefined',
+          LineMaterial: typeof window.BeastTactics?.THREEAddons?.LineMaterial !== 'undefined'
+        });
+
+        // Check for the modules in both our namespace and global THREE to handle all cases
+        console.log("[GAME] Module export names:", {
+          Line2ModuleExports: Object.keys(Line2Module),
+          GeometryModuleExports: Object.keys(LineGeometryModule),
+          MaterialModuleExports: Object.keys(LineMaterialModule)
+        });
+      } catch (lineModuleError) {
+        console.error("[GAME] Failed to load THREE.js line modules:", lineModuleError);
+        window._moduleLoadingIssues.push({
+          component: 'THREE.js-line-modules',
+          error: lineModuleError.toString(),
+          stack: lineModuleError.stack,
+          time: new Date().toISOString()
+        });
+        // We'll continue without line modules but log the issue
+      }
+    } catch (threeError) {
+      console.error("[GAME] CRITICAL ERROR: Failed to load THREE.js:", threeError);
+      window._moduleLoadingIssues.push({
+        component: 'THREE.js',
+        error: threeError.toString(),
+        stack: threeError.stack,
+        time: new Date().toISOString()
+      });
+      throw new Error('THREE.js loading failed - cannot continue initialization');
+    }
+
+    // STEP 2: Load our custom FBXLoader handler 
+    console.log("[GAME] Loading FBXLoader handler...");
+    try {
+      // Load the FBXLoader handler (non-module version that works with script tags)
+      await loadScript("/libs/three/addons/loaders/FBXLoader.handler.js");
+      console.log("[GAME] FBXLoader handler loaded, checking if initialized:", {
+        initFunctionAvailable: typeof window.initFBXLoader === 'function',
+        loaderAvailable: typeof window.FBXLoader === 'function'
+      });
+
+      // If FBXLoader wasn't automatically initialized, do it manually
+      if (typeof window.FBXLoader !== 'function' && typeof window.initFBXLoader === 'function') {
+        console.log("[GAME] Manually initializing FBXLoader with our THREE instance");
+        window.initFBXLoader(THREE);
+      }
+    } catch (fbxError) {
+      console.warn("[GAME] Warning: FBXLoader handler failed to load:", fbxError);
+      window._moduleLoadingIssues.push({
+        component: 'FBXLoader.handler.js',
+        error: fbxError.toString(),
+        time: new Date().toISOString()
+      });
+      // Continue despite error - AssetLoader has fallbacks
+    }
+
+    // STEP 3: Load utility libraries
+    console.log("[GAME] Loading utility libraries...");
+    await Promise.all([
+      loadScript("/libs/SpriteMixer.js").catch(e => {
+        console.warn("[GAME] Warning: SpriteMixer library failed to load:", e);
+        window._moduleLoadingIssues.push({
+          component: 'SpriteMixer.js',
+          error: e.toString(),
+          time: new Date().toISOString()
+        });
+      })
+    ]);
+
+    // STEP 4: Load Asset Management modules in correct dependency order
+    console.log("[GAME] Loading asset management modules...");
+    try {
+      // Create scene first to ensure it's available for later modules
+      console.log('[GAME] Creating scene for asset management initialization');
+      if (!THREE || typeof THREE.Scene !== 'function') {
+        console.error('[GAME] Cannot create scene: THREE or THREE.Scene is not available', {
+          THREE: !!THREE,
+          Scene: typeof THREE?.Scene
+        });
+        throw new Error('THREE.Scene constructor not available');
+      }
+
+      // Create and initialize scene
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x222222);
+      sceneInitialized = true;
+
+      console.log('[GAME] Scene created successfully', {
+        sceneType: scene.type || typeof scene,
+        hasChildren: scene.children?.length || 0,
+        background: scene.background ? 'set' : 'none',
+        initialized: sceneInitialized
+      });
+
+      // First load the AssetLoader which provides core loading functionality
+      await loadScript("/AssetLoader.js");
+      console.log("[GAME] AssetLoader module loaded successfully");
+
+      // Verify AssetLoader is available
+      if (typeof window.AssetLoader !== 'function') {
+        throw new Error('AssetLoader not available after loading script');
+      }
+
+      // Initialize AssetLoader with our THREE instance
+      assetLoader = new window.AssetLoader(THREE, {
+        debug: true,
+        basePath: window.location.href
+      });
+
+      // Make AssetLoader globally available so it can be accessed by other modules
+      window.assetLoader = assetLoader;
+
+      console.log("[GAME] AssetLoader initialized:", {
+        loaders: Object.keys(assetLoader.loaders || {}),
+        isGlobal: !!window.assetLoader,
+        cacheSize: assetLoader.cache ? {
+          models: assetLoader.cache.models.size,
+          textures: assetLoader.cache.textures.size
+        } : 'unknown'
+      });
+
+      // Then load the ShardManager which depends on AssetLoader
+      console.log('[GAME] Attempting to load ShardManager.js');
+
+      // Add retry logic for loading ShardManager script
+      let maxRetries = 3;
+      let retryCount = 0;
+      let shardManagerLoaded = false;
+
+      while (!shardManagerLoaded && retryCount < maxRetries) {
+        try {
+          // Log attempt number if retrying
+          if (retryCount > 0) {
+            console.warn(`[GAME] Retry ${retryCount}/${maxRetries} loading ShardManager.js`);
+          }
+
+          // Attempt to load the script
+          await loadScript("/ShardManager.js");
+
+          // Verify ShardManager is available after loading
+          if (typeof window.ShardManager === 'function') {
+            console.log('[GAME] ShardManager constructor successfully loaded', {
+              constructorType: typeof window.ShardManager,
+              prototype: !!window.ShardManager.prototype,
+              methods: Object.keys(window.ShardManager.prototype || {}),
+              attempt: retryCount + 1
+            });
+            shardManagerLoaded = true;
+          } else {
+            throw new Error(`ShardManager constructor not available (attempt ${retryCount + 1})`);
+          }
+        } catch (loadError) {
+          retryCount++;
+          console.error(`[GAME] Error loading ShardManager.js (attempt ${retryCount}/${maxRetries}):`, loadError);
+
+          // If we've exhausted retries, throw the error
+          if (retryCount >= maxRetries) {
+            console.error('[GAME] Failed to load ShardManager.js after all retry attempts');
+            throw loadError;
+          }
+
+          // Wait briefly before retrying
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      }
+
+      console.log("[GAME] ShardManager module loaded and verified");
+
+      // Initialize ShardManager with robust error handling
+      try {
+        // Double check dependencies availability before creating ShardManager
+        if (!assetLoader) {
+          console.error('[GAME] Asset loader not available for ShardManager initialization');
+          throw new Error('AssetLoader not available');
+        }
+
+        if (!scene) {
+          console.error('[GAME] Scene not available for ShardManager initialization');
+          throw new Error('Scene not available');
+        }
+
+        // Pre-validation logging of initialization parameters
+        console.log('[GAME] ShardManager initialization parameters:', {
+          threeAvailable: !!THREE && typeof THREE === 'object',
+          sceneAvailable: !!scene && (scene instanceof THREE.Scene),
+          assetLoaderAvailable: !!assetLoader && typeof assetLoader === 'object',
+          sceneInitialized: sceneInitialized
+        });
+
+        // Initialize ShardManager with required dependencies
+        shardManager = new window.ShardManager({
+          THREE: THREE,
+          scene: scene,
+          assetLoader: assetLoader
+        });
+
+        // Make ShardManager globally available
+        window.shardManager = shardManager;
+
+        // Post-initialization validation
+        if (!shardManager) {
+          throw new Error('ShardManager constructor returned null or undefined');
+        }
+
+        console.log('[GAME] ShardManager initialized successfully with dependencies', {
+          managerType: typeof shardManager,
+          hasProperties: Object.keys(shardManager).length,
+          scene: scene ? 'provided' : 'missing',
+          assetLoader: assetLoader ? 'provided' : 'missing',
+          isGlobal: !!window.shardManager
+        });
+      } catch (managerError) {
+        console.error('[GAME] Failed to initialize ShardManager:', managerError);
+        console.error('[GAME] ShardManager initialization error details:', {
+          errorName: managerError.name,
+          errorMessage: managerError.message,
+          stack: managerError.stack,
+          THREE: typeof THREE,
+          scene: scene ? 'exists' : 'missing',
+          assetLoader: assetLoader ? 'exists' : 'missing',
+          ShardManagerAvailable: typeof window.ShardManager === 'function'
+        });
+
+        // Create a placeholder ShardManager to prevent null references
+        try {
+          shardManager = {
+            // Add minimal required methods as empty functions
+            createShard: () => {
+              console.warn('[GAME] Using placeholder ShardManager.createShard');
+              return null;
+            },
+            update: () => {
+              console.warn('[GAME] Using placeholder ShardManager.update');
+            },
+            placeShard: () => {
+              console.warn('[GAME] Using placeholder ShardManager.placeShard');
+              return null;
+            }
+          };
+          window.shardManager = shardManager;
+          console.warn('[GAME] Created placeholder ShardManager object as fallback');
+        } catch (fallbackError) {
+          console.error('[GAME] Even fallback ShardManager creation failed:', fallbackError);
+        }
+      }
+
+    } catch (assetError) {
+      console.error("[GAME] Failed to initialize asset management modules:", assetError);
+      console.error("[GAME] This may affect 3D model loading. Stack trace:", assetError.stack);
+      window._moduleLoadingIssues.push({
+        component: 'AssetManagement',
+        error: assetError.toString(),
+        stack: assetError.stack,
+        time: new Date().toISOString()
+      });
+    }
+
+    // Log module loading completion time
+    const loadingTime = performance.now() - startTime;
+    console.log(`[GAME] All modules loaded in ${loadingTime.toFixed(2)}ms`);
+
     // Initialize the game after all modules are loaded
     initGame();
+
   } catch (err) {
-    console.error("[GAME] Failed to load modules:", err);
+    console.error("[GAME] CRITICAL ERROR: Failed to load essential modules:", err);
     console.error("[GAME] Stack trace:", err.stack);
+    window._moduleLoadingIssues.push({
+      component: 'ModuleLoading',
+      error: err.toString(),
+      stack: err.stack,
+      time: new Date().toISOString(),
+      fatal: true
+    });
+
+    // Display error message on screen
+    document.body.innerHTML += `
+      <div style="position:fixed; top:0; left:0; right:0; background:rgba(255,0,0,0.8); color:white; padding:20px; z-index:9999;">
+        <h2>Error Loading Game Modules</h2>
+        <p>${err.message}</p>
+        <p>Check the console for details (F12)</p>
+      </div>
+    `;
   }
 }
 
@@ -225,20 +608,51 @@ function setupScene() {
 
     // Create stroke material for hover effect using LineMaterial for thicker lines with gold animation
     console.log('[HOVER] Creating stroke material with LineMaterial for gold animated effect');
-    
+
     // Base values for stroke effect
     const BASE_STROKE_WIDTH = 10;   // Thicker line as requested
     const hexPointCount = 6;        // Number of points in hexagon
-    
+
     // Create reusable hover effect elements
     let currentHoverStroke = null;      // The Line2 object that renders the hover effect
     let currentHoverHex = null;         // Which hex currently has the hover
     let animationStartTime = 0;         // When the animation started
     let hoverAnimationActive = false;   // Whether animation is currently running
     let hoverAnimationFrame = null;     // Handle to cancel animation frame
-    
-    // Create the stroke material with improved settings for maximum visibility
-    const strokeMaterial = new LineMaterial({
+
+    // Check if line modules are available in our custom namespace instead of THREE
+    console.log("[GRID] Line modules availability check:", {
+      BeastTacticsExists: typeof window.BeastTactics !== 'undefined',
+      THREEAddonsExists: typeof window.BeastTactics?.THREEAddons !== 'undefined',
+      Line2: typeof window.BeastTactics?.THREEAddons?.Line2 === 'function',
+      LineGeometry: typeof window.BeastTactics?.THREEAddons?.LineGeometry === 'function',
+      LineMaterial: typeof window.BeastTactics?.THREEAddons?.LineMaterial === 'function'
+    });
+
+    // Also log any global window exposures of the modules
+    console.log("[GRID] Global module availability:", {
+      Line2Global: typeof window.Line2 === 'function',
+      LineGeometryGlobal: typeof window.LineGeometry === 'function',
+      LineMaterialGlobal: typeof window.LineMaterial === 'function'
+    });
+
+    let strokeMaterial, useSimpleLine = false;
+
+    // Try to create the stroke material with error handling
+    try {
+      // Create the stroke material with improved settings for maximum visibility
+      // Use our custom namespace to access the line material
+      console.log('[GRID] Attempting to create LineMaterial from custom namespace');
+
+      // Try to get LineMaterial from our custom namespace
+      const LineMaterial = window.BeastTactics?.THREEAddons?.LineMaterial || window.LineMaterial;
+
+      if (!LineMaterial) {
+        throw new Error('LineMaterial not found in BeastTactics.THREEAddons namespace or as global');
+      }
+
+      console.log('[GRID] Using LineMaterial constructor:', typeof LineMaterial);
+      strokeMaterial = new LineMaterial({
       color: 0xFFD700,      // Brighter gold color for better visibility (0xFFD700 instead of 0xDAA520)
       linewidth: BASE_STROKE_WIDTH, // Thicker lines as requested 
       vertexColors: true,   // Enable vertex colors for wave effect
@@ -254,7 +668,29 @@ function setupScene() {
       toneMapped: false,    // Disable tone mapping to preserve bright colors
       renderOrder: 999      // Very high render order to ensure it renders on top
     });
-    
+      console.log("[GRID] Successfully created LineMaterial");
+    } catch (materialError) {
+      console.error("[GRID] Error creating LineMaterial:", materialError);
+      console.warn("[GRID] Falling back to standard LineBasicMaterial");
+
+      // Create a standard LineBasicMaterial as fallback
+      // Note: renderOrder is an Object3D property, not a material property
+      // so we'll set it later on the mesh object, not the material
+      strokeMaterial = new THREE.LineBasicMaterial({
+        color: 0xFFD700,
+        linewidth: 1, // Standard WebGL limitation
+        vertexColors: true,
+        transparent: true,
+        opacity: 0.9,
+        depthTest: false,
+        depthWrite: false,
+        toneMapped: false
+      });
+
+      useSimpleLine = true;
+      console.log("[GRID] Fallback LineBasicMaterial created");
+    }
+
     console.log('[HOVER] LineMaterial created with enhanced settings:', {
       linewidth: BASE_STROKE_WIDTH,
       opacity: 0.8,
@@ -263,13 +699,13 @@ function setupScene() {
       vertexColors: true,
       resolution: [window.innerWidth, window.innerHeight]
     });
-    
+
     // Add resize handler to update resolution when window size changes
     window.addEventListener('resize', () => {
       console.log('[HOVER] Updating LineMaterial resolution on resize');
       strokeMaterial.resolution.set(window.innerWidth, window.innerHeight);
     });
-    
+
     console.log('[HOVER] LineMaterial created successfully:', { 
       material: strokeMaterial,
       materialType: strokeMaterial.type,
@@ -281,7 +717,7 @@ function setupScene() {
     // Initialize mouse position vector outside event handler
     const mousePos = new THREE.Vector2();
     console.log('[MOUSE] Initialized mouse position vector:', mousePos);
-    
+
     // Function to animate the hover effect with gold wave
     function animateHoverEffect() {
       // Only run if animation is active and we have a hover stroke
@@ -289,51 +725,51 @@ function setupScene() {
         //console.log('[HOVER-ANIM] Animation inactive or no hover stroke');
         return;
       }
-      
+
       // Calculate elapsed time for smooth animation
       const elapsed = Date.now() - animationStartTime;
       const colors = [];
-      
+
       // Debug - log once per second that animation is running
-      
+
       // Generate new gold colors with a shifting phase for wave effect
       for (let i = 0; i <= hexPointCount; i++) {
         // Faster animation for more vibrant effect
         const phase = (elapsed / 500); // Increased speed for more dynamic wave
-        
+
         // Calculate wave position - offset each vertex by its position around the hexagon
         const vertexPosition = i / hexPointCount;
         const angle = ((vertexPosition * Math.PI * 2) + phase) % (Math.PI * 2);
-        
+
         // Enhanced gold effect with more pronounced shimmer
         const baseHue = 0.13; // Rich gold base hue
         const hueVariation = 0.01 * Math.sin(angle * 2); // Subtle hue shift
         const hue = baseHue + hueVariation;
-        
+
         // More dynamic saturation and lightness for a shinier effect
         const saturation = 0.9 + Math.sin(angle) * 0.1; // 0.8-1.0 range
         const lightness = 0.6 + Math.cos(angle) * 0.25; // 0.35-0.85 range for stronger highlight
-        
+
         // Create color and add to array
         const color = new THREE.Color().setHSL(hue, saturation, lightness);
         colors.push(color.r, color.g, color.b);
-        
+
         // Debug color values every 60 frames (approximately once per second)
       }
-      
+
       // Update the colors in the geometry
       try {
         if (currentHoverStroke.geometry && 
             typeof currentHoverStroke.geometry.setColors === 'function') {
-          
+
           // Apply colors to geometry
           currentHoverStroke.geometry.setColors(colors);
-          
+
           // Make sure attributes are updated
           if (currentHoverStroke.geometry.attributes && 
               currentHoverStroke.geometry.attributes.color) {
             currentHoverStroke.geometry.attributes.color.needsUpdate = true;
-            
+
             // Log vertex count periodically to verify connections
             // if (elapsed % 300 === 0) { // Every ~5 seconds
             //   console.log(`[HOVER-ANIM] Vertex data check:`, {
@@ -343,13 +779,13 @@ function setupScene() {
             //   });
             // }
           }
-          
+
           // Update material if needed
           if (currentHoverStroke.material) {
             currentHoverStroke.material.needsUpdate = true;
           }
         }
-        
+
         // Schedule next frame if still active
         if (hoverAnimationActive) {
           hoverAnimationFrame = requestAnimationFrame(animateHoverEffect);
@@ -359,7 +795,7 @@ function setupScene() {
         hoverAnimationActive = false;
       }
     }
-    
+
     // Function to clear hover effect
     function clearHoverEffect() {
       // Stop animation
@@ -368,13 +804,13 @@ function setupScene() {
         cancelAnimationFrame(hoverAnimationFrame);
         hoverAnimationFrame = null;
       }
-      
+
       // If we have a current hover hex and stroke
       if (currentHoverHex && currentHoverStroke) {
         try {
           // Remove the stroke from its parent
           currentHoverHex.remove(currentHoverStroke);
-          
+
           // Clean up references
           if (currentHoverHex.material && currentHoverHex.material.userData) {
             currentHoverHex.material.userData.strokeMesh = null;
@@ -383,7 +819,7 @@ function setupScene() {
           console.error('[HOVER] Error removing stroke mesh:', err);
         }
       }
-      
+
       // Reset references
       currentHoverHex = null;
       window.hoveredHex = null;
@@ -420,7 +856,7 @@ function setupScene() {
       console.warn('[RAYCASTER] Cannot raycast: hexagons array is undefined or empty');
       return; // Exit the event handler early
     }
-    
+
     // Debug camera and scene state for troubleshooting ray intersection issues
     console.log('[RAYCASTER] Camera state:', {
       position: [camera.position.x.toFixed(2), camera.position.y.toFixed(2), camera.position.z.toFixed(2)],
@@ -428,22 +864,22 @@ function setupScene() {
       near: camera.near,
       far: camera.far
     });
-    
+
     // Use recursive flag to ensure we check child objects too
     // This is critical if the hexagons have any nested structures
     const recursive = true;
-    
+
     // Find intersected hexagons with defensive try/catch
     let intersects = [];
     try {
       // Try first with direct objects approach
       intersects = raycaster.intersectObjects(hexagons, recursive);
-      
+
       // If no intersections are found, try with the entire scene as fallback
       if (intersects.length === 0) {
         console.log('[RAYCASTER] No direct intersections found, trying with scene objects');
         const sceneIntersects = raycaster.intersectObjects(scene.children, recursive);
-        
+
         // Filter scene intersects to only include hexagons
         intersects = sceneIntersects.filter(intersect => {
           // Check if this object or any parent is in our hexagons array
@@ -455,7 +891,7 @@ function setupScene() {
           return false;
         });
       }
-      
+
       // Log after raycasting to confirm execution
       console.log('[RAYCASTER] Intersects found:', {
         intersectCount: intersects.length,
@@ -485,7 +921,7 @@ function setupScene() {
         hasMaterial: !!window.hoveredHex.material,
         hasUserData: window.hoveredHex.material ? !!window.hoveredHex.material.userData : false
       });
-      
+
       try {
         // Safely access nested properties with optional chaining
         const strokeMesh = window.hoveredHex?.material?.userData?.strokeMesh;
@@ -517,24 +953,24 @@ function setupScene() {
           hasUserData: !!hex?.material?.userData,
           hexType: hex?.userData?.element || 'unknown'
         });
-        
+
         // Ensure the hex has required properties before proceeding
         if (!hex || !hex.material) {
           console.error('[HOVER] Cannot create hover effect: hex or material is undefined');
           return;
         }
-        
+
         // Initialize userData if it doesn't exist and track hover state
         if (!hex.material.userData) {
           hex.material.userData = {};
         }
-        
+
         // Add timestamp to track hover duration for debugging
         hex.material.userData.hoverStartTime = Date.now();
-        
+
         // Store as global reference for inspection
         window.hoveredHex = hex;
-        
+
         console.log(`[HOVER] Hovering hex of type: ${hex.userData.element}`, {
           position: [hex.position.x.toFixed(2), hex.position.y.toFixed(2), hex.position.z.toFixed(2)],
           rotation: [hex.rotation.x.toFixed(2), hex.rotation.y.toFixed(2), hex.rotation.z.toFixed(2)],
@@ -543,21 +979,21 @@ function setupScene() {
 
         // Create stroke geometry (hexagon outline) using LineGeometry
         console.log('[HOVER] Creating stroke geometry with LineGeometry');
-        
+
         const radius = 0.95; // Slightly smaller than hex radius for inset effect
         const positions = [];
-        
+
         // CRITICAL: Store the first point coordinates to ensure perfect closure
         const firstX = radius * Math.cos(0);
         const firstZ = radius * Math.sin(0);
-        
+
         // Generate points for hexagon ensuring proper closure
         // Store all points for debugging
         const hexPoints = [];
-        
+
         for (let i = 0; i <= hexPointCount; i++) {
           let x, z;
-          
+
           if (i === hexPointCount) {
             // Use EXACT same coordinates for first and last point
             // This guarantees perfect closure with no visible seam
@@ -569,17 +1005,17 @@ function setupScene() {
             x = radius * Math.cos(angle);
             z = radius * Math.sin(angle);
           }
-          
+
           // Track point for debugging
           hexPoints.push({index: i, x: x.toFixed(6), z: z.toFixed(6)});
-          
+
           positions.push(
             x,
             0.01, // Slightly above hex surface to prevent z-fighting
             z
           );
         }
-        
+
         // Log first and last points to verify perfect closure
         console.log('[HOVER] Hexagon stroke points verification:', {
           pointCount: hexPoints.length,
@@ -588,47 +1024,121 @@ function setupScene() {
           identical: hexPoints[0].x === hexPoints[hexPoints.length-1].x && 
                      hexPoints[0].z === hexPoints[hexPoints.length-1].z
         });
-        
+
         console.log(`[HOVER] Created ${positions.length / 3} vertices for hexagon stroke`);
-        
+
         // Generate initial gold colors
         const colors = [];
         for (let i = 0; i <= hexPointCount; i++) {
           const gold = new THREE.Color(0xDAA520); // Default gold color
           colors.push(gold.r, gold.g, gold.b);
         }
-        
+
         // Create LineGeometry and set positions and colors for Line2
         console.log('[HOVER] Creating stroke geometry with LineGeometry');
-        
-        const strokeGeometry = new LineGeometry();
-        strokeGeometry.setPositions(positions);
-        strokeGeometry.setColors(colors); // Add initial colors for animation
-        
+
+        // Get LineGeometry constructor from our custom namespace or window global
+        const LineGeometry = window.BeastTactics?.THREEAddons?.LineGeometry || window.LineGeometry;
+
+        // Log LineGeometry availability for debugging
+        console.log('[HOVER] LineGeometry constructor availability:', {
+          fromBeastTactics: !!window.BeastTactics?.THREEAddons?.LineGeometry,
+          fromWindow: !!window.LineGeometry,
+          fromTHREE: !!THREE.LineGeometry,
+          constructor: typeof LineGeometry
+        });
+
+        if (!LineGeometry) {
+          console.error('[HOVER] LineGeometry constructor not found in any namespace');
+          throw new Error('LineGeometry constructor not available');
+        }
+
+        let strokeGeometry;
+        try {
+          // Use the LineGeometry constructor we found
+          strokeGeometry = new LineGeometry();
+          strokeGeometry.setPositions(positions);
+          strokeGeometry.setColors(colors); // Add initial colors for animation
+          console.log('[HOVER] LineGeometry created and configured successfully');
+        } catch (geometryError) {
+          console.error('[HOVER] Error creating LineGeometry:', geometryError);
+          console.warn('[HOVER] Falling back to standard THREE.BufferGeometry');
+
+          // Create standard BufferGeometry as fallback
+          strokeGeometry = new THREE.BufferGeometry();
+          strokeGeometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+          strokeGeometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+          useSimpleLine = true;
+        }
+
         console.log('[HOVER] LineGeometry created successfully with points:', positions.length / 3);
-        
+
         // Create stroke mesh with material
         console.log('[HOVER] Creating stroke mesh with Line2');
-        
+
         // Create the stroke mesh with our geometry and material
-        const strokeMesh = new Line2(strokeGeometry, strokeMaterial);
-        strokeMesh.computeLineDistances(); // Required for Line2
-        
+        let strokeMesh;
+        try {
+          if (useSimpleLine) {
+            // If we're using a fallback, create a standard Line instead of Line2
+            console.log('[HOVER] Using fallback standard THREE.Line');
+            strokeMesh = new THREE.Line(strokeGeometry, new THREE.LineBasicMaterial({
+              color: strokeMaterial.color,
+              linewidth: 1, // Standard WebGL can only do width 1
+              vertexColors: true
+            }));
+          } else {
+            // Get Line2 constructor from our custom namespace or window global
+            const Line2 = window.BeastTactics?.THREEAddons?.Line2 || window.Line2;
+
+            // Log Line2 availability for debugging
+            console.log('[HOVER] Line2 constructor availability:', {
+              fromBeastTactics: !!window.BeastTactics?.THREEAddons?.Line2,
+              fromWindow: !!window.Line2,
+              fromTHREE: !!THREE.Line2,
+              constructor: typeof Line2
+            });
+
+            if (!Line2) {
+              throw new Error('Line2 constructor not found in any namespace');
+            }
+
+            // Create Line2 mesh with our constructor
+            strokeMesh = new Line2(strokeGeometry, strokeMaterial);
+            strokeMesh.computeLineDistances(); // Required for Line2
+            console.log('[HOVER] Line2 created successfully with:', {
+              material: strokeMaterial.type || typeof strokeMaterial,
+              geometry: strokeGeometry ? 'valid' : 'missing',
+              renderOrder: strokeMesh.renderOrder
+            });
+          }
+        } catch (meshError) {
+          console.error('[HOVER] Error creating Line2:', meshError);
+          console.warn('[HOVER] Falling back to standard THREE.Line');
+
+          // Create standard Line as ultimate fallback
+          strokeMesh = new THREE.Line(strokeGeometry, new THREE.LineBasicMaterial({
+            color: 0xFFD700,
+            linewidth: 1,
+            vertexColors: true
+          }));
+        }
+
         // Use hex rotation to align properly
         const hexRotationY = hex.rotation.y || 0;
         strokeMesh.rotation.y = hexRotationY;
-        
+
         console.log(`[HOVER] Using hex rotation: ${hexRotationY.toFixed(4)} radians`);
-        
+
         // Position higher above hex to avoid z-fighting
         strokeMesh.position.y = 0.05;
-        
+
         // Set very high rendering order to ensure visibility
         strokeMesh.renderOrder = 1000;
-        
+
         // Make sure it's visible regardless of distance
         strokeMesh.frustumCulled = false;
-        
+
         // Store mesh references
         currentHoverStroke = strokeMesh;
         currentHoverHex = hex;
@@ -636,12 +1146,12 @@ function setupScene() {
 
         // Add stroke to hex
         hex.add(strokeMesh);
-        
+
         // Start the animation
         animationStartTime = Date.now();
         hoverAnimationActive = true;
         hoverAnimationFrame = requestAnimationFrame(animateHoverEffect);
-        
+
         console.log('[HOVER] Successfully created and attached animated gold stroke mesh');
       } catch (err) {
         console.error('[HOVER] Error creating hover effect:', err);
@@ -667,19 +1177,19 @@ function setupScene() {
   // Initialize map generator with scene and THREE
   debugLog("Initializing MapGenerator...");
   const mapGenerator = new MapGenerator(scene, THREE);
-  
+
   // Define variable to store hexagons with immediate initialization from MapGenerator
   // This helps avoid race conditions where code tries to access hexagons before they're ready
   let hexagons = mapGenerator.getHexagons() || [];
   console.log(`[GAME] Initial hexagons array: ${hexagons.length} hexagons available at startup`);
-  
+
   // Listen for map generation completion to update the hexagons array
   mapGenerator.onMapGenerated((generatedHexagons) => {
     console.log(`[GAME] Map generation complete: ${generatedHexagons.length} hexagons received via callback`);
     if (generatedHexagons && generatedHexagons.length > 0) {
       hexagons = generatedHexagons;
       console.log(`[GAME] Hexagons array updated with ${hexagons.length} hexagons`);
-      
+
       // Update any components that depend on hexagons array
       if (debugMenu) {
         console.log('[GAME] Updating debug menu with new hexagons array');
@@ -689,7 +1199,7 @@ function setupScene() {
       console.warn('[GAME] Received empty hexagons array from map generator callback!');
     }
   });
-  
+
   // Function to re-generate the hexagon grid (for compatibility with existing code)
   function generateHexagonGrid(horizontalSpacing = 1.5, verticalFactor = 1.0) {
     debugLog(`Delegating hexagon grid generation to MapGenerator...`);
@@ -698,7 +1208,7 @@ function setupScene() {
 
   // Make generateHexagonGrid available globally for diagnostics tools
   window.generateHexagonGrid = generateHexagonGrid;
-  
+
   // Make mapGenerator available globally for diagnostics
   window.mapGenerator = mapGenerator;
 
@@ -766,7 +1276,7 @@ function setupScene() {
         try {
           // Update hover stroke animation with safe property access
           const hoverProgress = (Math.sin(currentTime * 0.002) + 1) / 2; // 0 to 1 animation
-          
+
           // Debug logging - runs once every 300 frames to avoid console spam
           if (frameCount % 300 === 0) {
             console.log('[HOVER] Animation state:', {
@@ -776,7 +1286,7 @@ function setupScene() {
               hasStrokeMaterial: !!window.hoveredHex?.material?.userData?.strokeMaterial
             });
           }
-          
+
           // Safely access and update the stroke material
           const strokeMaterial = window.hoveredHex?.material?.userData?.strokeMaterial;
           if (strokeMaterial) {
@@ -1088,7 +1598,7 @@ function setupScene() {
 
   // Add beast update to animation loop
   let originalAnimate = animate;
-  
+
   // Create a clock for tracking time
   const clock = new THREE.Clock();
 
@@ -1098,12 +1608,12 @@ function setupScene() {
     const now = performance.now();
     const delta = (now - (lastFrameTime || now)) / 1000; // Convert to seconds
     lastFrameTime = now;
-    
+
     // Log delta time occasionally for debugging
     if (frameCount % 300 === 0) {
       console.log(`[GAME] Animation delta: ${delta.toFixed(4)}s (${(1/delta).toFixed(1)} FPS)`);
     }
-    
+
     // Call original animation function first
     originalAnimate();
 
@@ -1125,7 +1635,7 @@ function setupScene() {
       }
     }
   }
-  
+
   // Track last frame time for delta calculation
   let lastFrameTime = null;
 
