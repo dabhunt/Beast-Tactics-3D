@@ -50,10 +50,28 @@ class ShardManager {
       console.error('[SHARDS] Scene not provided to ShardManager');
     }
     
+    // Check AssetLoader availability with detailed validation
     console.log('[SHARDS] AssetLoader availability:', {
       available: !!this.assetLoader,
-      type: this.assetLoader ? typeof this.assetLoader : 'undefined'
+      type: this.assetLoader ? typeof this.assetLoader : 'undefined',
+      hasLoadModel: this.assetLoader && typeof this.assetLoader.loadModel === 'function',
+      hasCache: this.assetLoader && !!this.assetLoader.cache
     });
+    
+    // Create a placeholder assetLoader if not provided
+    if (!this.assetLoader) {
+      console.warn('[SHARDS] AssetLoader not provided - creating placeholder with logging');
+      this.assetLoader = {
+        loadModel: async (path, options) => {
+          console.warn(`[SHARDS] Placeholder AssetLoader.loadModel called with: ${path}`);
+          return null; // Will trigger fallback shard creation
+        },
+        cache: {
+          models: new Map(),
+          textures: new Map()
+        }
+      };
+    }
     
     // Default configuration with overrides from options
     this.config = {
@@ -99,12 +117,29 @@ class ShardManager {
     if (this.debugMaterial) return;
     
     console.log('[SHARDS] Creating debug material for high visibility');
-    this.debugMaterial = new this.THREE.MeshBasicMaterial({
-      color: 0xFF00FF,  // Bright magenta
-      wireframe: this.config.debugWireframe || false,
-      transparent: false,
-      side: this.THREE.DoubleSide
-    });
+    
+    try {
+      // Validate THREE is available
+      if (!this.THREE || typeof this.THREE.MeshBasicMaterial !== 'function') {
+        console.error('[SHARDS] THREE or MeshBasicMaterial not available');
+        return null;
+      }
+      
+      // Create debug material with proper validation
+      this.debugMaterial = new this.THREE.MeshBasicMaterial({
+        color: 0xFF00FF,  // Bright magenta
+        wireframe: this.config.debugWireframe || false,
+        transparent: false,
+        side: this.THREE.DoubleSide
+      });
+      
+      console.log('[SHARDS] Debug material created successfully:', {
+        materialType: this.debugMaterial.type,
+        color: this.debugMaterial.color.getHexString()
+      });
+    } catch (error) {
+      console.error('[SHARDS] Error creating debug material:', error);
+    }
   }
   
   /**
@@ -372,15 +407,45 @@ class ShardManager {
       }
       
       // Create a vibrant, easily visible material
-      const material = new this.THREE.MeshStandardMaterial({
-        color: 0xff00ff, // Bright magenta
-        metalness: 0.9,
-        roughness: 0.1,
-        emissive: 0x330066,
-        emissiveIntensity: 0.8,
-        transparent: true,
-        opacity: 0.8
-      });
+      // Construct material properties with explicit THREE.Color objects to avoid WebGL uniform errors
+      let material;
+      try {
+        // Validate MeshStandardMaterial is available
+        if (!this.THREE.MeshStandardMaterial) {
+          console.error('[SHARDS] THREE.MeshStandardMaterial not available');
+          throw new Error('MeshStandardMaterial constructor not found');
+        }
+        
+        // Log material creation parameters
+        console.log('[SHARDS] Creating fallback material with:', {
+          colorType: typeof 0xff00ff,
+          colorValue: '0x' + (0xff00ff).toString(16),
+          emissiveType: typeof 0x330066,
+          emissiveValue: '0x' + (0x330066).toString(16)
+        });
+        
+        // Create material with proper color objects
+        material = new this.THREE.MeshStandardMaterial({
+          color: new this.THREE.Color(0xff00ff), // Explicit color object
+          metalness: 0.9,
+          roughness: 0.1,
+          emissive: new this.THREE.Color(0x330066), // Explicit color object
+          emissiveIntensity: 0.8,
+          transparent: true,
+          opacity: 0.8
+        });
+        
+        // Validate material creation
+        console.log('[SHARDS] Fallback material created:', {
+          type: material.type,
+          colorType: material.color?.constructor?.name || 'unknown',
+          emissiveType: material.emissive?.constructor?.name || 'unknown'
+        });
+      } catch (materialError) {
+        console.error('[SHARDS] Error creating fallback material:', materialError);
+        // Create a simple material as ultimate fallback
+        material = new this.THREE.MeshBasicMaterial({ color: 0xff00ff });
+      }
       
       // Create mesh and position it
       const fallbackShard = new this.THREE.Mesh(geometry, material);
