@@ -7,10 +7,10 @@ import { MapGenerator, ELEMENT_TYPES, textureLoadingTracker } from './MapGenerat
 
 // Log the imported textureLoadingTracker to verify it's properly loaded
 console.log('[GAME] Imported textureLoadingTracker:', textureLoadingTracker);
-// Import Line2 and related modules for thicker lines
-import { Line2 } from 'three/addons/lines/Line2.js';
-import { LineGeometry } from 'three/addons/lines/LineGeometry.js';
-import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
+// Import Line2 and related modules for thicker lines - using consistent paths
+import { Line2 } from '/libs/three/addons/lines/Line2.js';
+import { LineGeometry } from '/libs/three/addons/lines/LineGeometry.js';
+import { LineMaterial } from '/libs/three/addons/lines/LineMaterial.js';
 
 // Global THREE variable
 let THREE;
@@ -252,13 +252,12 @@ function setupScene() {
       transparent: true,    // Enable transparency
       opacity: 0.9,         // 90% opacity for better visibility
       resolution: new THREE.Vector2(window.innerWidth, window.innerHeight), // Important for LineMaterial
-      linecap: 'round',     // Round line caps to help with connections
-      linejoin: 'round',    // Round joins for smoother connections
       depthTest: false,     // Disable depth testing to ensure visibility above other objects
       depthWrite: false,    // Don't write to depth buffer (prevents z-fighting)
       alphaToCoverage: true, // Improves antialiasing of transparent lines
-      toneMapped: false,    // Disable tone mapping to preserve bright colors
-      renderOrder: 999      // Very high render order to ensure it renders on top
+      toneMapped: false     // Disable tone mapping to preserve bright colors
+      // Removed invalid properties: linecap, linejoin, renderOrder
+      // renderOrder should be applied to the mesh, not the material
     });
     
     console.log('[HOVER] LineMaterial created with enhanced settings:', {

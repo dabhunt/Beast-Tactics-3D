@@ -325,15 +325,65 @@ export class LogViewer {
       
       // Add data tooltip if present
       if (log.data) {
-        logElement.title = JSON.stringify(log.data, null, 2);
-        logElement.style.cursor = 'pointer';
-        logElement.style.textDecoration = 'underline dotted';
-        
-        // Add click handler to show full data
-        logElement.addEventListener('click', () => {
-          console.log('[LOG-VIEWER] Log data details:', log.data);
-          alert(JSON.stringify(log.data, null, 2));
-        });
+        try {
+          // Custom replacer function to handle circular references and THREE.js objects
+          const safeReplacer = (key, value) => {
+            // Handle special THREE.js object types
+            if (value && typeof value === 'object') {
+              // Check for known THREE.js classes by properties
+              if (
+                (value.isObject3D || value.isGeometry || value.isMaterial || value.isBufferGeometry) ||
+                (value.uuid && value.type && (value.matrix || value.color || value.layers)) ||
+                // Check if it's a mesh, light, or camera
+                (value.geometry && value.material) ||
+                (value.intensity && value.shadow) ||
+                (value.fov && value.aspect)
+              ) {
+                return `[THREE.${value.type || 'Object'}]`;
+              }
+              
+              // Handle HTML elements
+              if (value instanceof Element) {
+                return `[HTML ${value.tagName} Element]`;
+              }
+              
+              // Handle functions
+              if (typeof value === 'function') {
+                return '[Function]';
+              }
+            }
+            
+            return value;
+          };
+          
+          // Try to stringify the data with our custom replacer
+          const safeJsonString = JSON.stringify(log.data, safeReplacer, 2);
+          logElement.title = safeJsonString;
+          logElement.style.cursor = 'pointer';
+          logElement.style.textDecoration = 'underline dotted';
+          
+          // Add click handler to show full data
+          logElement.addEventListener('click', () => {
+            console.log('[LOG-VIEWER] Log data details:', log.data);
+            try {
+              alert(safeJsonString);
+            } catch (error) {
+              console.error('[LOG-VIEWER] Failed to show data in alert:', error);
+              alert('Data contains circular references or complex objects that cannot be displayed. See console for details.');
+            }
+          });
+        } catch (jsonError) {
+          console.warn('[LOG-VIEWER] Failed to stringify log data:', jsonError);
+          logElement.title = 'Data contains circular references or complex objects that cannot be displayed';
+          logElement.style.cursor = 'pointer';
+          logElement.style.textDecoration = 'underline dotted';
+          
+          // Add click handler to show limited data
+          logElement.addEventListener('click', () => {
+            console.log('[LOG-VIEWER] Log data details (cannot be stringified):', log.data);
+            alert('Data contains circular references or complex objects. Check the console for the raw data.');
+          });
+        }
       }
       
       // Add to display
