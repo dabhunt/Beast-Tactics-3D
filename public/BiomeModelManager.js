@@ -9,6 +9,9 @@
 // Import enhanced FBXLoader handler
 import { getFBXLoader, isFBXLoaderReady } from "./libs/three/addons/loaders/FBXLoader.handler.js";
 
+// Import FBXLoader directly as fallback when handler fails
+import { FBXLoader } from "./libs/three/addons/loaders/FBXLoader.js";
+
 // Debug flag for verbose logging
 const DEBUG = true;
 
@@ -71,6 +74,9 @@ export class BiomeModelManager {
       ...config                // Override defaults with provided config
     };
     
+    // Add diagnostic info to window for debugging
+    window._biomeModelManager = this;
+    
     this.fbxLoader = null;
     this.textureLoader = null;
     
@@ -91,15 +97,77 @@ export class BiomeModelManager {
     // Active biome models for tracking/cleanup
     this.activeBiomeModels = [];
     
+    // List of potential model base paths to check
+    this.potentialBasePaths = [
+      './assets/BiomeTiles/Models/',
+      '/assets/BiomeTiles/Models/',
+      'assets/BiomeTiles/Models/',
+      '../assets/BiomeTiles/Models/',
+      this.config.modelBasePath
+    ];
+    
+    // Deduplicate base paths
+    this.potentialBasePaths = [...new Set(this.potentialBasePaths)];
+    
     debugLog("Biome Model Manager initialized with config:", this.config);
+    debugLog("Potential base paths to check:", this.potentialBasePaths);
     
     // Initialize texture loader
     this.initializeTextureLoader();
+    
+    // Validate config paths
+    this.validatePaths();
     
     // Initialize the FBX loader
     this.initializeFBXLoader().then(success => {
       debugLog(`FBX loader initialization ${success ? 'succeeded' : 'failed'}`);
     });
+  }
+  
+  /**
+   * Validate the model and texture paths by checking for the existence of sample files
+   */
+  async validatePaths() {
+    debugLog("Validating model and texture paths...");
+    
+    const testModels = [
+      "Fire_Volcano.fbx",
+      "Earth_Mountain.fbx",
+      "Light_Desert.fbx"
+    ];
+    
+    // Test each potential base path with each test model
+    for (const basePath of this.potentialBasePaths) {
+      debugLog(`Testing base path: ${basePath}`);
+      let foundFiles = false;
+      
+      for (const modelFile of testModels) {
+        const testPath = `${basePath}${modelFile}`;
+        try {
+          const exists = await this.checkFileExists(testPath);
+          if (exists) {
+            debugLog(`\u2705 Found model at: ${testPath}`);
+            foundFiles = true;
+            
+            // Update the config base path if we found a working one
+            if (basePath !== this.config.modelBasePath) {
+              debugLog(`Updating model base path from ${this.config.modelBasePath} to ${basePath}`);
+              this.config.modelBasePath = basePath;
+            }
+            
+            break;
+          }
+        } catch (error) {
+          logError(`Error checking path: ${testPath}`, error);
+        }
+      }
+      
+      if (foundFiles) {
+        break;
+      }
+    }
+    
+    debugLog(`Path validation complete, using base path: ${this.config.modelBasePath}`);
   }
   
   /**
@@ -112,7 +180,7 @@ export class BiomeModelManager {
   
   /**
    * Initialize the FBX loader if it doesn't exist
-   * Uses the enhanced FBXLoader.handler.js to manage loading
+   * Uses multiple approaches for reliable loading
    *
    * @returns {Promise<boolean>} - Returns true if loader was initialized successfully
    */
@@ -122,6 +190,18 @@ export class BiomeModelManager {
       alreadyInitializing: this._initializingLoader,
       alreadyLoaded: this.fbxLoader !== null
     });
+    
+    // If we already have the cached promise, reuse it
+    if (this._fbxLoaderPromise) {
+      debugLog("Reusing existing FBX loader promise");
+      try {
+        await this._fbxLoaderPromise;
+        return this._fbxLoaderSuccess;
+      } catch (error) {
+        logError("Error from cached FBX loader promise", error);
+        return false;
+      }
+    }
     
     // Prevent multiple initializations by tracking state
     if (this._initializingLoader) {
@@ -152,6 +232,7 @@ export class BiomeModelManager {
     if (this.fbxLoader && typeof this.fbxLoader.load === 'function') {
       debugLog("FBX loader already initialized and has load method");
       this._initializingLoader = false;
+      this._fbxLoaderSuccess = true;
       return true;
     } else if (this.fbxLoader) {
       debugLog("WARNING: FBX loader exists but doesn't have load method, reinitializing", { 
@@ -161,67 +242,128 @@ export class BiomeModelManager {
       this.fbxLoader = null; // Reset invalid loader
     }
 
-    try {
-      // Check if FBXLoader is already ready
-      debugLog("Checking if FBXLoader is ready via handler");
-      
-      if (isFBXLoaderReady()) {
-        debugLog("FBXLoader is already ready, retrieving instance");
+    // Create initialization promise that can be reused
+    this._fbxLoaderPromise = (async () => {
+      try {
+        // Attempt multiple loader initialization strategies
+        let loaderInitialized = false;
         
+        // Strategy 1: Use the handler's getFBXLoader method
         try {
-          // Get the loader class from our handler
-          const LoaderClass = await getFBXLoader();
+          debugLog("Strategy 1: Using FBXLoader.handler.js");
+          const isReady = isFBXLoaderReady();
+          debugLog(`Handler reports FBXLoader ready: ${isReady}`);
           
-          // Instantiate it - getFBXLoader returns the constructor, not an instance
-          debugLog("Instantiating FBXLoader from constructor");
-          this.fbxLoader = new LoaderClass();
-          this._fbxLoaderSuccess = true;
+          if (isReady) {
+            const LoaderClass = await getFBXLoader();
+            this.fbxLoader = new LoaderClass();
+            if (this.fbxLoader && typeof this.fbxLoader.load === 'function') {
+              loaderInitialized = true;
+              debugLog("✅ Successfully initialized FBXLoader via handler");
+            } else {
+              debugLog("❌ Handler getFBXLoader returned an invalid loader", this.fbxLoader);
+              this.fbxLoader = null;
+            }
+          } else {
+            debugLog("Handler reports FBXLoader not ready, waiting...");
+            const LoaderClass = await getFBXLoader(5000); // Wait up to 5 seconds
+            this.fbxLoader = new LoaderClass();
+            if (this.fbxLoader && typeof this.fbxLoader.load === 'function') {
+              loaderInitialized = true;
+              debugLog("✅ Successfully initialized FBXLoader via handler after waiting");
+            } else {
+              debugLog("❌ Handler getFBXLoader (after waiting) returned an invalid loader", this.fbxLoader);
+              this.fbxLoader = null;
+            }
+          }
+        } catch (handlerError) {
+          logError("Strategy 1 failed: Handler-based FBXLoader initialization", handlerError);
+          debugLog("FBXLoader.handler.js strategy failed, trying direct import");
+        }
+        
+        // Strategy 2: Use direct FBXLoader import as fallback
+        if (!loaderInitialized) {
+          try {
+            debugLog("Strategy 2: Using direct FBXLoader import");
+            this.fbxLoader = new FBXLoader();
+            if (this.fbxLoader && typeof this.fbxLoader.load === 'function') {
+              loaderInitialized = true;
+              debugLog("✅ Successfully initialized FBXLoader via direct import");
+            } else {
+              debugLog("❌ Direct import returned an invalid loader", this.fbxLoader);
+              this.fbxLoader = null;
+            }
+          } catch (directError) {
+            logError("Strategy 2 failed: Direct FBXLoader import", directError);
+          }
+        }
+        
+        // Strategy 3: Try dynamic imports with different paths
+        if (!loaderInitialized) {
+          const pathsToTry = [
+            './libs/three/addons/loaders/FBXLoader.js',
+            '/libs/three/addons/loaders/FBXLoader.js',
+            '../libs/three/addons/loaders/FBXLoader.js',
+            'libs/three/addons/loaders/FBXLoader.js'
+          ];
           
-          debugLog("Successfully obtained FBXLoader immediately", {
-            loader: this.fbxLoader ? "valid" : "null"
+          for (const path of pathsToTry) {
+            if (loaderInitialized) break;
+            
+            try {
+              debugLog(`Strategy 3: Using dynamic import with path: ${path}`);
+              const fbxModule = await import(path);
+              this.fbxLoader = new fbxModule.FBXLoader();
+              
+              if (this.fbxLoader && typeof this.fbxLoader.load === 'function') {
+                loaderInitialized = true;
+                debugLog(`✅ Successfully initialized FBXLoader via dynamic import from ${path}`);
+                break;
+              } else {
+                debugLog(`❌ Dynamic import from ${path} returned an invalid loader`, this.fbxLoader);
+                this.fbxLoader = null;
+              }
+            } catch (dynamicError) {
+              logError(`Strategy 3 failed: Dynamic import from ${path}`, dynamicError);
+            }
+          }
+        }
+        
+        // Final result check
+        this._initializingLoader = false;
+        this._fbxLoaderSuccess = loaderInitialized;
+        
+        if (loaderInitialized) {
+          // Validate the loader by checking its methods
+          const methods = Object.keys(this.fbxLoader);
+          const hasRequiredMethods = methods.includes('load') && typeof this.fbxLoader.load === 'function';
+          
+          debugLog("FBX loader initialization status:", {
+            status: loaderInitialized ? 'SUCCESS' : 'FAILED',
+            loaderType: typeof this.fbxLoader,
+            methods: methods.join(', '),
+            hasRequiredMethods
           });
           
-          this._initializingLoader = false;
           return true;
-        } catch (immediateError) {
-          logError("Getting FBXLoader despite ready status", immediateError);
+        } else {
+          debugLog("❌ All FBX loader initialization strategies failed");
+          return false;
         }
+      } catch (error) {
+        logError("Unexpected error during FBX loader initialization", error);
+        this._initializingLoader = false;
+        return false;
       }
-      
-      // Wait for handler to initialize loader
-      debugLog("FBXLoader not immediately ready, setting up wait process");
-      
-      // Create new promise only if we don't already have one
-      if (!this._fbxLoaderPromise) {
-        debugLog("Creating new loader wait promise");
-        
-        this._fbxLoaderPromise = new Promise(async (resolve) => {
-          try {
-            // Try to get the FBX loader 
-            debugLog("Attempting to get FBX loader from handler...");
-            const LoaderClass = await getFBXLoader();
-            
-            // Create an instance
-            this.fbxLoader = new LoaderClass();
-            this._fbxLoaderSuccess = true;
-            
-            debugLog("Successfully created FBX loader instance");
-            resolve(true);
-          } catch (error) {
-            logError("Failed to initialize FBX loader", error);
-            resolve(false);
-          } finally {
-            this._initializingLoader = false;
-          }
-        });
-      }
-      
+    })();
+    
+    try {
       // Wait for the promise to resolve
       const result = await this._fbxLoaderPromise;
-      debugLog("FBX loader initialization complete", { success: result });
+      this._initializingLoader = false;
       return result;
     } catch (error) {
-      logError("Unexpected error during FBX loader initialization", error);
+      logError("Error resolving FBX loader promise", error);
       this._initializingLoader = false;
       return false;
     }
@@ -258,6 +400,58 @@ export class BiomeModelManager {
     return { element, biomeName };
   }
   
+  /**
+   * Check if biome model files actually exist at the expected path
+   * @param {string} modelPath - Path to the model file
+   * @returns {Promise<boolean>} - True if the file exists
+   */
+  async checkFileExists(filePath) {
+    try {
+      debugLog(`Checking if file exists: ${filePath}`);      
+      
+      // First try the HEAD method (faster, doesn't download content)
+      try {
+        const response = await fetch(filePath, {
+          method: 'HEAD',
+          cache: 'no-cache'
+        });
+        
+        if (response.status === 200) {
+          debugLog(`✅ File exists (HEAD method): ${filePath}`);
+          return true;
+        }
+        
+        debugLog(`HEAD check failed for ${filePath} with status ${response.status}`);
+      } catch (headError) {
+        debugLog(`HEAD request failed for ${filePath}, trying GET instead: ${headError.message}`);
+      }
+      
+      // If HEAD fails, try GET as fallback (some servers don't support HEAD)
+      try {
+        const getResponse = await fetch(filePath, {
+          method: 'GET',
+          headers: {
+            'Range': 'bytes=0-0' // Just request the first byte to minimize data
+          }
+        });
+        
+        if (getResponse.status === 200 || getResponse.status === 206) {
+          debugLog(`✅ File exists (GET method): ${filePath}`);
+          return true;
+        }
+        
+        debugLog(`❌ File not found (GET method): ${filePath}, status: ${getResponse.status}`);
+        return false;
+      } catch (getError) {
+        debugLog(`❌ GET request also failed for ${filePath}: ${getError.message}`);
+        return false;
+      }
+    } catch (error) {
+      logError(`Complete file check failure for ${filePath}`, error);
+      return false;
+    }
+  }
+
   /**
    * Attempt to load a biome model for a hexagon based on its element type
    * @param {Object} hex - The hexagon to add a biome model to
@@ -305,18 +499,35 @@ export class BiomeModelManager {
         }
       }
       
-      // Check if we've already loaded this model
+      // Generate unique key for caching
       const modelKey = `${element}_${biomeName}`;
       
+      // Check if we've already loaded this model
       if (this.loadedModels[modelKey]) {
         debugLog(`Using cached model for ${modelKey}`);
         this.placeCachedBiomeModel(hex, modelKey);
         return true;
       }
       
-      // Load the model
+      // Full paths for model and texture
       const modelPath = `${this.config.modelBasePath}${modelFile}`;
       const texturePath = `${this.config.modelBasePath}${textureFile}`;
+      
+      // Log all path details for debugging
+      debugLog('Model loading details:', {
+        baseConfig: this.config.modelBasePath,
+        modelFile,
+        textureFile,
+        fullModelPath: modelPath,
+        fullTexturePath: texturePath
+      });
+      
+      // Check if files actually exist before attempting to load
+      const modelExists = await this.checkFileExists(modelPath);
+      if (!modelExists) {
+        debugLog(`Model file does not exist at path: ${modelPath}`);
+        return false;
+      }
       
       debugLog(`Loading model: ${modelPath}`);
       debugLog(`Loading texture: ${texturePath}`);
@@ -499,9 +710,7 @@ export class BiomeModelManager {
   async discoverBiomeMapping(element) {
     debugLog(`Discovering biome mapping for element: ${element}`);
     
-    // For simplicity in this implementation, we'll hardcode the mappings
-    // based on the files we saw in the directory listing
-    // In a real implementation, you might want to fetch this from the server
+    // Define known biome mappings with file naming pattern
     const knownMappings = {
       "Combat": { 
         biomeName: "Arena", 
@@ -521,12 +730,12 @@ export class BiomeModelManager {
       "Fire": { 
         biomeName: "Volcano", 
         modelFile: "Fire_Volcano.fbx", 
-        textureFile: "Fire_Volcano_texture.png" 
+        textureFile: "Fire_Volcano_Texture.png" 
       },
       "Light": { 
         biomeName: "Desert", 
         modelFile: "Light_Desert.fbx", 
-        // No texture for Light_Desert
+        textureFile: "Light_Desert_Texture.png" 
       },
       "Metal": { 
         biomeName: "Mineshaft", 
@@ -545,13 +754,56 @@ export class BiomeModelManager {
       }
     };
     
+    // List of potential base paths to try (in order of preference)
+    const potentialPaths = [
+      this.config.modelBasePath,
+      'assets/BiomeTiles/Models/',
+      '/assets/BiomeTiles/Models/',
+      './assets/BiomeTiles/Models/',
+      '../assets/BiomeTiles/Models/'
+    ];
+    
+    debugLog(`Testing model paths for ${element}, current base path: ${this.config.modelBasePath}`);
+    
+    // Check if we have a known mapping for this element
     if (knownMappings[element]) {
-      this.biomeMappings[element] = knownMappings[element];
-      debugLog(`Found biome mapping for ${element}: ${knownMappings[element].biomeName}`);
-      return knownMappings[element];
+      const mapping = knownMappings[element];
+      debugLog(`Found potential mapping for ${element}:`, mapping);
+      
+      // Try to verify this mapping exists by checking if the model file exists at any of our paths
+      for (const basePath of potentialPaths) {
+        const testPath = `${basePath}${mapping.modelFile}`;
+        debugLog(`Testing path: ${testPath}`);
+        
+        try {
+          const exists = await this.checkFileExists(testPath);
+          if (exists) {
+            debugLog(`✅ Verified model exists at: ${testPath}`);
+            
+            // If we found a working path that's different from config, update it
+            if (basePath !== this.config.modelBasePath) {
+              debugLog(`Updating base path from ${this.config.modelBasePath} to ${basePath}`);
+              this.config.modelBasePath = basePath;
+            }
+            
+            // Store the mapping for future use
+            this.biomeMappings[element] = mapping;
+            return mapping;
+          }
+          debugLog(`❌ Model not found at: ${testPath}`);
+        } catch (error) {
+          logError(`Error checking path ${testPath}`, error);
+        }
+      }
+      
+      // If we got here, we couldn't verify the model exists, but let's still return the mapping
+      // as a best effort - maybe the file check just failed
+      debugLog(`Could not verify model exists for ${element}, returning mapping as best effort`);
+      this.biomeMappings[element] = mapping;
+      return mapping;
     }
     
-    debugLog(`No biome mapping found for element: ${element}`);
+    debugLog(`No known mapping found for element: ${element}`);
     return null;
   }
 }
