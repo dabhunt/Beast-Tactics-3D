@@ -92,8 +92,9 @@ let fbxTree;
 let connections;
 let sceneGraph;
 
-// Define the FBXLoader class
-FBXLoader = class FBXLoader extends (isModule ? null : THREE.Loader) {
+// Define the FBXLoader class - always extend from THREE.Loader 
+// Fixed: Previous code was extending from null when isModule was true
+FBXLoader = class FBXLoader extends THREE.Loader {
     /**
      * Constructor for FBXLoader with enhanced error handling
      * @param {THREE.LoadingManager} manager - Optional loading manager

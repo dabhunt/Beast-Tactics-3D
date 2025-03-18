@@ -1,5 +1,6 @@
 when you want specific information about Three.js, use this MCP to query for relevant documentation, Ex: 
 debug/direct-threejs-query.js "how to create a shiny material"
+don't search overly specific questions, but phrase the word categorically, I.E. don't search for an "FBX loader", but search for "load 3D models"
 
 When you need specific information available from the web you don't have comprehensive training on not directly related to Three.js,
 or the user mentions perplexity, 

@@ -2,15 +2,15 @@
  * BiomeModelManager.js
  * Responsible for loading and managing 3D models for biome tiles
  * Models are loaded from public/assets/BiomeTiles/Models
- * Following the naming convention: {element}_{biomename}.fbx for models
+ * Following the naming convention: {element}_{biomename}.glb for models
  * and {element}_{biomename}_Texture.png for textures
  */
 
-// Import enhanced FBXLoader handler
-import { getFBXLoader, isFBXLoaderReady } from "./libs/three/addons/loaders/FBXLoader.handler.js";
+// Import enhanced GLTFLoader handler
+import { getGLTFLoader, isGLTFLoaderReady } from "./libs/three/addons/loaders/GLTFLoader.handler.js";
 
-// Import FBXLoader directly as fallback when handler fails
-import { FBXLoader } from "./libs/three/addons/loaders/FBXLoader.js";
+// Import GLTFLoader directly as fallback when handler fails
+import { GLTFLoader } from "./libs/three/addons/loaders/GLTFLoader.js";
 
 // Debug flag for verbose logging
 const DEBUG = true;
@@ -70,22 +70,22 @@ export class BiomeModelManager {
     this.config = {
       modelBasePath: "./assets/BiomeTiles/Models/",
       modelHeightOffset: 0.3, // Height above the hexagon
-      modelScaleFactor: 0.01, // Size of the model
+      modelScaleFactor: 0.01, // Size of the model (may need adjustment for GLB models)
       ...config                // Override defaults with provided config
     };
     
     // Add diagnostic info to window for debugging
     window._biomeModelManager = this;
     
-    this.fbxLoader = null;
+    this.gltfLoader = null;
     this.textureLoader = null;
     
     // Track initialization state for loaders
     this._initializingLoader = false;
     
     // Class-level promise for tracking loader initialization
-    this._fbxLoaderPromise = null;
-    this._fbxLoaderSuccess = false;
+    this._gltfLoaderPromise = null;
+    this._gltfLoaderSuccess = false;
     
     // Map to store element-biome mappings (once discovered)
     this.biomeMappings = {};
@@ -115,13 +115,30 @@ export class BiomeModelManager {
     // Initialize texture loader
     this.initializeTextureLoader();
     
-    // Validate config paths
-    this.validatePaths();
+    // Initialize the manager
+    this.initialize();
+  }
+  
+  /**
+   * Initialize the biome model manager
+   * This method handles initialization of paths and the FBX loader
+   * @returns {Promise<void>}
+   */
+  async initialize() {
+    debugLog("Starting BiomeModelManager initialization...");
     
-    // Initialize the FBX loader
-    this.initializeFBXLoader().then(success => {
+    try {
+      // Step 1: Validate paths
+      await this.validatePaths();
+      
+      // Step 2: Initialize the FBX loader
+      const success = await this.initializeFBXLoader();
       debugLog(`FBX loader initialization ${success ? 'succeeded' : 'failed'}`);
-    });
+      
+      debugLog("BiomeModelManager initialization complete");
+    } catch (error) {
+      logError("BiomeModelManager initialization failed", error);
+    }
   }
   
   /**
@@ -184,21 +201,21 @@ export class BiomeModelManager {
    *
    * @returns {Promise<boolean>} - Returns true if loader was initialized successfully
    */
-  async initializeFBXLoader() {
+  async initializeGLTFLoader() {
     // Start with detailed debug logging
-    debugLog("Starting FBX loader initialization", {
+    debugLog("Starting GLTF loader initialization", {
       alreadyInitializing: this._initializingLoader,
-      alreadyLoaded: this.fbxLoader !== null
+      alreadyLoaded: this.gltfLoader !== null
     });
     
     // If we already have the cached promise, reuse it
-    if (this._fbxLoaderPromise) {
-      debugLog("Reusing existing FBX loader promise");
+    if (this._gltfLoaderPromise) {
+      debugLog("Reusing existing GLTF loader promise");
       try {
-        await this._fbxLoaderPromise;
-        return this._fbxLoaderSuccess;
+        await this._gltfLoaderPromise;
+        return this._gltfLoaderSuccess;
       } catch (error) {
-        logError("Error from cached FBX loader promise", error);
+        logError("Error from cached GLTF loader promise", error);
         return false;
       }
     }
@@ -219,7 +236,7 @@ export class BiomeModelManager {
       });
       
       // Return the result of the previous initialization
-      const result = this.fbxLoader !== null;
+      const result = this.gltfLoader !== null;
       debugLog("Using result from previous initialization", { successful: result });
       return result;
     }
@@ -229,82 +246,82 @@ export class BiomeModelManager {
     debugLog("Starting new initialization process");
 
     // If we already have a loader, verify it has the load method before returning success
-    if (this.fbxLoader && typeof this.fbxLoader.load === 'function') {
-      debugLog("FBX loader already initialized and has load method");
+    if (this.gltfLoader && typeof this.gltfLoader.load === 'function') {
+      debugLog("GLTF loader already initialized and has load method");
       this._initializingLoader = false;
-      this._fbxLoaderSuccess = true;
+      this._gltfLoaderSuccess = true;
       return true;
-    } else if (this.fbxLoader) {
-      debugLog("WARNING: FBX loader exists but doesn't have load method, reinitializing", { 
-        type: typeof this.fbxLoader,
-        methods: this.fbxLoader ? Object.keys(this.fbxLoader) : 'null'
+    } else if (this.gltfLoader) {
+      debugLog("WARNING: GLTF loader exists but doesn't have load method, reinitializing", { 
+        type: typeof this.gltfLoader,
+        methods: this.gltfLoader ? Object.keys(this.gltfLoader) : 'null'
       });
-      this.fbxLoader = null; // Reset invalid loader
+      this.gltfLoader = null; // Reset invalid loader
     }
 
     // Create initialization promise that can be reused
-    this._fbxLoaderPromise = (async () => {
+    this._gltfLoaderPromise = (async () => {
       try {
         // Attempt multiple loader initialization strategies
         let loaderInitialized = false;
         
-        // Strategy 1: Use the handler's getFBXLoader method
+        // Strategy 1: Use the handler's getGLTFLoader method
         try {
-          debugLog("Strategy 1: Using FBXLoader.handler.js");
-          const isReady = isFBXLoaderReady();
-          debugLog(`Handler reports FBXLoader ready: ${isReady}`);
+          debugLog("Strategy 1: Using GLTFLoader.handler.js");
+          const isReady = isGLTFLoaderReady();
+          debugLog(`Handler reports GLTFLoader ready: ${isReady}`);
           
           if (isReady) {
-            const LoaderClass = await getFBXLoader();
-            this.fbxLoader = new LoaderClass();
-            if (this.fbxLoader && typeof this.fbxLoader.load === 'function') {
+            const LoaderClass = await getGLTFLoader();
+            this.gltfLoader = new LoaderClass();
+            if (this.gltfLoader && typeof this.gltfLoader.load === 'function') {
               loaderInitialized = true;
-              debugLog("✅ Successfully initialized FBXLoader via handler");
+              debugLog("✅ Successfully initialized GLTFLoader via handler");
             } else {
-              debugLog("❌ Handler getFBXLoader returned an invalid loader", this.fbxLoader);
-              this.fbxLoader = null;
+              debugLog("❌ Handler getGLTFLoader returned an invalid loader", this.gltfLoader);
+              this.gltfLoader = null;
             }
           } else {
-            debugLog("Handler reports FBXLoader not ready, waiting...");
-            const LoaderClass = await getFBXLoader(5000); // Wait up to 5 seconds
-            this.fbxLoader = new LoaderClass();
-            if (this.fbxLoader && typeof this.fbxLoader.load === 'function') {
+            debugLog("Handler reports GLTFLoader not ready, waiting...");
+            const LoaderClass = await getGLTFLoader(5000); // Wait up to 5 seconds
+            this.gltfLoader = new LoaderClass();
+            if (this.gltfLoader && typeof this.gltfLoader.load === 'function') {
               loaderInitialized = true;
-              debugLog("✅ Successfully initialized FBXLoader via handler after waiting");
+              debugLog("✅ Successfully initialized GLTFLoader via handler after waiting");
             } else {
-              debugLog("❌ Handler getFBXLoader (after waiting) returned an invalid loader", this.fbxLoader);
-              this.fbxLoader = null;
+              debugLog("❌ Handler getGLTFLoader (after waiting) returned an invalid loader", this.gltfLoader);
+              this.gltfLoader = null;
             }
           }
         } catch (handlerError) {
-          logError("Strategy 1 failed: Handler-based FBXLoader initialization", handlerError);
-          debugLog("FBXLoader.handler.js strategy failed, trying direct import");
+          logError("Strategy 1 failed: Handler-based GLTFLoader initialization", handlerError);
+          debugLog("GLTFLoader.handler.js strategy failed, trying direct import");
         }
         
-        // Strategy 2: Use direct FBXLoader import as fallback
+        // Strategy 2: Use direct GLTFLoader import as fallback
         if (!loaderInitialized) {
           try {
-            debugLog("Strategy 2: Using direct FBXLoader import");
-            this.fbxLoader = new FBXLoader();
-            if (this.fbxLoader && typeof this.fbxLoader.load === 'function') {
+            debugLog("Strategy 2: Using direct GLTFLoader import");
+            this.gltfLoader = new GLTFLoader();
+            if (this.gltfLoader && typeof this.gltfLoader.load === 'function') {
               loaderInitialized = true;
-              debugLog("✅ Successfully initialized FBXLoader via direct import");
+              debugLog("✅ Successfully initialized GLTFLoader via direct import");
             } else {
-              debugLog("❌ Direct import returned an invalid loader", this.fbxLoader);
-              this.fbxLoader = null;
+              debugLog("❌ Direct import returned an invalid loader", this.gltfLoader);
+              this.gltfLoader = null;
             }
           } catch (directError) {
-            logError("Strategy 2 failed: Direct FBXLoader import", directError);
+            logError("Strategy 2 failed: Direct GLTFLoader import", directError);
           }
         }
         
         // Strategy 3: Try dynamic imports with different paths
         if (!loaderInitialized) {
           const pathsToTry = [
-            './libs/three/addons/loaders/FBXLoader.js',
-            '/libs/three/addons/loaders/FBXLoader.js',
-            '../libs/three/addons/loaders/FBXLoader.js',
-            'libs/three/addons/loaders/FBXLoader.js'
+            './libs/three/addons/loaders/GLTFLoader.js',
+            '/libs/three/addons/loaders/GLTFLoader.js',
+            '../libs/three/addons/loaders/GLTFLoader.js',
+            'libs/three/addons/loaders/GLTFLoader.js'
           ];
           
           for (const path of pathsToTry) {
@@ -312,16 +329,16 @@ export class BiomeModelManager {
             
             try {
               debugLog(`Strategy 3: Using dynamic import with path: ${path}`);
-              const fbxModule = await import(path);
-              this.fbxLoader = new fbxModule.FBXLoader();
+              const gltfModule = await import(path);
+              this.gltfLoader = new gltfModule.GLTFLoader();
               
-              if (this.fbxLoader && typeof this.fbxLoader.load === 'function') {
+              if (this.gltfLoader && typeof this.gltfLoader.load === 'function') {
                 loaderInitialized = true;
-                debugLog(`✅ Successfully initialized FBXLoader via dynamic import from ${path}`);
+                debugLog(`✅ Successfully initialized GLTFLoader via dynamic import from ${path}`);
                 break;
               } else {
-                debugLog(`❌ Dynamic import from ${path} returned an invalid loader`, this.fbxLoader);
-                this.fbxLoader = null;
+                debugLog(`❌ Dynamic import from ${path} returned an invalid loader`, this.gltfLoader);
+                this.gltfLoader = null;
               }
             } catch (dynamicError) {
               logError(`Strategy 3 failed: Dynamic import from ${path}`, dynamicError);
@@ -329,6 +346,132 @@ export class BiomeModelManager {
           }
         }
         
+        // Strategy 4: Try using THREE.GLTFLoader if available directly
+        if (!loaderInitialized && this.THREE.GLTFLoader) {
+          try {
+            debugLog("Strategy 4: Using THREE.GLTFLoader directly from THREE instance");
+            this.gltfLoader = new this.THREE.GLTFLoader();
+            
+            if (this.gltfLoader && typeof this.gltfLoader.load === 'function') {
+              loaderInitialized = true;
+              debugLog("✅ Successfully initialized GLTFLoader from THREE instance");
+            } else {
+              debugLog("❌ THREE.GLTFLoader instance is invalid", this.gltfLoader);
+              this.gltfLoader = null;
+            }
+          } catch (threeError) {
+            logError("Strategy 4 failed: Direct THREE.GLTFLoader access", threeError);
+            window._biomeModelErrors = window._biomeModelErrors || [];
+            window._biomeModelErrors.push(threeError);
+          }
+        }
+
+        // Strategy 5: Try loading via script tag injection
+        if (!loaderInitialized) {
+          try {
+            debugLog("Strategy 5: Loading GLTFLoader via script tag");
+            
+            await new Promise((resolve, reject) => {
+              // Check if script already exists to avoid duplicates
+              if (document.querySelector('script[src*="GLTFLoader.js"]')) {
+                debugLog("GLTFLoader script already exists in document");
+                resolve();
+                return;
+              }
+              
+              const script = document.createElement('script');
+              script.src = '/libs/three/addons/loaders/GLTFLoader.js';
+              script.async = true;
+              
+              script.onload = () => {
+                debugLog("GLTFLoader script loaded successfully");
+                resolve();
+              };
+              
+              script.onerror = (err) => {
+                debugLog("GLTFLoader script failed to load", err);
+                reject(new Error("Failed to load GLTFLoader script"));
+              };
+              
+              document.head.appendChild(script);
+            });
+            
+            // After script is loaded, check if window.GLTFLoader is available
+            if (window.GLTFLoader) {
+              this.gltfLoader = new window.GLTFLoader();
+              if (this.gltfLoader && typeof this.gltfLoader.load === 'function') {
+                loaderInitialized = true;
+                debugLog("✅ Successfully initialized GLTFLoader via script tag");
+              } else {
+                debugLog("❌ Script loaded but invalid GLTFLoader", this.gltfLoader);
+                this.gltfLoader = null;
+              }
+            } else {
+              debugLog("❌ Script loaded but GLTFLoader not defined on window");
+            }
+          } catch (scriptError) {
+            logError("Strategy 5 failed: Script tag loading", scriptError);
+            window._biomeModelErrors = window._biomeModelErrors || [];
+            window._biomeModelErrors.push(scriptError);
+          }
+        }
+        
+        // Strategy 6: Create a stub GLTFLoader as last resort
+        if (!loaderInitialized) {
+          try {
+            debugLog("Strategy 6: Creating stub GLTFLoader for testing");
+            
+            // Create a minimal stub loader that shows a placeholder model
+            // This allows the application to continue running even without real models
+            this.gltfLoader = {
+              load: (url, onLoad, onProgress, onError) => {
+                console.warn(`[BIOME] Using STUB GLTFLoader for: ${url}`);
+                
+                // Create a simple cube as a substitute model for debugging
+                const geometry = new this.THREE.BoxGeometry(1, 1, 1);
+                const material = new this.THREE.MeshBasicMaterial({ 
+                  color: 0xff9900, 
+                  wireframe: true,
+                  opacity: 0.8,
+                  transparent: true
+                });
+                const mesh = new this.THREE.Mesh(geometry, material);
+                
+                // Add metadata to help with debugging
+                mesh.name = "STUB_MODEL_" + url.split('/').pop();
+                mesh.userData.isStubModel = true;
+                mesh.userData.originalPath = url;
+                
+                // Show text label on the model
+                const fileName = url.split('/').pop();
+                try {
+                  this.addDebugLabel(mesh, fileName);
+                } catch (labelError) {
+                  console.warn("[BIOME] Could not add debug label to stub model", labelError);
+                }
+                
+                if (onLoad) {
+                  // Simulate async loading with small delay
+                  setTimeout(() => {
+                    onLoad(mesh);
+                  }, 200);
+                }
+                
+                return mesh;
+              }
+            };
+            
+            loaderInitialized = true;
+            window._usingStubGLTFLoader = true;
+            console.warn("[BIOME] Using STUB GLTFLoader as fallback - models will be placeholders");
+            debugLog("✅ Created stub GLTFLoader for testing");
+          } catch (stubError) {
+            logError("Strategy 6 failed: Creating stub loader", stubError);
+            window._biomeModelErrors = window._biomeModelErrors || [];
+            window._biomeModelErrors.push(stubError);
+          }
+        }
+
         // Final result check
         this._initializingLoader = false;
         this._fbxLoaderSuccess = loaderInitialized;
@@ -342,7 +485,8 @@ export class BiomeModelManager {
             status: loaderInitialized ? 'SUCCESS' : 'FAILED',
             loaderType: typeof this.fbxLoader,
             methods: methods.join(', '),
-            hasRequiredMethods
+            hasRequiredMethods,
+            isStub: window._usingStubFBXLoader || false
           });
           
           return true;
@@ -805,6 +949,68 @@ export class BiomeModelManager {
     
     debugLog(`No known mapping found for element: ${element}`);
     return null;
+  }
+  
+  /**
+   * Add a debug text label to a 3D object
+   * @param {THREE.Object3D} object - The object to add a label to
+   * @param {string} text - The text to display
+   */
+  addDebugLabel(object, text) {
+    debugLog(`Adding debug label to model: ${text}`);
+    
+    try {
+      // Create a canvas texture for the text
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d');
+      canvas.width = 256;
+      canvas.height = 128;
+      
+      // Background with opacity
+      context.fillStyle = 'rgba(0, 0, 0, 0.5)';
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      
+      // Text styling
+      context.font = 'bold 24px Arial';
+      context.fillStyle = '#ff9900';
+      context.textAlign = 'center';
+      context.textBaseline = 'middle';
+      
+      // Draw text with stroke
+      context.strokeStyle = '#000000';
+      context.lineWidth = 3;
+      context.strokeText(`STUB MODEL`, canvas.width / 2, 40);
+      context.fillText(`STUB MODEL`, canvas.width / 2, 40);
+      
+      context.font = 'bold 20px Arial';
+      context.strokeText(text, canvas.width / 2, 80);
+      context.fillText(text, canvas.width / 2, 80);
+      
+      // Create a texture from the canvas
+      const texture = new this.THREE.CanvasTexture(canvas);
+      texture.needsUpdate = true;
+      
+      // Create a sprite material using the texture
+      const material = new this.THREE.SpriteMaterial({ 
+        map: texture,
+        transparent: true
+      });
+      
+      // Create a sprite and position it above the object
+      const sprite = new this.THREE.Sprite(material);
+      sprite.scale.set(1, 0.5, 1);
+      sprite.position.set(0, 1, 0);
+      
+      // Add the sprite to the object
+      object.add(sprite);
+      
+      // Store reference to the label
+      object.userData.debugLabel = sprite;
+      
+      debugLog("Debug label added successfully");
+    } catch (error) {
+      logError("Error creating debug label", error);
+    }
   }
 }
 

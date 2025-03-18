@@ -15,6 +15,65 @@
 // This should be a relative import to wherever three.module.js is located
 import * as THREE from '/libs/three/three.module.js';
 
+// Load Global Dependencies - Using the direct, focused approach
+let fbxGlobalDepsLoaded = false;
+
+/**
+ * Load and validate FBX dependencies explicitly
+ * @returns {Promise<boolean>} - True when dependencies are properly loaded
+ */
+async function loadFbxGlobalDependencies() {
+    if (fbxGlobalDepsLoaded) {
+        debugLog('FBX global dependencies already loaded');
+        return true;
+    }
+    
+    debugLog('Loading FBX global dependencies script');
+    
+    // Use a direct, synchronous approach to guarantee dependencies are loaded
+    // before FBXLoader tries to use them
+    return new Promise((resolve) => {
+        const script = document.createElement('script');
+        script.src = '/libs/three/addons/loaders/fbx-global-dependencies.js';
+        
+        script.onload = () => {
+            debugLog('FBX global dependencies script loaded');
+            fbxGlobalDepsLoaded = true;
+            
+            // Verify that fflate is now available in the global scope
+            if (window.fflate) {
+                debugLog('SUCCESS: fflate is now available in the global scope', {
+                    type: typeof window.fflate,
+                    functions: Object.keys(window.fflate)
+                });
+            } else {
+                debugLog('WARNING: fflate is still not available after loading dependencies');
+            }
+            
+            // Always resolve as true since we have fallbacks if needed
+            resolve(true);
+        };
+        
+        script.onerror = (err) => {
+            debugLog('ERROR: Failed to load FBX global dependencies script', err);
+            // Create an emergency fallback for fflate to prevent errors
+            if (!window.fflate) {
+                debugLog('Creating emergency fflate fallback');
+                window.fflate = {
+                    unzlibSync: function() { 
+                        console.warn('Using emergency fflate fallback - FBX models may not load correctly');
+                        return new Uint8Array(0); 
+                    },
+                    strFromU8: function() { return ''; }
+                };
+            }
+            resolve(false);
+        };
+        
+        document.head.appendChild(script);
+    });
+}
+
 // Enhanced debug logging
 const DEBUG = true;
 
@@ -137,7 +196,7 @@ async function loadDependencies() {
  * Try multiple approaches to load the FBXLoader
  */
 async function loadFBXLoader() {
-    debugLog('Starting multi-approach FBXLoader loading');
+    debugLog('Starting enhanced FBXLoader loading sequence');
     
     // Method tracking
     const methods = [];
@@ -148,17 +207,35 @@ async function loadFBXLoader() {
         return true;
     }
     
-    // Method 2: Try loading dependencies first
+    // Method 2: Load global dependencies FIRST - most critical step
+    // This ensures fflate and other dependencies are available in global scope
     try {
-        const depsLoaded = await loadDependencies();
-        methods.push({ name: 'load-dependencies', success: depsLoaded });
+        debugLog('Step 1: Ensuring global dependencies are loaded');
+        const globalDepsLoaded = await loadFbxGlobalDependencies();
+        methods.push({ name: 'load-global-dependencies', success: globalDepsLoaded });
         
-        if (!depsLoaded) {
-            debugLog('Warning: Not all dependencies loaded successfully');
+        // Verify fflate is available
+        if (window.fflate) {
+            debugLog('fflate is available in global scope', { type: typeof window.fflate });
+        } else {
+            debugLog('WARNING: fflate still not available in global scope after loading dependencies');
         }
     } catch (error) {
-        logError('load-dependencies', error);
-        methods.push({ name: 'load-dependencies', success: false, error: error.message });
+        logError('load-global-dependencies', error);
+        methods.push({ name: 'load-global-dependencies', success: false, error: error.message });
+    }
+    
+    // Method 3: Try loading original dependencies as backup
+    try {
+        const depsLoaded = await loadDependencies();
+        methods.push({ name: 'load-original-dependencies', success: depsLoaded });
+        
+        if (!depsLoaded) {
+            debugLog('Warning: Not all original dependencies loaded successfully');
+        }
+    } catch (error) {
+        logError('load-original-dependencies', error);
+        methods.push({ name: 'load-original-dependencies', success: false, error: error.message });
     }
     
     // Method 3: Try ES module import
