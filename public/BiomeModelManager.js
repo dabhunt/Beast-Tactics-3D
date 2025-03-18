@@ -121,7 +121,7 @@ export class BiomeModelManager {
   
   /**
    * Initialize the biome model manager
-   * This method handles initialization of paths and the FBX loader
+   * This method handles initialization of paths and the GLTF loader
    * @returns {Promise<void>}
    */
   async initialize() {
@@ -131,9 +131,9 @@ export class BiomeModelManager {
       // Step 1: Validate paths
       await this.validatePaths();
       
-      // Step 2: Initialize the FBX loader
-      const success = await this.initializeFBXLoader();
-      debugLog(`FBX loader initialization ${success ? 'succeeded' : 'failed'}`);
+      // Step 2: Initialize the GLTF loader
+      const success = await this.initializeGLTFLoader();
+      debugLog(`GLTF loader initialization ${success ? 'succeeded' : 'failed'}`);
       
       debugLog("BiomeModelManager initialization complete");
     } catch (error) {
@@ -148,9 +148,9 @@ export class BiomeModelManager {
     debugLog("Validating model and texture paths...");
     
     const testModels = [
-      "Fire_Volcano.fbx",
-      "Earth_Mountain.fbx",
-      "Light_Desert.fbx"
+      "Fire_Volcano.glb",
+      "Earth_Mountain.glb",
+      "Light_Desert.glb"
     ];
     
     // Test each potential base path with each test model

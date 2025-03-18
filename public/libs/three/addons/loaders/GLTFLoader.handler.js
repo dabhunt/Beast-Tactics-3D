@@ -113,15 +113,73 @@ export async function getGLTFLoader() {
 async function loadDependencies() {
     debugLog('Loading GLTFLoader dependencies');
     
-    // GLTFLoader has minimal dependencies compared to FBXLoader
-    const results = [];
+    const dependencies = [
+        { path: '/libs/three/addons/utils/BufferGeometryUtils.js', name: 'BufferGeometryUtils' }
+    ];
+    
+    const results = await Promise.all(dependencies.map(async dep => {
+        try {
+            // Try dynamic import for ES modules
+            debugLog(`Loading dependency: ${dep.name} from ${dep.path}`);
+            
+            // Method 1: Try using dynamic import
+            try {
+                const module = await import(dep.path);
+                debugLog(`✅ Successfully loaded ${dep.name} via dynamic import`);
+                return { name: dep.name, success: true, method: 'dynamic-import' };
+            } catch (importError) {
+                debugLog(`Dynamic import failed for ${dep.name}:`, importError);
+                
+                // Method 2: Try fetch and eval as a fallback
+                try {
+                    const response = await fetch(dep.path);
+                    if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
+                    
+                    const code = await response.text();
+                    // Execute the code in the global scope
+                    const scriptFn = new Function(code);
+                    scriptFn();
+                    
+                    debugLog(`✅ Successfully loaded ${dep.name} via fetch and eval`);
+                    return { name: dep.name, success: true, method: 'fetch-eval' };
+                } catch (fetchError) {
+                    debugLog(`Fetch method failed for ${dep.name}:`, fetchError);
+                    
+                    // Method 3: Inject script tag as final fallback
+                    return new Promise((resolve) => {
+                        const script = document.createElement('script');
+                        script.src = dep.path;
+                        script.async = true;
+                        
+                        script.onload = () => {
+                            debugLog(`✅ Successfully loaded ${dep.name} via script tag`);
+                            resolve({ name: dep.name, success: true, method: 'script-tag' });
+                        };
+                        
+                        script.onerror = (err) => {
+                            logError(`Failed to load ${dep.name} via script tag`, err);
+                            resolve({ name: dep.name, success: false, method: 'script-tag', error: err });
+                        };
+                        
+                        document.head.appendChild(script);
+                    });
+                }
+            }
+        } catch (error) {
+            logError(`All methods failed to load dependency: ${dep.name}`, error);
+            return { name: dep.name, success: false, error };
+        }
+    }));
+    
+    // Check if all dependencies were loaded successfully
+    const allSuccess = results.every(r => r.success);
     
     debugLog('Dependency loading complete', { 
-        success: true, 
+        success: allSuccess, 
         results 
     });
     
-    return true;
+    return allSuccess;
 }
 
 /**
