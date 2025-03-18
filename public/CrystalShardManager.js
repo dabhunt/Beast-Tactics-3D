@@ -8,11 +8,11 @@
 // Import the particle effect system
 import { CrystalParticleEffect } from "./effects/CrystalParticleEffect.js";
 
-// Import our enhanced FBXLoader handler
-import { getFBXLoader, isFBXLoaderReady } from "./libs/three/addons/loaders/FBXLoader.handler.js";
+// Import enhanced GLTFLoader handler
+import { getGLTFLoader, isGLTFLoaderReady } from "./libs/three/addons/loaders/GLTFLoader.handler.js";
 
-// Reference to FBXLoader
-let FBXLoader;
+// Reference to GLTFLoader
+let GLTFLoader;
 
 // Debug flag for verbose logging
 const DEBUG = true;
@@ -51,9 +51,9 @@ function logError(context, error) {
   });
 }
 
-// FBXLoader will be loaded through our enhanced handler module
+// GLTFLoader will be loaded through our enhanced handler module
 // No need for manual script or import loading anymore
-console.log("[CRYSTAL] Using enhanced FBXLoader.handler.js for loading");
+console.log("[CRYSTAL] Using enhanced GLTFLoader.handler.js for loading");
 
 /**
  * Crystal Shard Manager class
@@ -76,8 +76,8 @@ export class CrystalShardManager {
     this.config = {
       crystalSpawnChance: 0.3, // 30% chance to spawn a crystal per hex (increased for better visibility)
       crystalHeightOffset: 0.5, // Height above the hexagon
-      crystalScaleFactor: 0.005, // Size of the crystal
-      crystalModelPath: "./assets/Purple_Crystal_Shard.fbx", // Fixed path with correct relative URL
+      crystalScaleFactor: 0.005, // Size of the crystal (may need adjustment for GLB models)
+      crystalModelPath: "./assets/Purple_Crystal_Shard.glb", // Updated to use GLB format
       crystalTexturePath: "./assets/Purple_Crystal_Shard_texture.png", // Fixed path with correct relative URL
       
       // Particle effect configuration
@@ -109,8 +109,8 @@ export class CrystalShardManager {
     this._initializingLoader = false;
     
     // Class-level promise for tracking loader initialization
-    this._fbxLoaderPromise = null;
-    this._fbxLoaderSuccess = false;
+    this._gltfLoaderPromise = null;
+    this._gltfLoaderSuccess = false;
     
     // Particle effect system
     this.particleEffect = null;
@@ -214,7 +214,7 @@ export class CrystalShardManager {
 
       // If we have a crystal loader, use it to load the model
       if (this.crystalLoader) {
-        console.log("[CRYSTAL] Using FBX loader to load crystal model");
+        console.log("[CRYSTAL] Using GLTF loader to load crystal model");
         this.loadCrystalModel(hex);
       } else {
         // Otherwise use the fallback crystal method
@@ -241,7 +241,7 @@ export class CrystalShardManager {
   
   /**
    * Initialize the crystal loader if it doesn't exist
-   * Uses the enhanced FBXLoader.handler.js to manage loading
+   * Uses the enhanced GLTFLoader.handler.js to manage loading
    *
    * @returns {Promise<boolean>} - Returns true if loader was initialized successfully
    */
@@ -292,23 +292,23 @@ export class CrystalShardManager {
       this.crystalLoader = null; // Reset invalid loader
 
     try {
-      // ===== STEP 1: Check if FBXLoader is already ready =====
-      debugLog("STEP 1: Checking if FBXLoader is ready via handler");
+      // ===== STEP 1: Check if GLTFLoader is already ready =====
+      debugLog("STEP 1: Checking if GLTFLoader is ready via handler");
       
-      if (isFBXLoaderReady()) {
-        debugLog("FBXLoader is already ready, retrieving instance");
+      if (isGLTFLoaderReady()) {
+        debugLog("GLTFLoader is already ready, retrieving instance");
         
         try {
           // Get the loader class from our handler
-          const LoaderClass = await getFBXLoader();
+          const LoaderClass = await getGLTFLoader();
           
-          // Instantiate it - getFBXLoader returns the constructor, not an instance
-          debugLog("Instantiating FBXLoader from constructor");
+          // Instantiate it - getGLTFLoader returns the constructor, not an instance
+          debugLog("Instantiating GLTFLoader from constructor");
           this.crystalLoader = new LoaderClass();
-          this._crystalLoaderSource = "fbx-handler-ready-instance";
-          this._fbxLoaderSuccess = true;
+          this._crystalLoaderSource = "gltf-handler-ready-instance";
+          this._gltfLoaderSuccess = true;
           
-          debugLog("Successfully obtained FBXLoader immediately", {
+          debugLog("Successfully obtained GLTFLoader immediately", {
             loader: this.crystalLoader ? "valid" : "null",
             source: this._crystalLoaderSource
           });
@@ -317,7 +317,7 @@ export class CrystalShardManager {
           return true;
         } catch (immediateError) {
           // Log but continue to next step if this fails
-          debugLog("Error getting FBXLoader despite ready status", {
+          debugLog("Error getting GLTFLoader despite ready status", {
             error: immediateError.message,
             stack: immediateError.stack?.split('\n')[0] || 'No stack'
           });
@@ -325,13 +325,13 @@ export class CrystalShardManager {
       }
       
       // ===== STEP 2: Wait for handler to initialize loader =====
-      debugLog("STEP 2: FBXLoader not immediately ready, setting up wait process");
+      debugLog("STEP 2: GLTFLoader not immediately ready, setting up wait process");
       
       // Create new promise only if we don't already have one
-      if (!this._fbxLoaderPromise) {
+      if (!this._gltfLoaderPromise) {
         debugLog("Creating new loader wait promise");
         
-        this._fbxLoaderPromise = new Promise(async (resolve) => {
+        this._gltfLoaderPromise = new Promise(async (resolve) => {
           // Set timeout constraints
           const maxWaitTime = 8000; // 8 seconds max wait
           const startTime = Date.now();
@@ -343,7 +343,7 @@ export class CrystalShardManager {
             
             // Log each check attempt
             if (attemptCount % 4 === 0) { // Log every 4th attempt to avoid spam
-              debugLog("Checking FBXLoader readiness", {
+              debugLog("Checking GLTFLoader readiness", {
                 attempt: attemptCount,
                 elapsed: `${elapsed}ms`,
                 maxWait: `${maxWaitTime}ms`,
@@ -354,7 +354,7 @@ export class CrystalShardManager {
             // Check for timeout
             if (elapsed > maxWaitTime) {
               clearInterval(checkLoaderInterval);
-              debugLog("Timeout waiting for FBXLoader", { 
+              debugLog("Timeout waiting for GLTFLoader", { 
                 attemptsMade: attemptCount,
                 elapsedMs: elapsed 
               });
@@ -363,25 +363,25 @@ export class CrystalShardManager {
             }
             
             // Check if loader is ready now
-            if (isFBXLoaderReady()) {
+            if (isGLTFLoaderReady()) {
               clearInterval(checkLoaderInterval);
-              debugLog("FBXLoader became ready during wait");
+              debugLog("GLTFLoader became ready during wait");
               
               // Try to get the loader constructor
-              getFBXLoader().then(LoaderClass => {
-                debugLog("Successfully retrieved FBXLoader constructor after waiting");
+              getGLTFLoader().then(LoaderClass => {
+                debugLog("Successfully retrieved GLTFLoader constructor after waiting");
                 
                 try {
                   // Instantiate the loader class
                   const loaderInstance = new LoaderClass();
-                  debugLog("Successfully instantiated FBXLoader");
+                  debugLog("Successfully instantiated GLTFLoader");
                   resolve({ success: true, loader: loaderInstance });
                 } catch (instantiationError) {
-                  debugLog("Error instantiating FBXLoader", { error: instantiationError.message });
+                  debugLog("Error instantiating GLTFLoader", { error: instantiationError.message });
                   resolve({ success: false, reason: "instantiation-error", error: instantiationError });
                 }
               }).catch(err => {
-                debugLog("Error getting FBXLoader after it became ready", {
+                debugLog("Error getting GLTFLoader after it became ready", {
                   error: err.message
                 });
                 resolve({ success: false, reason: "get-error", error: err });
@@ -393,7 +393,7 @@ export class CrystalShardManager {
       
       // Wait for the promise to resolve
       debugLog("Waiting for loader promise to resolve");
-      const result = await this._fbxLoaderPromise;
+      const result = await this._gltfLoaderPromise;
       
       // Process the result
       debugLog("Loader wait process completed", { 
@@ -404,9 +404,9 @@ export class CrystalShardManager {
       // If we got a loader instance, save it
       if (result?.success && result?.loader) {
         this.crystalLoader = result.loader;
-        this._crystalLoaderSource = "fbx-handler-wait-instance";
-        this._fbxLoaderSuccess = true;
-        debugLog("Successfully obtained FBXLoader from wait process");
+        this._crystalLoaderSource = "gltf-handler-wait-instance";
+        this._gltfLoaderSuccess = true;
+        debugLog("Successfully obtained GLTFLoader from wait process");
         this._initializingLoader = false;
         return true;
       }
@@ -416,9 +416,9 @@ export class CrystalShardManager {
       
       // Try basic global checks
       const availabilityChecks = [
-        { name: "global-FBXLoader", check: () => typeof FBXLoader === "function", create: () => new FBXLoader() },
-        { name: "THREE.FBXLoader", check: () => this.THREE && typeof this.THREE.FBXLoader === "function", create: () => new this.THREE.FBXLoader() },
-        { name: "window.FBXLoader", check: () => typeof window.FBXLoader === "function", create: () => new window.FBXLoader() }
+        { name: "global-GLTFLoader", check: () => typeof GLTFLoader === "function", create: () => new GLTFLoader() },
+        { name: "THREE.GLTFLoader", check: () => this.THREE && typeof this.THREE.GLTFLoader === "function", create: () => new this.THREE.GLTFLoader() },
+        { name: "window.GLTFLoader", check: () => typeof window.GLTFLoader === "function", create: () => new window.GLTFLoader() }
       ];
       
       // Try each fallback method
@@ -431,7 +431,7 @@ export class CrystalShardManager {
           try {
             this.crystalLoader = method.create();
             this._crystalLoaderSource = method.name;
-            this._fbxLoaderSuccess = true;
+            this._gltfLoaderSuccess = true;
             
             debugLog(`Successfully created loader from ${method.name}`);
             this._initializingLoader = false;
@@ -692,7 +692,7 @@ export class CrystalShardManager {
   }
   
   /**
-   * Load a crystal model for a specific hex using the FBXLoader
+   * Load a crystal model for a specific hex using the GLTFLoader
    * @param {Object} hex - The hexagon to place the crystal on
    */
   loadCrystalModel(hex) {
@@ -723,21 +723,26 @@ export class CrystalShardManager {
       this.crystalLoader.load(
         this.config.crystalModelPath,
         
-        // onLoad callback
-        (fbx) => {
+        // onLoad callback - GLTF loads differently than FBX
+        (gltf) => {
           console.log(
-            `[CRYSTAL] FBX model loaded successfully for hex (${hex.userData.q}, ${hex.userData.r})`,
+            `[CRYSTAL] GLTF model loaded successfully for hex (${hex.userData.q}, ${hex.userData.r})`,
             {
-              childCount: fbx?.children?.length || 0,
-              type: typeof fbx,
-              isObject3D: fbx?.isObject3D || false
+              // GLTF format is different - scene contains the actual model
+              sceneChildCount: gltf.scene?.children?.length || 0,
+              type: typeof gltf,
+              hasScene: gltf?.scene != null,
+              animations: gltf?.animations?.length || 0
             }
           );
         
         try {
+          // Extract the model from the GLTF scene (different from FBX format)
+          const model = gltf.scene;
+          
           // Apply crystal texture if available
           if (this.crystalTextureLoaded && this.crystalTexture) {
-            fbx.traverse((child) => {
+            model.traverse((child) => {
               if (child.isMesh) {
                 console.log("[CRYSTAL] Applying texture to mesh:", child.name);
                 
@@ -756,15 +761,15 @@ export class CrystalShardManager {
             });
           }
           
-          // Scale the crystal (FBX models are typically much larger)
-          fbx.scale.set(
+          // Scale the crystal (GLB models may need different scaling than FBX)
+          model.scale.set(
             this.config.crystalScaleFactor,
             this.config.crystalScaleFactor,
             this.config.crystalScaleFactor
           );
           
           // Position the crystal
-          fbx.position.set(
+          model.position.set(
             hex.position.x,
             hex.position.y + this.config.crystalHeightOffset,
             hex.position.z
@@ -772,7 +777,7 @@ export class CrystalShardManager {
           
           // Apply randomized 360-degree rotation on Y-axis only (keeps base on hexagon)
           const randomYRotation = Math.random() * Math.PI * 2; // Random angle between 0 and 2π
-          fbx.rotation.y = randomYRotation;
+          model.rotation.y = randomYRotation;
           
           debugLog("Applied random Y-axis rotation to crystal:", {
             hexPosition: [hex.position.x, hex.position.y, hex.position.z],
@@ -780,38 +785,46 @@ export class CrystalShardManager {
           });
           
           // Add to the scene and associate with hex
-          this.scene.add(fbx);
-          hex.userData.crystal = fbx;
+          this.scene.add(model);
+          hex.userData.crystal = model;
           
           // Track this crystal for animations and particles
-          this.activeCrystals.push(fbx);
+          this.activeCrystals.push(model);
           
           // Add sparkle particle effects
-          this._addParticlesToCrystal(fbx);
+          this._addParticlesToCrystal(model);
           
           console.log(
             `[CRYSTAL] Crystal successfully placed on hex (${hex.userData.q}, ${hex.userData.r})`,
-            { modelType: "FBX" }
+            { modelType: "GLTF" }
           );
         } catch (error) {
-          console.error("[CRYSTAL] Error processing loaded FBX model:", error);
+          console.error("[CRYSTAL] Error processing loaded GLTF model:", error);
+          console.error("[CRYSTAL] Error stack:", error.stack);
           // Try fallback if model processing fails
           this.createFallbackCrystal(hex);
         }
       },
       
-      // onProgress callback - not used
-      undefined,
+      // onProgress callback - GLTF loaders support this too
+      (xhr) => {
+        if (xhr.lengthComputable) {
+          const percentComplete = (xhr.loaded / xhr.total) * 100;
+          debugLog(`[CRYSTAL] Loading progress: ${Math.round(percentComplete)}%`);
+        }
+      },
       
       // onError callback
       (error) => {
-        console.error("[CRYSTAL] Error loading FBX model:", error);
+        console.error("[CRYSTAL] Error loading GLTF model:", error);
+        console.error("[CRYSTAL] Error details:", error.message);
         // Create fallback crystal on error
         this.createFallbackCrystal(hex);
       }
     );
     } catch (err) {
       console.error("[CRYSTAL] Exception during model loading attempt:", err);
+      console.error("[CRYSTAL] Stack trace:", err.stack);
       return this.createFallbackCrystal(hex);
     }
   }
