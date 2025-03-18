@@ -404,7 +404,7 @@ class GLTFLoader extends Loader {
 	}
 
 	/**
-	 * Parses the given FBX data and returns the resulting group.
+	 * Parses the given GLB data and returns the resulting group.
 	 *
 	 * @param {string|ArrayBuffer} data - The raw glTF data.
 	 * @param {string} path - The URL base path.

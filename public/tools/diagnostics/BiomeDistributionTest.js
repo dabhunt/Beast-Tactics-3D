@@ -21,7 +21,7 @@ const CONFIG = {
   crystalSpawnChance: 0.2,  // 20% chance to spawn a crystal per hex
   crystalHeightOffset: 0.3, // Height above the hexagon
   crystalScaleFactor: 0.3,  // Size of the crystal (scale)
-  crystalModelPath: '/assets/Purple_Crystal_Shard.fbx',
+  crystalModelPath: '/assets/Purple_Crystal_Shard.glb',
   crystalTexturePath: '/assets/Purple_Crystal_Shard_texture.png'
 };
 
@@ -206,10 +206,10 @@ function createBiomeVisualization() {
         console.log(`[BIOME-VIZ] ✅ Successfully loaded crystal texture: ${CONFIG.crystalTexturePath}`);
         
         // Load the model after texture is loaded
-        const fbxLoader = new THREE.FBXLoader();
+        const GLBLoader = new THREE.glbLoader();
         console.log(`[BIOME-VIZ] Loading crystal model: ${CONFIG.crystalModelPath}`);
         
-        fbxLoader.load(
+        GLBLoader.load(
           CONFIG.crystalModelPath,
           // onLoad callback
           (model) => {
@@ -534,7 +534,7 @@ if (typeof THREE === 'undefined') {
   // Chain the scripts loading in correct order
   loadScript('/libs/three/three.min.js')
     .then(() => loadScript('/libs/three/addons/controls/OrbitControls.js'))
-    .then(() => loadScript('/libs/three/addons/loaders/FBXLoader.js'))
+    .then(() => loadScript('/libs/three/addons/loaders/GLBLoader.js'))
     .then(() => {
       console.log('[BIOME-TEST] All THREE.js dependencies loaded successfully');
       createBiomeVisualization();

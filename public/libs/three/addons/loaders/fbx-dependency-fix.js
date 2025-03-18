@@ -1,9 +1,9 @@
 /**
- * fbx-dependency-fix.js
+ * GLB-dependency-fix.js
  * 
- * This script fixes issues with missing FBXLoader dependencies by ensuring 
+ * This script fixes issues with missing GLBLoader dependencies by ensuring 
  * that fflate and other required libraries are properly loaded in the global scope
- * before FBXLoader attempts to use them.
+ * before GLBLoader attempts to use them.
  */
 
 // Debug flag to control logging output
@@ -18,7 +18,7 @@ function logMessage(message, data = null) {
     if (!DEBUG_LOG) return;
     
     const timestamp = new Date().toISOString().split('T')[1].split('.')[0]; // HH:MM:SS
-    const prefix = `[FBX-DEPS ${timestamp}]`;
+    const prefix = `[GLB-DEPS ${timestamp}]`;
     
     if (data !== null) {
         console.log(`${prefix} ${message}`, data);
@@ -36,11 +36,11 @@ function logError(context, error) {
     if (!DEBUG_LOG) return;
     
     const timestamp = new Date().toISOString().split('T')[1].split('.')[0];
-    console.error(`[FBX-DEPS ${timestamp}] Error in ${context}:`, error);
+    console.error(`[GLB-DEPS ${timestamp}] Error in ${context}:`, error);
     
     // Add to diagnostic history
-    window._fbxDepsFixErrors = window._fbxDepsFixErrors || [];
-    window._fbxDepsFixErrors.push({
+    window._GLBDepsFixErrors = window._GLBDepsFixErrors || [];
+    window._GLBDepsFixErrors.push({
         timestamp: new Date().toISOString(),
         context,
         message: error.message,
@@ -294,7 +294,7 @@ async function loadDependency(dependency) {
 }
 
 /**
- * Load all dependencies required by FBXLoader
+ * Load all dependencies required by GLBLoader
  * @returns {Promise<boolean>} - True if all required dependencies loaded
  */
 async function loadAllDependencies() {
@@ -351,12 +351,12 @@ function createFflateFallback() {
     window.fflate = {
         // Minimal implementation to avoid errors
         unzlibSync: function(data) {
-            console.warn('[FBX-DEPS] Using fflate fallback - real decompression unavailable');
+            console.warn('[GLB-DEPS] Using fflate fallback - real decompression unavailable');
             // Return empty array to prevent errors
             return new Uint8Array(0);
         },
         strFromU8: function(data) {
-            console.warn('[FBX-DEPS] Using fflate fallback - real conversion unavailable');
+            console.warn('[GLB-DEPS] Using fflate fallback - real conversion unavailable');
             return '';
         }
     };
@@ -365,11 +365,11 @@ function createFflateFallback() {
 }
 
 /**
- * Initialize and fix FBXLoader dependencies
+ * Initialize and fix GLBLoader dependencies
  * @returns {Promise<boolean>} - True if successfully initialized
  */
 async function initializeAndFixDependencies() {
-    logMessage('Starting FBXLoader dependency fix');
+    logMessage('Starting GLBLoader dependency fix');
     
     // Check if already available
     if (checkAllDependenciesAvailable()) {
@@ -402,14 +402,14 @@ async function initializeAndFixDependencies() {
 // Immediately initialize when script loads
 initializeAndFixDependencies().then(success => {
     if (success) {
-        logMessage('FBXLoader dependencies successfully initialized');
+        logMessage('GLBLoader dependencies successfully initialized');
     } else {
-        logMessage('WARNING: FBXLoader dependencies could not be fully initialized');
+        logMessage('WARNING: GLBLoader dependencies could not be fully initialized');
     }
 });
 
 // Export functions for external use
-window.fbxDependencyFix = {
+window.glbDependencyFix = {
     initialize: initializeAndFixDependencies,
     checkDependencies: checkAllDependenciesAvailable,
     loadDependency

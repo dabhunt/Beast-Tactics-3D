@@ -1,5 +1,5 @@
 /**
- * Enhanced FBXLoader.js with local imports and better error handling
+ * Enhanced GLBLoader.js with local imports and better error handling
  * Modified for Beast-Tactics-3D to work with local THREE.js structure
  */
 
@@ -19,7 +19,7 @@ import {
 } from '/libs/three/three.module.js';
 
 // Create a global export for standalone usage
-let FBXLoader;
+let GLBLoader;
 
 // We'll treat everything as a module now that we're explicitly importing
 const isModule = true;
@@ -28,7 +28,7 @@ const isModule = true;
 const loadErrors = [];
 
 // Log load status to help with debugging
-console.log('[FBXLoader] Initializing with explicit THREE imports');
+console.log('[GLBLoader] Initializing with explicit THREE imports');
 
 // Setup dependencies to use imports
 let dependencies;
@@ -36,7 +36,7 @@ let dependencies;
 try {
     if (isModule) {
         // Module environment - load dependencies dynamically
-        console.log('[FBXLoader] Loading in module environment');
+        console.log('[GLBLoader] Loading in module environment');
         
         // Import using dynamic import() if needed
         // For now, use local dependencies
@@ -49,7 +49,7 @@ try {
         // We'll use direct THREE imports later in the class definition
     } else {
         // Browser environment with THREE already loaded
-        console.log('[FBXLoader] Loading in browser environment with global THREE');
+        console.log('[GLBLoader] Loading in browser environment with global THREE');
         
         // Use globals
         dependencies = {
@@ -59,9 +59,9 @@ try {
         };
     }
     
-    console.log('[FBXLoader] Dependencies initialized');
+    console.log('[GLBLoader] Dependencies initialized');
 } catch (error) {
-    console.error('[FBXLoader] Failed to initialize dependencies:', error);
+    console.error('[GLBLoader] Failed to initialize dependencies:', error);
     loadErrors.push({ type: 'initialization', error: error.message });
     
     // Provide fallback stubs
@@ -73,30 +73,30 @@ try {
 }
 
 /**
- * Loader loads FBX file and generates Group representing FBX scene.
- * Requires FBX file to be >= 7.0 and in ASCII or >= 6400 in Binary format
+ * Loader loads GLB file and generates Group representing GLB scene.
+ * Requires GLB file to be >= 7.0 and in ASCII or >= 6400 in Binary format
  * Versions lower than this may load but will probably have errors
  *
  * Needs Support:
  *  Morph normals / blend shape normals
  *
- * FBX format references:
- * 	https://help.autodesk.com/view/FBX/2017/ENU/?guid=__cpp_ref_index_html (C++ SDK reference)
+ * GLB format references:
+ * 	https://help.autodesk.com/view/GLB/2017/ENU/?guid=__cpp_ref_index_html (C++ SDK reference)
  *
  * Binary format specification:
- *	https://code.blender.org/2013/08/fbx-binary-file-format-specification/
+ *	https://code.blender.org/2013/08/GLB-binary-file-format-specification/
  */
 
 
-let fbxTree;
+let GLBTree;
 let connections;
 let sceneGraph;
 
-// Define the FBXLoader class - always extend from THREE.Loader 
+// Define the GLBLoader class - always extend from THREE.Loader 
 // Fixed: Previous code was extending from null when isModule was true
-FBXLoader = class FBXLoader extends THREE.Loader {
+GLBLoader = class GLBLoader extends THREE.Loader {
     /**
-     * Constructor for FBXLoader with enhanced error handling
+     * Constructor for GLBLoader with enhanced error handling
      * @param {THREE.LoadingManager} manager - Optional loading manager
      */
 
@@ -144,44 +144,44 @@ FBXLoader = class FBXLoader extends THREE.Loader {
 
 	}
 
-	parse( FBXBuffer, path ) {
+	parse( GLBBuffer, path ) {
 
-		if ( isFbxFormatBinary( FBXBuffer ) ) {
+		if ( isGLBFormatBinary( GLBBuffer ) ) {
 
-			fbxTree = new BinaryParser().parse( FBXBuffer );
+			GLBTree = new BinaryParser().parse( GLBBuffer );
 
 		} else {
 
-			const FBXText = convertArrayBufferToString( FBXBuffer );
+			const GLBText = convertArrayBufferToString( GLBBuffer );
 
-			if ( ! isFbxFormatASCII( FBXText ) ) {
+			if ( ! isGLBFormatASCII( GLBText ) ) {
 
-				throw new Error( 'THREE.FBXLoader: Unknown format.' );
-
-			}
-
-			if ( getFbxVersion( FBXText ) < 7000 ) {
-
-				throw new Error( 'THREE.FBXLoader: FBX version not supported, FileVersion: ' + getFbxVersion( FBXText ) );
+				throw new Error( 'THREE.glbLoader: Unknown format.' );
 
 			}
 
-			fbxTree = new TextParser().parse( FBXText );
+			if ( getGLBVersion( GLBText ) < 7000 ) {
+
+				throw new Error( 'THREE.glbLoader: GLB version not supported, FileVersion: ' + getGLBVersion( GLBText ) );
+
+			}
+
+			GLBTree = new TextParser().parse( GLBText );
 
 		}
 
-		// console.log( fbxTree );
+		// console.log( GLBTree );
 
 		const textureLoader = new TextureLoader( this.manager ).setPath( this.resourcePath || path ).setCrossOrigin( this.crossOrigin );
 
-		return new FBXTreeParser( textureLoader, this.manager ).parse( fbxTree );
+		return new GLBTreeParser( textureLoader, this.manager ).parse( GLBTree );
 
 	}
 
 }
 
-// Parse the FBXTree object returned by the BinaryParser or TextParser and return a Group
-class FBXTreeParser {
+// Parse the GLBTree object returned by the BinaryParser or TextParser and return a Group
+class GLBTreeParser {
 
 	constructor( textureLoader, manager ) {
 
@@ -206,15 +206,15 @@ class FBXTreeParser {
 
 	}
 
-	// Parses FBXTree.Connections which holds parent-child connections between objects (e.g. material -> texture, model->geometry )
+	// Parses GLBTree.Connections which holds parent-child connections between objects (e.g. material -> texture, model->geometry )
 	// and details the connection type
 	parseConnections() {
 
 		const connectionMap = new Map();
 
-		if ( 'Connections' in fbxTree ) {
+		if ( 'Connections' in GLBTree ) {
 
-			const rawConnections = fbxTree.Connections.connections;
+			const rawConnections = GLBTree.Connections.connections;
 
 			rawConnections.forEach( function ( rawConnection ) {
 
@@ -254,17 +254,17 @@ class FBXTreeParser {
 
 	}
 
-	// Parse FBXTree.Objects.Video for embedded image data
-	// These images are connected to textures in FBXTree.Objects.Textures
-	// via FBXTree.Connections.
+	// Parse GLBTree.Objects.Video for embedded image data
+	// These images are connected to textures in GLBTree.Objects.Textures
+	// via GLBTree.Connections.
 	parseImages() {
 
 		const images = {};
 		const blobs = {};
 
-		if ( 'Video' in fbxTree.Objects ) {
+		if ( 'Video' in GLBTree.Objects ) {
 
-			const videoNodes = fbxTree.Objects.Video;
+			const videoNodes = GLBTree.Objects.Video;
 
 			for ( const nodeID in videoNodes ) {
 
@@ -307,7 +307,7 @@ class FBXTreeParser {
 
 	}
 
-	// Parse embedded image data in FBXTree.Video.Content
+	// Parse embedded image data in GLBTree.Video.Content
 	parseImage( videoNode ) {
 
 		const content = videoNode.Content;
@@ -343,7 +343,7 @@ class FBXTreeParser {
 
 				if ( this.manager.getHandler( '.tga' ) === null ) {
 
-					console.warn( 'FBXLoader: TGA loader not found, skipping ', fileName );
+					console.warn( 'GLBLoader: TGA loader not found, skipping ', fileName );
 
 				}
 
@@ -352,7 +352,7 @@ class FBXTreeParser {
 
 			default:
 
-				console.warn( 'FBXLoader: Image type "' + extension + '" is not supported.' );
+				console.warn( 'GLBLoader: Image type "' + extension + '" is not supported.' );
 				return;
 
 		}
@@ -370,16 +370,16 @@ class FBXTreeParser {
 
 	}
 
-	// Parse nodes in FBXTree.Objects.Texture
+	// Parse nodes in GLBTree.Objects.Texture
 	// These contain details such as UV scaling, cropping, rotation etc and are connected
-	// to images in FBXTree.Objects.Video
+	// to images in GLBTree.Objects.Video
 	parseTextures( images ) {
 
 		const textureMap = new Map();
 
-		if ( 'Texture' in fbxTree.Objects ) {
+		if ( 'Texture' in GLBTree.Objects ) {
 
-			const textureNodes = fbxTree.Objects.Texture;
+			const textureNodes = GLBTree.Objects.Texture;
 			for ( const nodeID in textureNodes ) {
 
 				const texture = this.parseTexture( textureNodes[ nodeID ], images );
@@ -393,7 +393,7 @@ class FBXTreeParser {
 
 	}
 
-	// Parse individual node in FBXTree.Objects.Texture
+	// Parse individual node in GLBTree.Objects.Texture
 	parseTexture( textureNode, images ) {
 
 		const texture = this.loadTexture( textureNode, images );
@@ -408,7 +408,7 @@ class FBXTreeParser {
 		const valueU = wrapModeU !== undefined ? wrapModeU.value : 0;
 		const valueV = wrapModeV !== undefined ? wrapModeV.value : 0;
 
-		// http://download.autodesk.com/us/fbx/SDKdocs/FBX_SDK_Help/files/fbxsdkref/class_k_fbx_texture.html#889640e63e2e681259ea81061b85143a
+		// http://download.autodesk.com/us/GLB/SDKdocs/GLB_SDK_Help/files/GLBsdkref/class_k_GLB_texture.html#889640e63e2e681259ea81061b85143a
 		// 0: repeat(default), 1: clamp
 
 		texture.wrapS = valueU === 0 ? RepeatWrapping : ClampToEdgeWrapping;
@@ -467,7 +467,7 @@ class FBXTreeParser {
 
 			if ( loader === null ) {
 
-				console.warn( 'FBXLoader: TGA loader not found, creating placeholder texture for', textureNode.RelativeFilename );
+				console.warn( 'GLBLoader: TGA loader not found, creating placeholder texture for', textureNode.RelativeFilename );
 				texture = new Texture();
 
 			} else {
@@ -483,7 +483,7 @@ class FBXTreeParser {
 
 			if ( loader === null ) {
 
-				console.warn( 'FBXLoader: DDS loader not found, creating placeholder texture for', textureNode.RelativeFilename );
+				console.warn( 'GLBLoader: DDS loader not found, creating placeholder texture for', textureNode.RelativeFilename );
 				texture = new Texture();
 
 			} else {
@@ -495,7 +495,7 @@ class FBXTreeParser {
 
 		} else if ( extension === 'psd' ) {
 
-			console.warn( 'FBXLoader: PSD textures are not supported, creating placeholder texture for', textureNode.RelativeFilename );
+			console.warn( 'GLBLoader: PSD textures are not supported, creating placeholder texture for', textureNode.RelativeFilename );
 			texture = new Texture();
 
 		} else {
@@ -510,14 +510,14 @@ class FBXTreeParser {
 
 	}
 
-	// Parse nodes in FBXTree.Objects.Material
+	// Parse nodes in GLBTree.Objects.Material
 	parseMaterials( textureMap ) {
 
 		const materialMap = new Map();
 
-		if ( 'Material' in fbxTree.Objects ) {
+		if ( 'Material' in GLBTree.Objects ) {
 
-			const materialNodes = fbxTree.Objects.Material;
+			const materialNodes = GLBTree.Objects.Material;
 
 			for ( const nodeID in materialNodes ) {
 
@@ -533,16 +533,16 @@ class FBXTreeParser {
 
 	}
 
-	// Parse single node in FBXTree.Objects.Material
-	// Materials are connected to texture maps in FBXTree.Objects.Textures
-	// FBX format currently only supports Lambert and Phong shading models
+	// Parse single node in GLBTree.Objects.Material
+	// Materials are connected to texture maps in GLBTree.Objects.Textures
+	// GLB format currently only supports Lambert and Phong shading models
 	parseMaterial( materialNode, textureMap ) {
 
 		const ID = materialNode.id;
 		const name = materialNode.attrName;
 		let type = materialNode.ShadingModel;
 
-		// Case where FBX wraps shading model in property object.
+		// Case where GLB wraps shading model in property object.
 		if ( typeof type === 'object' ) {
 
 			type = type.value;
@@ -565,7 +565,7 @@ class FBXTreeParser {
 				material = new MeshLambertMaterial();
 				break;
 			default:
-				console.warn( 'THREE.FBXLoader: unknown material type "%s". Defaulting to MeshPhongMaterial.', type );
+				console.warn( 'THREE.glbLoader: unknown material type "%s". Defaulting to MeshPhongMaterial.', type );
 				material = new MeshPhongMaterial();
 				break;
 
@@ -578,7 +578,7 @@ class FBXTreeParser {
 
 	}
 
-	// Parse FBX material and return parameters suitable for a three.js material
+	// Parse GLB material and return parameters suitable for a three.js material
 	// Also parse the texture map and return any textures associated with the material
 	parseParameters( materialNode, textureMap, ID ) {
 
@@ -736,7 +736,7 @@ class FBXTreeParser {
 				case 'SpecularFactor': // AKA specularLevel
 				case 'VectorDisplacementColor': // NOTE: Seems to be a copy of DisplacementColor
 				default:
-					console.warn( 'THREE.FBXLoader: %s map is not supported in three.js, skipping texture.', type );
+					console.warn( 'THREE.glbLoader: %s map is not supported in three.js, skipping texture.', type );
 					break;
 
 			}
@@ -751,9 +751,9 @@ class FBXTreeParser {
 	getTexture( textureMap, id ) {
 
 		// if the texture is a layered texture, just use the first layer and issue a warning
-		if ( 'LayeredTexture' in fbxTree.Objects && id in fbxTree.Objects.LayeredTexture ) {
+		if ( 'LayeredTexture' in GLBTree.Objects && id in GLBTree.Objects.LayeredTexture ) {
 
-			console.warn( 'THREE.FBXLoader: layered textures are not supported in three.js. Discarding all but first layer.' );
+			console.warn( 'THREE.glbLoader: layered textures are not supported in three.js. Discarding all but first layer.' );
 			id = connections.get( id ).children[ 0 ].ID;
 
 		}
@@ -762,7 +762,7 @@ class FBXTreeParser {
 
 	}
 
-	// Parse nodes in FBXTree.Objects.Deformer
+	// Parse nodes in GLBTree.Objects.Deformer
 	// Deformer node can contain skinning or Vertex Cache animation data, however only skinning is supported here
 	// Generates map of Skeleton-like objects for use later when generating and binding skeletons.
 	parseDeformers() {
@@ -770,9 +770,9 @@ class FBXTreeParser {
 		const skeletons = {};
 		const morphTargets = {};
 
-		if ( 'Deformer' in fbxTree.Objects ) {
+		if ( 'Deformer' in GLBTree.Objects ) {
 
-			const DeformerNodes = fbxTree.Objects.Deformer;
+			const DeformerNodes = GLBTree.Objects.Deformer;
 
 			for ( const nodeID in DeformerNodes ) {
 
@@ -785,7 +785,7 @@ class FBXTreeParser {
 					const skeleton = this.parseSkeleton( relationships, DeformerNodes );
 					skeleton.ID = nodeID;
 
-					if ( relationships.parents.length > 1 ) console.warn( 'THREE.FBXLoader: skeleton attached to more than one geometry is not supported.' );
+					if ( relationships.parents.length > 1 ) console.warn( 'THREE.glbLoader: skeleton attached to more than one geometry is not supported.' );
 					skeleton.geometryID = relationships.parents[ 0 ].ID;
 
 					skeletons[ nodeID ] = skeleton;
@@ -799,7 +799,7 @@ class FBXTreeParser {
 					morphTarget.rawTargets = this.parseMorphTargets( relationships, DeformerNodes );
 					morphTarget.id = nodeID;
 
-					if ( relationships.parents.length > 1 ) console.warn( 'THREE.FBXLoader: morph target attached to more than one geometry is not supported.' );
+					if ( relationships.parents.length > 1 ) console.warn( 'THREE.glbLoader: morph target attached to more than one geometry is not supported.' );
 
 					morphTargets[ nodeID ] = morphTarget;
 
@@ -818,7 +818,7 @@ class FBXTreeParser {
 
 	}
 
-	// Parse single nodes in FBXTree.Objects.Deformer
+	// Parse single nodes in GLBTree.Objects.Deformer
 	// The top level skeleton node has type 'Skin' and sub nodes have type 'Cluster'
 	// Each skin node represents a skeleton and each cluster node represents a bone
 	parseSkeleton( relationships, deformerNodes ) {
@@ -905,7 +905,7 @@ class FBXTreeParser {
 
 		const modelMap = this.parseModels( deformers.skeletons, geometryMap, materialMap );
 
-		const modelNodes = fbxTree.Objects.Model;
+		const modelNodes = GLBTree.Objects.Model;
 
 		const scope = this;
 		modelMap.forEach( function ( model ) {
@@ -969,11 +969,11 @@ class FBXTreeParser {
 
 	}
 
-	// parse nodes in FBXTree.Objects.Model
+	// parse nodes in GLBTree.Objects.Model
 	parseModels( skeletons, geometryMap, materialMap ) {
 
 		const modelMap = new Map();
-		const modelNodes = fbxTree.Objects.Model;
+		const modelNodes = GLBTree.Objects.Model;
 
 		for ( const nodeID in modelNodes ) {
 
@@ -1081,7 +1081,7 @@ class FBXTreeParser {
 
 		relationships.children.forEach( function ( child ) {
 
-			const attr = fbxTree.Objects.NodeAttribute[ child.ID ];
+			const attr = GLBTree.Objects.NodeAttribute[ child.ID ];
 
 			if ( attr !== undefined ) {
 
@@ -1152,7 +1152,7 @@ class FBXTreeParser {
 					break;
 
 				default:
-					console.warn( 'THREE.FBXLoader: Unknown camera type ' + type + '.' );
+					console.warn( 'THREE.glbLoader: Unknown camera type ' + type + '.' );
 					model = new Object3D();
 					break;
 
@@ -1172,7 +1172,7 @@ class FBXTreeParser {
 
 		relationships.children.forEach( function ( child ) {
 
-			const attr = fbxTree.Objects.NodeAttribute[ child.ID ];
+			const attr = GLBTree.Objects.NodeAttribute[ child.ID ];
 
 			if ( attr !== undefined ) {
 
@@ -1258,7 +1258,7 @@ class FBXTreeParser {
 					let penumbra = 0;
 					if ( lightAttribute.OuterAngle !== undefined ) {
 
-						// TODO: this is not correct - FBX calculates outer and inner angle in degrees
+						// TODO: this is not correct - GLB calculates outer and inner angle in degrees
 						// with OuterAngle > InnerAngle && OuterAngle <= Math.PI
 						// while three.js uses a penumbra between (0, 1) to attenuate the inner angle
 						penumbra = MathUtils.degToRad( lightAttribute.OuterAngle.value );
@@ -1270,7 +1270,7 @@ class FBXTreeParser {
 					break;
 
 				default:
-					console.warn( 'THREE.FBXLoader: Unknown light type ' + lightAttribute.LightType.value + ', defaulting to a PointLight.' );
+					console.warn( 'THREE.glbLoader: Unknown light type ' + lightAttribute.LightType.value + ', defaulting to a PointLight.' );
 					model = new PointLight( color, intensity );
 					break;
 
@@ -1340,7 +1340,7 @@ class FBXTreeParser {
 
 		}
 
-		if ( geometry.FBX_Deformer ) {
+		if ( geometry.glb_Deformer ) {
 
 			model = new SkinnedMesh( geometry, material );
 			model.normalizeSkinWeights();
@@ -1365,7 +1365,7 @@ class FBXTreeParser {
 
 		}, null );
 
-		// FBX does not list materials for Nurbs lines, so we'll just put our own in here.
+		// GLB does not list materials for Nurbs lines, so we'll just put our own in here.
 		const material = new LineBasicMaterial( {
 			name: Loader.DEFAULT_MATERIAL_NAME,
 			color: 0x3300ff,
@@ -1413,7 +1413,7 @@ class FBXTreeParser {
 
 				if ( child.relationship === 'LookAtProperty' ) {
 
-					const lookAtTarget = fbxTree.Objects.Model[ child.ID ];
+					const lookAtTarget = GLBTree.Objects.Model[ child.ID ];
 
 					if ( 'Lcl_Translation' in lookAtTarget ) {
 
@@ -1482,9 +1482,9 @@ class FBXTreeParser {
 
 		const bindMatrices = {};
 
-		if ( 'Pose' in fbxTree.Objects ) {
+		if ( 'Pose' in GLBTree.Objects ) {
 
-			const BindPoseNode = fbxTree.Objects.Pose;
+			const BindPoseNode = GLBTree.Objects.Pose;
 
 			for ( const nodeID in BindPoseNode ) {
 
@@ -1518,13 +1518,13 @@ class FBXTreeParser {
 
 	addGlobalSceneSettings() {
 
-		if ( 'GlobalSettings' in fbxTree ) {
+		if ( 'GlobalSettings' in GLBTree ) {
 
-			if ( 'AmbientColor' in fbxTree.GlobalSettings ) {
+			if ( 'AmbientColor' in GLBTree.GlobalSettings ) {
 
 				// Parse ambient color - if it's not set to black (default), create an ambient light
 
-				const ambientColor = fbxTree.GlobalSettings.AmbientColor.value;
+				const ambientColor = GLBTree.GlobalSettings.AmbientColor.value;
 				const r = ambientColor[ 0 ];
 				const g = ambientColor[ 1 ];
 				const b = ambientColor[ 2 ];
@@ -1538,9 +1538,9 @@ class FBXTreeParser {
 
 			}
 
-			if ( 'UnitScaleFactor' in fbxTree.GlobalSettings ) {
+			if ( 'UnitScaleFactor' in GLBTree.GlobalSettings ) {
 
-				sceneGraph.userData.unitScaleFactor = fbxTree.GlobalSettings.UnitScaleFactor.value;
+				sceneGraph.userData.unitScaleFactor = GLBTree.GlobalSettings.UnitScaleFactor.value;
 
 			}
 
@@ -1550,7 +1550,7 @@ class FBXTreeParser {
 
 }
 
-// parse Geometry data from FBXTree and return map of BufferGeometries
+// parse Geometry data from GLBTree and return map of BufferGeometries
 class GeometryParser {
 
 	constructor() {
@@ -1559,14 +1559,14 @@ class GeometryParser {
 
 	}
 
-	// Parse nodes in FBXTree.Objects.Geometry
+	// Parse nodes in GLBTree.Objects.Geometry
 	parse( deformers ) {
 
 		const geometryMap = new Map();
 
-		if ( 'Geometry' in fbxTree.Objects ) {
+		if ( 'Geometry' in GLBTree.Objects ) {
 
-			const geoNodes = fbxTree.Objects.Geometry;
+			const geoNodes = GLBTree.Objects.Geometry;
 
 			for ( const nodeID in geoNodes ) {
 
@@ -1583,7 +1583,7 @@ class GeometryParser {
 
 		if ( this.negativeMaterialIndices === true ) {
 
-			console.warn( 'THREE.FBXLoader: The FBX file contains invalid (negative) material indices. The asset might not render as expected.' );
+			console.warn( 'THREE.glbLoader: The GLB file contains invalid (negative) material indices. The asset might not render as expected.' );
 
 		}
 
@@ -1591,7 +1591,7 @@ class GeometryParser {
 
 	}
 
-	// Parse single node in FBXTree.Objects.Geometry
+	// Parse single node in GLBTree.Objects.Geometry
 	parseGeometry( relationships, geoNode, deformers ) {
 
 		switch ( geoNode.attrType ) {
@@ -1608,7 +1608,7 @@ class GeometryParser {
 
 	}
 
-	// Parse single node mesh geometry in FBXTree.Objects.Geometry
+	// Parse single node mesh geometry in GLBTree.Objects.Geometry
 	parseMeshGeometry( relationships, geoNode, deformers ) {
 
 		const skeletons = deformers.skeletons;
@@ -1616,7 +1616,7 @@ class GeometryParser {
 
 		const modelNodes = relationships.parents.map( function ( parent ) {
 
-			return fbxTree.Objects.Model[ parent.ID ];
+			return GLBTree.Objects.Model[ parent.ID ];
 
 		} );
 
@@ -1660,7 +1660,7 @@ class GeometryParser {
 
 	}
 
-	// Generate a BufferGeometry from a node in FBXTree.Objects.Geometry
+	// Generate a BufferGeometry from a node in GLBTree.Objects.Geometry
 	genGeometry( geoNode, skeleton, morphTargets, preTransform ) {
 
 		const geo = new BufferGeometry();
@@ -1688,7 +1688,7 @@ class GeometryParser {
 			geo.setAttribute( 'skinWeight', new Float32BufferAttribute( buffers.vertexWeights, 4 ) );
 
 			// used later to bind the skeleton to the model
-			geo.FBX_Deformer = skeleton;
+			geo.glb_Deformer = skeleton;
 
 		}
 
@@ -1909,7 +1909,7 @@ class GeometryParser {
 
 					if ( ! displayedWeightsWarning ) {
 
-						console.warn( 'THREE.FBXLoader: Vertex has more than 4 skinning weights assigned to vertex. Deleting additional weights.' );
+						console.warn( 'THREE.glbLoader: Vertex has more than 4 skinning weights assigned to vertex. Deleting additional weights.' );
 						displayedWeightsWarning = true;
 
 					}
@@ -2237,7 +2237,7 @@ class GeometryParser {
 
 			morphTarget.rawTargets.forEach( function ( rawTarget ) {
 
-				const morphGeoNode = fbxTree.Objects.Geometry[ rawTarget.geoID ];
+				const morphGeoNode = GLBTree.Objects.Geometry[ rawTarget.geoID ];
 
 				if ( morphGeoNode !== undefined ) {
 
@@ -2252,7 +2252,7 @@ class GeometryParser {
 	}
 
 	// a morph geometry node is similar to a standard  node, and the node is also contained
-	// in FBXTree.Objects.Geometry, however it can only have attributes for position, normal
+	// in GLBTree.Objects.Geometry, however it can only have attributes for position, normal
 	// and a special attribute Index defining which vertices of the original geometry are affected
 	// Normal and position attributes only have data for the vertices that are affected by the morph
 	genMorphGeometry( parentGeo, parentGeoNode, morphGeoNode, preTransform, name ) {
@@ -2293,7 +2293,7 @@ class GeometryParser {
 
 	}
 
-	// Parse normal from FBXTree.Objects.Geometry.LayerElementNormal if it exists
+	// Parse normal from GLBTree.Objects.Geometry.LayerElementNormal if it exists
 	parseNormals( NormalNode ) {
 
 		const mappingType = NormalNode.MappingInformationType;
@@ -2324,7 +2324,7 @@ class GeometryParser {
 
 	}
 
-	// Parse UVs from FBXTree.Objects.Geometry.LayerElementUV if it exists
+	// Parse UVs from GLBTree.Objects.Geometry.LayerElementUV if it exists
 	parseUVs( UVNode ) {
 
 		const mappingType = UVNode.MappingInformationType;
@@ -2347,7 +2347,7 @@ class GeometryParser {
 
 	}
 
-	// Parse Vertex Colors from FBXTree.Objects.Geometry.LayerElementColor if it exists
+	// Parse Vertex Colors from GLBTree.Objects.Geometry.LayerElementColor if it exists
 	parseVertexColors( ColorNode ) {
 
 		const mappingType = ColorNode.MappingInformationType;
@@ -2376,7 +2376,7 @@ class GeometryParser {
 
 	}
 
-	// Parse mapping and material data in FBXTree.Objects.Geometry.LayerElementMaterial if it exists
+	// Parse mapping and material data in GLBTree.Objects.Geometry.LayerElementMaterial if it exists
 	parseMaterialIndices( MaterialNode ) {
 
 		const mappingType = MaterialNode.MappingInformationType;
@@ -2396,7 +2396,7 @@ class GeometryParser {
 
 		const materialIndexBuffer = MaterialNode.Materials.a;
 
-		// Since materials are stored as indices, there's a bit of a mismatch between FBX and what
+		// Since materials are stored as indices, there's a bit of a mismatch between GLB and what
 		// we expect.So we create an intermediate buffer that points to the index in the buffer,
 		// for conforming with the other functions we've written for other data.
 		const materialIndices = [];
@@ -2417,14 +2417,14 @@ class GeometryParser {
 
 	}
 
-	// Generate a NurbGeometry from a node in FBXTree.Objects.Geometry
+	// Generate a NurbGeometry from a node in GLBTree.Objects.Geometry
 	parseNurbsGeometry( geoNode ) {
 
 		const order = parseInt( geoNode.Order );
 
 		if ( isNaN( order ) ) {
 
-			console.error( 'THREE.FBXLoader: Invalid Order %s given for geometry ID: %s', geoNode.Order, geoNode.id );
+			console.error( 'THREE.glbLoader: Invalid Order %s given for geometry ID: %s', geoNode.Order, geoNode.id );
 			return new BufferGeometry();
 
 		}
@@ -2469,7 +2469,7 @@ class GeometryParser {
 
 }
 
-// parse animation data from FBXTree
+// parse animation data from GLBTree
 class AnimationParser {
 
 	// take raw animation clips and turn them into three.js animation clips
@@ -2499,9 +2499,9 @@ class AnimationParser {
 
 	parseClips() {
 
-		// since the actual transformation data is stored in FBXTree.Objects.AnimationCurve,
+		// since the actual transformation data is stored in GLBTree.Objects.AnimationCurve,
 		// if this is undefined we can safely assume there are no animations
-		if ( fbxTree.Objects.AnimationCurve === undefined ) return undefined;
+		if ( GLBTree.Objects.AnimationCurve === undefined ) return undefined;
 
 		const curveNodesMap = this.parseAnimationCurveNodes();
 
@@ -2514,12 +2514,12 @@ class AnimationParser {
 
 	}
 
-	// parse nodes in FBXTree.Objects.AnimationCurveNode
+	// parse nodes in GLBTree.Objects.AnimationCurveNode
 	// each AnimationCurveNode holds data for an animation transform for a model (e.g. left arm rotation )
 	// and is referenced by an AnimationLayer
 	parseAnimationCurveNodes() {
 
-		const rawCurveNodes = fbxTree.Objects.AnimationCurveNode;
+		const rawCurveNodes = GLBTree.Objects.AnimationCurveNode;
 
 		const curveNodesMap = new Map();
 
@@ -2547,26 +2547,26 @@ class AnimationParser {
 
 	}
 
-	// parse nodes in FBXTree.Objects.AnimationCurve and connect them up to
+	// parse nodes in GLBTree.Objects.AnimationCurve and connect them up to
 	// previously parsed AnimationCurveNodes. Each AnimationCurve holds data for a single animated
 	// axis ( e.g. times and values of x rotation)
 	parseAnimationCurves( curveNodesMap ) {
 
-		const rawCurves = fbxTree.Objects.AnimationCurve;
+		const rawCurves = GLBTree.Objects.AnimationCurve;
 
 		// TODO: Many values are identical up to roundoff error, but won't be optimised
 		// e.g. position times: [0, 0.4, 0. 8]
 		// position values: [7.23538335023477e-7, 93.67518615722656, -0.9982695579528809, 7.23538335023477e-7, 93.67518615722656, -0.9982695579528809, 7.235384487103147e-7, 93.67520904541016, -0.9982695579528809]
 		// clearly, this should be optimised to
 		// times: [0], positions [7.23538335023477e-7, 93.67518615722656, -0.9982695579528809]
-		// this shows up in nearly every FBX file, and generally time array is length > 100
+		// this shows up in nearly every GLB file, and generally time array is length > 100
 
 		for ( const nodeID in rawCurves ) {
 
 			const animationCurve = {
 
 				id: rawCurves[ nodeID ].id,
-				times: rawCurves[ nodeID ].KeyTime.a.map( convertFBXTimeToSeconds ),
+				times: rawCurves[ nodeID ].KeyTime.a.map( convertGLBTimeToSeconds ),
 				values: rawCurves[ nodeID ].KeyValueFloat.a,
 
 			};
@@ -2602,12 +2602,12 @@ class AnimationParser {
 
 	}
 
-	// parse nodes in FBXTree.Objects.AnimationLayer. Each layers holds references
+	// parse nodes in GLBTree.Objects.AnimationLayer. Each layers holds references
 	// to various AnimationCurveNodes and is referenced by an AnimationStack node
 	// note: theoretically a stack can have multiple layers, however in practice there always seems to be one per stack
 	parseAnimationLayers( curveNodesMap ) {
 
-		const rawLayers = fbxTree.Objects.AnimationLayer;
+		const rawLayers = GLBTree.Objects.AnimationLayer;
 
 		const layersMap = new Map();
 
@@ -2641,11 +2641,11 @@ class AnimationParser {
 
 								if ( modelID !== undefined ) {
 
-									const rawModel = fbxTree.Objects.Model[ modelID.toString() ];
+									const rawModel = GLBTree.Objects.Model[ modelID.toString() ];
 
 									if ( rawModel === undefined ) {
 
-										console.warn( 'THREE.FBXLoader: Encountered a unused curve.', child );
+										console.warn( 'THREE.glbLoader: Encountered a unused curve.', child );
 										return;
 
 									}
@@ -2703,12 +2703,12 @@ class AnimationParser {
 								// assuming geometry is not used in more than one model
 								const modelID = connections.get( geoID ).parents[ 0 ].ID;
 
-								const rawModel = fbxTree.Objects.Model[ modelID ];
+								const rawModel = GLBTree.Objects.Model[ modelID ];
 
 								const node = {
 
 									modelName: rawModel.attrName ? PropertyBinding.sanitizeNodeName( rawModel.attrName ) : '',
-									morphName: fbxTree.Objects.Deformer[ deformerID ].attrName,
+									morphName: GLBTree.Objects.Deformer[ deformerID ].attrName,
 
 								};
 
@@ -2734,11 +2734,11 @@ class AnimationParser {
 
 	}
 
-	// parse nodes in FBXTree.Objects.AnimationStack. These are the top level node in the animation
+	// parse nodes in GLBTree.Objects.AnimationStack. These are the top level node in the animation
 	// hierarchy. Each Stack node will be used to create a AnimationClip
 	parseAnimStacks( layersMap ) {
 
-		const rawStacks = fbxTree.Objects.AnimationStack;
+		const rawStacks = GLBTree.Objects.AnimationStack;
 
 		// connect the stacks (clips) up to the layers
 		const rawClips = {};
@@ -2751,7 +2751,7 @@ class AnimationParser {
 
 				// it seems like stacks will always be associated with a single layer. But just in case there are files
 				// where there are multiple layers per stack, we'll display a warning
-				console.warn( 'THREE.FBXLoader: Encountered an animation stack with multiple layers, this is currently not supported. Ignoring subsequent layers.' );
+				console.warn( 'THREE.glbLoader: Encountered an animation stack with multiple layers, this is currently not supported. Ignoring subsequent layers.' );
 
 			}
 
@@ -3141,7 +3141,7 @@ class AnimationParser {
 
 }
 
-// parse an FBX file in ASCII format
+// parse an GLB file in ASCII format
 class TextParser {
 
 	getPrevNode() {
@@ -3187,7 +3187,7 @@ class TextParser {
 
 		this.currentIndent = 0;
 
-		this.allNodes = new FBXTree();
+		this.allNodes = new GLBTree();
 		this.nodeStack = [];
 		this.currentProp = [];
 		this.currentPropName = '';
@@ -3475,7 +3475,7 @@ class TextParser {
 
 }
 
-// Parse an FBX file in Binary format
+// Parse an GLB file in Binary format
 class BinaryParser {
 
 	parse( buffer ) {
@@ -3487,11 +3487,11 @@ class BinaryParser {
 
 		if ( version < 6400 ) {
 
-			throw new Error( 'THREE.FBXLoader: FBX version not supported, FileVersion: ' + version );
+			throw new Error( 'THREE.glbLoader: GLB version not supported, FileVersion: ' + version );
 
 		}
 
-		const allNodes = new FBXTree();
+		const allNodes = new GLBTree();
 
 		while ( ! this.endOfContent( reader ) ) {
 
@@ -3605,7 +3605,7 @@ class BinaryParser {
 
 			subNode.propertyList.forEach( function ( property, i ) {
 
-				// first Connection is FBX type (OO, OP, etc.). We'll discard these
+				// first Connection is GLB type (OO, OP, etc.). We'll discard these
 				if ( i !== 0 ) array.push( property );
 
 			} );
@@ -3792,7 +3792,7 @@ class BinaryParser {
 				break; // cannot happen but is required by the DeepScan
 
 			default:
-				throw new Error( 'THREE.FBXLoader: Unknown property type ' + type );
+				throw new Error( 'THREE.glbLoader: Unknown property type ' + type );
 
 		}
 
@@ -4040,9 +4040,9 @@ class BinaryReader {
 
 }
 
-// FBXTree holds a representation of the FBX data, returned by the TextParser ( FBX ASCII format)
-// and BinaryParser( FBX Binary format)
-class FBXTree {
+// GLBTree holds a representation of the GLB data, returned by the TextParser ( GLB ASCII format)
+// and BinaryParser( GLB Binary format)
+class GLBTree {
 
 	add( key, val ) {
 
@@ -4054,15 +4054,15 @@ class FBXTree {
 
 // ************** UTILITY FUNCTIONS **************
 
-function isFbxFormatBinary( buffer ) {
+function isGLBFormatBinary( buffer ) {
 
-	const CORRECT = 'Kaydara\u0020FBX\u0020Binary\u0020\u0020\0';
+	const CORRECT = 'Kaydara\u0020GLB\u0020Binary\u0020\u0020\0';
 
 	return buffer.byteLength >= CORRECT.length && CORRECT === convertArrayBufferToString( buffer, 0, CORRECT.length );
 
 }
 
-function isFbxFormatASCII( text ) {
+function isGLBFormatASCII( text ) {
 
 	const CORRECT = [ 'K', 'a', 'y', 'd', 'a', 'r', 'a', '\\', 'F', 'B', 'X', '\\', 'B', 'i', 'n', 'a', 'r', 'y', '\\', '\\' ];
 
@@ -4092,9 +4092,9 @@ function isFbxFormatASCII( text ) {
 
 }
 
-function getFbxVersion( text ) {
+function getGLBVersion( text ) {
 
-	const versionRegExp = /FBXVersion: (\d+)/;
+	const versionRegExp = /GLBVersion: (\d+)/;
 	const match = text.match( versionRegExp );
 
 	if ( match ) {
@@ -4104,12 +4104,12 @@ function getFbxVersion( text ) {
 
 	}
 
-	throw new Error( 'THREE.FBXLoader: Cannot find the version number for the file given.' );
+	throw new Error( 'THREE.glbLoader: Cannot find the version number for the file given.' );
 
 }
 
-// Converts FBX ticks into real time seconds.
-function convertFBXTimeToSeconds( time ) {
+// Converts GLB ticks into real time seconds.
+function convertGLBTimeToSeconds( time ) {
 
 	return time / 46186158000;
 
@@ -4117,7 +4117,7 @@ function convertFBXTimeToSeconds( time ) {
 
 const dataArray = [];
 
-// extracts the data from the correct position in the FBX array based on indexing type
+// extracts the data from the correct position in the GLB array based on indexing type
 function getData( polygonVertexIndex, polygonIndex, vertexIndex, infoObject ) {
 
 	let index;
@@ -4137,7 +4137,7 @@ function getData( polygonVertexIndex, polygonIndex, vertexIndex, infoObject ) {
 			index = infoObject.indices[ 0 ];
 			break;
 		default :
-			console.warn( 'THREE.FBXLoader: unknown attribute mapping type ' + infoObject.mappingType );
+			console.warn( 'THREE.glbLoader: unknown attribute mapping type ' + infoObject.mappingType );
 
 	}
 
@@ -4155,9 +4155,9 @@ function getData( polygonVertexIndex, polygonIndex, vertexIndex, infoObject ) {
 const tempEuler = new Euler();
 const tempVec = new Vector3();
 
-// generate transformation from FBX transform data
-// ref: https://help.autodesk.com/view/FBX/2017/ENU/?guid=__files_GUID_10CDD63C_79C1_4F2D_BB28_AD2BE65A02ED_htm
-// ref: http://docs.autodesk.com/FBX/2014/ENU/FBX-SDK-Documentation/index.html?url=cpp_ref/_transformations_2main_8cxx-example.html,topicNumber=cpp_ref__transformations_2main_8cxx_example_htmlfc10a1e1-b18d-4e72-9dc0-70d0f1959f5e
+// generate transformation from GLB transform data
+// ref: https://help.autodesk.com/view/GLB/2017/ENU/?guid=__files_GUID_10CDD63C_79C1_4F2D_BB28_AD2BE65A02ED_htm
+// ref: http://docs.autodesk.com/GLB/2014/ENU/GLB-SDK-Documentation/index.html?url=cpp_ref/_transformations_2main_8cxx-example.html,topicNumber=cpp_ref__transformations_2main_8cxx_example_htmlfc10a1e1-b18d-4e72-9dc0-70d0f1959f5e
 function generateTransform( transformData ) {
 
 	const lTranslationM = new Matrix4();
@@ -4272,8 +4272,8 @@ function generateTransform( transformData ) {
 
 }
 
-// Returns the three.js intrinsic Euler order corresponding to FBX extrinsic Euler order
-// ref: http://help.autodesk.com/view/FBX/2017/ENU/?guid=__cpp_ref_class_fbx_euler_html
+// Returns the three.js intrinsic Euler order corresponding to GLB extrinsic Euler order
+// ref: http://help.autodesk.com/view/GLB/2017/ENU/?guid=__cpp_ref_class_GLB_euler_html
 function getEulerOrder( order ) {
 
 	order = order || 0;
@@ -4290,7 +4290,7 @@ function getEulerOrder( order ) {
 
 	if ( order === 6 ) {
 
-		console.warn( 'THREE.FBXLoader: unsupported Euler Order: Spherical XYZ. Animations and rotations may be incorrect.' );
+		console.warn( 'THREE.glbLoader: unsupported Euler Order: Spherical XYZ. Animations and rotations may be incorrect.' );
 		return enums[ 0 ];
 
 	}
@@ -4345,4 +4345,4 @@ function slice( a, b, from, to ) {
 }
 
 
-export { FBXLoader };
+export { GLBLoader };

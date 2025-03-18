@@ -10,7 +10,7 @@ import { CrystalShardManager } from './CrystalShardManager.js';
 // Import the BiomeModelManager for handling 3D models for biome tiles
 import { BiomeModelManager } from './BiomeModelManager.js';
 
-// FBXLoader handling moved to dedicated manager classes
+// GLBLoader handling moved to dedicated manager classes
 
 // Track loading status of resources
 // Export this so game.js can access it for debugging
@@ -65,7 +65,7 @@ export class MapGenerator {
       crystalSpawnChance: 0.2, // 20% chance to spawn a crystal per hex
       crystalHeightOffset: 0.5, // Height above the hexagon
       crystalScaleFactor: 0.005, // Size of the crystal
-      crystalModelPath: "/assets/Purple_Crystal_Shard.fbx",
+      crystalModelPath: "/assets/Purple_Crystal_Shard.glb",
       crystalTexturePath: "/assets/Purple_Crystal_Shard_texture.png",
     };
 

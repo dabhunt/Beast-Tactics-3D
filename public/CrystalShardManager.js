@@ -76,9 +76,8 @@ export class CrystalShardManager {
     this.config = {
       crystalSpawnChance: 0.3, // 30% chance to spawn a crystal per hex (increased for better visibility)
       crystalHeightOffset: 0.5, // Height above the hexagon
-      crystalScaleFactor: 0.005, // Size of the crystal (may need adjustment for GLB models)
-      crystalModelPath: "./assets/Purple_Crystal_Shard.glb", // Updated to use GLB format
-      crystalTexturePath: "./assets/Purple_Crystal_Shard_texture.png", // Fixed path with correct relative URL
+      crystalScaleFactor: 0.25, // Size of the crystal (increased from 0.005 which was likely too small)
+      crystalModelPath: "./assets/Crystal.glb", // Updated to use GLB format that exists
       
       // Particle effect configuration
       enableParticles: true,           // Whether to enable particle effects
@@ -101,8 +100,6 @@ export class CrystalShardManager {
     };
     
     this.crystalLoader = null;
-    this.crystalTexture = null;
-    this.crystalTextureLoaded = false;
     
     // Track initialization state for crystalloaders
     this._crystalLoaderSource = "none";
@@ -124,26 +121,6 @@ export class CrystalShardManager {
       this._initializeParticleSystem();
     }
     
-    // Load crystal texture
-    this.loadCrystalTexture();
-  }
-  
-  /**
-   * Load crystal texture for use with models or fallbacks
-   */
-  loadCrystalTexture() {
-    console.log("[CRYSTAL] Setting up crystal texture loading");
-    this.crystalTexture = new this.THREE.TextureLoader().load(
-      this.config.crystalTexturePath,
-      (texture) => {
-        console.log("[CRYSTAL] Crystal texture loaded successfully");
-        this.crystalTextureLoaded = true;
-      },
-      undefined,
-      (error) => {
-        console.error("[CRYSTAL] Error loading crystal texture:", error);
-      },
-    );
   }
   
   /**
@@ -723,7 +700,7 @@ export class CrystalShardManager {
       this.crystalLoader.load(
         this.config.crystalModelPath,
         
-        // onLoad callback - GLTF loads differently than FBX
+        // onLoad callback - GLTF loads differently than GLB
         (gltf) => {
           console.log(
             `[CRYSTAL] GLTF model loaded successfully for hex (${hex.userData.q}, ${hex.userData.r})`,
@@ -737,31 +714,10 @@ export class CrystalShardManager {
           );
         
         try {
-          // Extract the model from the GLTF scene (different from FBX format)
+          // Extract the model from the GLTF scene (different from GLB format)
           const model = gltf.scene;
           
-          // Apply crystal texture if available
-          if (this.crystalTextureLoaded && this.crystalTexture) {
-            model.traverse((child) => {
-              if (child.isMesh) {
-                console.log("[CRYSTAL] Applying texture to mesh:", child.name);
-                
-                // Create a material with the texture
-                const material = new this.THREE.MeshPhongMaterial({
-                  map: this.crystalTexture,
-                  shininess: 30,
-                  specular: 0xffffff,
-                  emissive: 0x330066,
-                  emissiveIntensity: 0.5,
-                });
-                
-                // Apply the material
-                child.material = material;
-              }
-            });
-          }
-          
-          // Scale the crystal (GLB models may need different scaling than FBX)
+          // Scale the crystal (GLB models may need different scaling than GLB)
           model.scale.set(
             this.config.crystalScaleFactor,
             this.config.crystalScaleFactor,
@@ -779,20 +735,61 @@ export class CrystalShardManager {
           const randomYRotation = Math.random() * Math.PI * 2; // Random angle between 0 and 2π
           model.rotation.y = randomYRotation;
           
-          debugLog("Applied random Y-axis rotation to crystal:", {
-            hexPosition: [hex.position.x, hex.position.y, hex.position.z],
-            rotationY: randomYRotation
+          // Add detailed diagnostic logging to help troubleshoot visibility issues
+          debugLog("Crystal model placement details:", {
+            scale: {
+              x: model.scale.x,
+              y: model.scale.y,
+              z: model.scale.z,
+              configValue: this.config.crystalScaleFactor
+            },
+            position: {
+              x: model.position.x,
+              y: model.position.y,
+              z: model.position.z
+            },
+            hexPosition: {
+              x: hex.position.x,
+              y: hex.position.y,
+              z: hex.position.z
+            },
+            heightOffset: this.config.crystalHeightOffset,
+            rotationY: randomYRotation,
+            visible: model.visible,
+            childCount: model.children ? model.children.length : 0,
+            modelType: model.type || model.constructor.name || 'unknown'
           });
           
           // Add to the scene and associate with hex
           this.scene.add(model);
           hex.userData.crystal = model;
           
+          // Log addition to scene
+          debugLog(`Added crystal model to scene for hex at (${hex.position.x.toFixed(2)}, ${hex.position.y.toFixed(2)}, ${hex.position.z.toFixed(2)})`);
+          
           // Track this crystal for animations and particles
           this.activeCrystals.push(model);
           
           // Add sparkle particle effects
           this._addParticlesToCrystal(model);
+          
+          // Verify model is in scene after all operations
+          setTimeout(() => {
+            const isInScene = this.scene.children.includes(model);
+            const modelStillVisible = model.visible;
+            const bBoxSize = new this.THREE.Box3().setFromObject(model).getSize(new this.THREE.Vector3());
+            
+            debugLog(`Verification: Crystal model presence in scene: ${isInScene}`, {
+              sceneChildCount: this.scene.children.length,
+              activeCrystalCount: this.activeCrystals.length,
+              stillVisible: modelStillVisible,
+              boundingBoxSize: {
+                x: bBoxSize.x,
+                y: bBoxSize.y,
+                z: bBoxSize.z
+              }
+            });
+          }, 100);
           
           console.log(
             `[CRYSTAL] Crystal successfully placed on hex (${hex.userData.q}, ${hex.userData.r})`,
@@ -926,11 +923,6 @@ export class CrystalShardManager {
           transparent: true, // Enable transparency
           opacity: 0.8, // Set to 80% opacity
         });
-        
-        // Apply texture if available
-        if (this.crystalTextureLoaded && this.crystalTexture) {
-          material.map = this.crystalTexture;
-        }
       }
 
       // Create the crystal mesh
@@ -1010,7 +1002,7 @@ export class CrystalShardManager {
         // Use the crystal's own geometry if available
         glowGeometry = crystal.geometry.clone();
       } else if (crystal.children && crystal.children.length > 0) {
-        // For FBX models, find the first mesh child with geometry
+        // For GLB models, find the first mesh child with geometry
         let meshWithGeometry = null;
         crystal.traverse(child => {
           if (child.isMesh && child.geometry && !meshWithGeometry) {
@@ -1091,7 +1083,7 @@ export class CrystalShardManager {
       
       // Scale the glow effect appropriately based on crystal type
       if (crystal.type === 'Group' || crystal.children?.length > 0) {
-        // FBX model or complex model - calculate appropriate scale
+        // GLB model or complex model - calculate appropriate scale
         console.log('[CRYSTAL] Applying glow to complex crystal model');
         
         // For complex models, we need to determine the appropriate scale

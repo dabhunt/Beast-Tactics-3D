@@ -1,8 +1,8 @@
-// fflate.module.js - Enhanced version with better compatibility for THREE.js FBXLoader
+// fflate.module.js - Enhanced version with better compatibility for THREE.js GLBLoader
 
 /**
- * Implementation of core fflate functionality required by THREE.js FBXLoader
- * This module provides the minimum necessary for FBX file parsing
+ * Implementation of core fflate functionality required by THREE.js GLBLoader
+ * This module provides the minimum necessary for GLB file parsing
  * 
  * Based on the fflate library but simplified for this specific use case
  * @see https://github.com/101arrowz/fflate for the full implementation
@@ -36,7 +36,7 @@ const stats = {
 
 /**
  * Decompress data using the inflate algorithm
- * This is a compatibility implementation for FBXLoader
+ * This is a compatibility implementation for GLBLoader
  * 
  * @param {Uint8Array|ArrayBuffer} data - The compressed data
  * @param {Object} opts - Options for decompression
@@ -56,9 +56,9 @@ function inflate(data, opts = {}) {
   try {
     // For actual production use, we'd implement real decompression
     // Since we're providing a compatibility layer, we'll pass through the data
-    // and let FBXLoader handle it (most modern FBX files aren't compressed anyway)
+    // and let GLBLoader handle it (most modern GLB files aren't compressed anyway)
     
-    // Ensure we return a Uint8Array as expected by FBXLoader
+    // Ensure we return a Uint8Array as expected by GLBLoader
     let result;
     if (data instanceof ArrayBuffer) {
       debugLog('Converting ArrayBuffer to Uint8Array');

@@ -1,7 +1,7 @@
 /**
- * fbx-global-dependencies.js
+ * GLB-global-dependencies.js
  * 
- * A simple, focused script that ensures FBXLoader dependencies are available in the global scope.
+ * A simple, focused script that ensures GLBLoader dependencies are available in the global scope.
  * This script takes a direct approach to fix the "fflate is not defined" error by:
  * 1. Loading fflate and other dependencies synchronously
  * 2. Explicitly exposing them to the global window object
@@ -20,7 +20,7 @@ function log(message, data = null) {
     if (!DEBUG_LOG) return;
     
     const timestamp = new Date().toISOString().split('T')[1].split('.')[0]; // HH:MM:SS
-    const prefix = `[FBX-DEPS ${timestamp}]`;
+    const prefix = `[GLB-DEPS ${timestamp}]`;
     
     if (data !== null) {
         console.log(`${prefix} ${message}`, data);
@@ -37,7 +37,7 @@ function log(message, data = null) {
 function logError(context, error) {
     if (!DEBUG_LOG) return;
     
-    console.error(`[FBX-DEPS] Error in ${context}:`, error);
+    console.error(`[GLB-DEPS] Error in ${context}:`, error);
 }
 
 // Track whether initialization has been completed
@@ -131,14 +131,14 @@ function createFallbacks() {
     if (!isGlobalDefined('fflate')) {
         log('Creating fflate fallback');
         window.fflate = {
-            // Basic functions FBXLoader tries to access
+            // Basic functions GLBLoader tries to access
             unzlibSync: function(data) {
-                console.warn('[FBX-DEPS] Using fflate fallback (unzlibSync) - real implementation unavailable');
+                console.warn('[GLB-DEPS] Using fflate fallback (unzlibSync) - real implementation unavailable');
                 // Return empty buffer to avoid crashes
                 return new Uint8Array(0);
             },
             strFromU8: function(data) {
-                console.warn('[FBX-DEPS] Using fflate fallback (strFromU8) - real implementation unavailable');
+                console.warn('[GLB-DEPS] Using fflate fallback (strFromU8) - real implementation unavailable');
                 return '';
             }
         };
@@ -150,7 +150,7 @@ function createFallbacks() {
         // Simple class that won't crash but won't work either
         window.NURBSCurve = class NURBSCurve {
             constructor() {
-                console.warn('[FBX-DEPS] Using NURBSCurve fallback - real implementation unavailable');
+                console.warn('[GLB-DEPS] Using NURBSCurve fallback - real implementation unavailable');
             }
         };
     }
@@ -211,11 +211,11 @@ function loadFflate() {
 }
 
 /**
- * Load all required dependencies for FBXLoader
+ * Load all required dependencies for GLBLoader
  * @returns {boolean} - True if all critical dependencies loaded
  */
 function loadAllDependencies() {
-    log('Loading all FBXLoader dependencies');
+    log('Loading all GLBLoader dependencies');
     
     // Start with most critical: fflate
     const fflateLoaded = loadFflate();
@@ -263,17 +263,17 @@ function loadAllDependencies() {
 }
 
 /**
- * Initialize dependencies for FBXLoader
- * This is the main function to call before using FBXLoader
+ * Initialize dependencies for GLBLoader
+ * This is the main function to call before using GLBLoader
  * @returns {boolean} - True if initialization successful
  */
-function initFbxDependencies() {
+function initGLBDependencies() {
     if (initialized) {
         log('Dependencies already initialized');
         return true;
     }
     
-    log('Initializing FBX dependencies');
+    log('Initializing GLB dependencies');
     
     // Load dependencies
     const success = loadAllDependencies();
@@ -283,7 +283,7 @@ function initFbxDependencies() {
     
     // Final validation
     if (success) {
-        log('FBX dependencies successfully initialized');
+        log('GLB dependencies successfully initialized');
         
         // Display what's actually in the global scope for diagnostics
         if (DEBUG_LOG) {
@@ -296,18 +296,18 @@ function initFbxDependencies() {
             log('Available globals:', globals);
         }
     } else {
-        log('WARNING: FBX dependencies initialization incomplete, using fallbacks');
+        log('WARNING: GLB dependencies initialization incomplete, using fallbacks');
     }
     
     return success;
 }
 
 // Expose functions to window
-window.fbxGlobalDeps = {
-    init: initFbxDependencies,
+window.glbGlobalDeps = {
+    init: initGLBDependencies,
     isInitialized: () => initialized,
     checkDependency: isGlobalDefined
 };
 
 // Auto-initialize when script is loaded
-initFbxDependencies();
+initGLBDependencies();

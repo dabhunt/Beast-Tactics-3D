@@ -1,7 +1,7 @@
 /**
- * FBXLoader.handler.js
+ * GLBLoader.handler.js
  * 
- * Enhanced handler for FBXLoader that ensures proper initialization
+ * Enhanced handler for GLBLoader that ensures proper initialization
  * and provides various methods for loading the loader in different
  * environments (ES modules, script tags, etc.)
  * 
@@ -16,29 +16,29 @@
 import * as THREE from '/libs/three/three.module.js';
 
 // Load Global Dependencies - Using the direct, focused approach
-let fbxGlobalDepsLoaded = false;
+let GLBGlobalDepsLoaded = false;
 
 /**
- * Load and validate FBX dependencies explicitly
+ * Load and validate GLB dependencies explicitly
  * @returns {Promise<boolean>} - True when dependencies are properly loaded
  */
-async function loadFbxGlobalDependencies() {
-    if (fbxGlobalDepsLoaded) {
-        debugLog('FBX global dependencies already loaded');
+async function loadGLBGlobalDependencies() {
+    if (GLBGlobalDepsLoaded) {
+        debugLog('GLB global dependencies already loaded');
         return true;
     }
     
-    debugLog('Loading FBX global dependencies script');
+    debugLog('Loading GLB global dependencies script');
     
     // Use a direct, synchronous approach to guarantee dependencies are loaded
-    // before FBXLoader tries to use them
+    // before GLBLoader tries to use them
     return new Promise((resolve) => {
         const script = document.createElement('script');
-        script.src = '/libs/three/addons/loaders/fbx-global-dependencies.js';
+        script.src = '/libs/three/addons/loaders/GLB-global-dependencies.js';
         
         script.onload = () => {
-            debugLog('FBX global dependencies script loaded');
-            fbxGlobalDepsLoaded = true;
+            debugLog('GLB global dependencies script loaded');
+            GLBGlobalDepsLoaded = true;
             
             // Verify that fflate is now available in the global scope
             if (window.fflate) {
@@ -55,13 +55,13 @@ async function loadFbxGlobalDependencies() {
         };
         
         script.onerror = (err) => {
-            debugLog('ERROR: Failed to load FBX global dependencies script', err);
+            debugLog('ERROR: Failed to load GLB global dependencies script', err);
             // Create an emergency fallback for fflate to prevent errors
             if (!window.fflate) {
                 debugLog('Creating emergency fflate fallback');
                 window.fflate = {
                     unzlibSync: function() { 
-                        console.warn('Using emergency fflate fallback - FBX models may not load correctly');
+                        console.warn('Using emergency fflate fallback - GLB models may not load correctly');
                         return new Uint8Array(0); 
                     },
                     strFromU8: function() { return ''; }
@@ -85,7 +85,7 @@ const DEBUG = true;
 function debugLog(message, data = null) {
     if (!DEBUG) return;
     
-    const prefix = '[FBX-HANDLER]';
+    const prefix = '[GLB-HANDLER]';
     if (data !== null) {
         console.log(`${prefix} ${message}`, data);
     } else {
@@ -99,11 +99,11 @@ function debugLog(message, data = null) {
  * @param {Error} error - The error object
  */
 function logError(context, error) {
-    console.error(`[FBX-HANDLER] Error in ${context}:`, error);
+    console.error(`[GLB-HANDLER] Error in ${context}:`, error);
     
     // Track loading errors for diagnostics
-    window._fbxLoaderErrors = window._fbxLoaderErrors || [];
-    window._fbxLoaderErrors.push({
+    window._GLBLoaderErrors = window._GLBLoaderErrors || [];
+    window._GLBLoaderErrors.push({
         timestamp: new Date().toISOString(),
         context,
         message: error.message,
@@ -112,14 +112,14 @@ function logError(context, error) {
     });
 }
 
-debugLog('Starting FBXLoader initialization with enhanced error handling');
+debugLog('Starting GLBLoader initialization with enhanced error handling');
 
 /**
- * Attempts to load FBXLoader dependencies
+ * Attempts to load GLBLoader dependencies
  * @returns {Promise<boolean>} - True if dependencies loaded successfully
  */
 async function loadDependencies() {
-    debugLog('Loading FBXLoader dependencies');
+    debugLog('Loading GLBLoader dependencies');
     
     // Define the dependencies we need to load
     // Use absolute paths from the root to avoid path resolution issues
@@ -193,17 +193,17 @@ async function loadDependencies() {
 }
 
 /**
- * Try multiple approaches to load the FBXLoader
+ * Try multiple approaches to load the GLBLoader
  */
-async function loadFBXLoader() {
-    debugLog('Starting enhanced FBXLoader loading sequence');
+async function loadGLBLoader() {
+    debugLog('Starting enhanced GLBLoader loading sequence');
     
     // Method tracking
     const methods = [];
     
     // Method 1: Check if it's already available
-    if (typeof window.FBXLoader === 'function') {
-        debugLog('FBXLoader already available on window');
+    if (typeof window.glbLoader === 'function') {
+        debugLog('GLBLoader already available on window');
         return true;
     }
     
@@ -211,7 +211,7 @@ async function loadFBXLoader() {
     // This ensures fflate and other dependencies are available in global scope
     try {
         debugLog('Step 1: Ensuring global dependencies are loaded');
-        const globalDepsLoaded = await loadFbxGlobalDependencies();
+        const globalDepsLoaded = await loadGLBGlobalDependencies();
         methods.push({ name: 'load-global-dependencies', success: globalDepsLoaded });
         
         // Verify fflate is available
@@ -240,14 +240,14 @@ async function loadFBXLoader() {
     
     // Method 3: Try ES module import
     try {
-        debugLog('Attempting to load FBXLoader as ES module');
+        debugLog('Attempting to load GLBLoader as ES module');
         // Try multiple paths for more reliable loading
         // Ensure absolute paths start with server root
         const paths = [
-            '/libs/three/addons/loaders/FBXLoader.js',    // Absolute path from server root - primary choice
-            './FBXLoader.js',                            // Current directory relative path - backup
-            '../loaders/FBXLoader.js',                   // Another relative option
-            '/public/libs/three/addons/loaders/FBXLoader.js' // Alternative with /public prefix
+            '/libs/three/addons/loaders/GLBLoader.js',    // Absolute path from server root - primary choice
+            './GLBLoader.js',                            // Current directory relative path - backup
+            '../loaders/GLBLoader.js',                   // Another relative option
+            '/public/libs/three/addons/loaders/GLBLoader.js' // Alternative with /public prefix
         ];
         
         debugLog('Attempting ES module import with paths:', paths);
@@ -275,21 +275,21 @@ async function loadFBXLoader() {
         
         const module = moduleLoaded;
         
-        debugLog('FBXLoader module loaded:', { moduleKeys: Object.keys(module) });
+        debugLog('GLBLoader module loaded:', { moduleKeys: Object.keys(module) });
         
-        if (module.FBXLoader) {
-            debugLog('Setting window.FBXLoader from module.FBXLoader');
-            window.FBXLoader = module.FBXLoader;
+        if (module.glbLoader) {
+            debugLog('Setting window.glbLoader from module.glbLoader');
+            window.glbLoader = module.glbLoader;
             methods.push({ name: 'es-module', success: true });
             return true;
         } else {
-            const error = new Error('Failed to extract FBXLoader from module');
+            const error = new Error('Failed to extract GLBLoader from module');
             logError('module-extraction', error);
             methods.push({ 
                 name: 'es-module', 
                 success: false, 
                 moduleKeys: Object.keys(module),
-                error: 'No FBXLoader property found' 
+                error: 'No GLBLoader property found' 
             });
         }
     } catch (error) {
@@ -305,11 +305,11 @@ async function loadFBXLoader() {
             const script = document.createElement('script');
             // Try multiple paths for script loading to increase success chances
             const paths = [
-                '/libs/three/addons/loaders/FBXLoader.js',    // Absolute path - most reliable
-                '/libs/three/FBXLoader.js',                  // Alternative location
-                './FBXLoader.js',                            // Relative path - less reliable
-                '/public/libs/three/addons/loaders/FBXLoader.js', // Alternative with /public prefix
-                `${window.location.origin}/libs/three/addons/loaders/FBXLoader.js` // Full URL with origin
+                '/libs/three/addons/loaders/GLBLoader.js',    // Absolute path - most reliable
+                '/libs/three/GLBLoader.js',                  // Alternative location
+                './GLBLoader.js',                            // Relative path - less reliable
+                '/public/libs/three/addons/loaders/GLBLoader.js', // Alternative with /public prefix
+                `${window.location.origin}/libs/three/addons/loaders/GLBLoader.js` // Full URL with origin
             ];
             
             debugLog('Script tag will try these paths:', paths);
@@ -318,33 +318,33 @@ async function loadFBXLoader() {
             // Add crossorigin attribute to avoid CORS issues
             script.crossOrigin = 'anonymous';
             script.onload = () => {
-                debugLog('Script loaded, checking for FBXLoader definition');
+                debugLog('Script loaded, checking for GLBLoader definition');
                 
-                // Check for FBXLoader in different possible locations
-                if (typeof window.FBXLoader === 'function') {
-                    debugLog('Found FBXLoader on window global');
+                // Check for GLBLoader in different possible locations
+                if (typeof window.glbLoader === 'function') {
+                    debugLog('Found GLBLoader on window global');
                     resolve(true);
-                } else if (typeof THREE.FBXLoader === 'function') {
-                    debugLog('Found FBXLoader on THREE namespace');
+                } else if (typeof THREE.glbLoader === 'function') {
+                    debugLog('Found GLBLoader on THREE namespace');
                     // Make it globally available as well
-                    window.FBXLoader = THREE.FBXLoader;
+                    window.glbLoader = THREE.glbLoader;
                     resolve(true);
                 } else {
                     // Check if the script might have added exports to require or define
                     // (for AMD or CommonJS support)
                     const possibleLocations = [
-                        'window.FBXLoader',
-                        'THREE.FBXLoader', 
-                        'window.THREE && window.THREE.FBXLoader'
+                        'window.glbLoader',
+                        'THREE.glbLoader', 
+                        'window.THREE && window.THREE.glbLoader'
                     ];
                     
-                    debugLog('FBXLoader not found in expected locations', {
+                    debugLog('GLBLoader not found in expected locations', {
                         checked: possibleLocations,
-                        windowKeys: Object.keys(window).filter(k => k.includes('FBX') || k.includes('Loader')),
-                        threeKeys: typeof THREE === 'object' ? Object.keys(THREE).filter(k => k.includes('FBX') || k.includes('Loader')) : 'THREE not available'
+                        windowKeys: Object.keys(window).filter(k => k.includes('GLB') || k.includes('Loader')),
+                        threeKeys: typeof THREE === 'object' ? Object.keys(THREE).filter(k => k.includes('GLB') || k.includes('Loader')) : 'THREE not available'
                     });
                     
-                    reject(new Error('Script loaded but FBXLoader not found in any expected location'));
+                    reject(new Error('Script loaded but GLBLoader not found in any expected location'));
                 }
             };
             script.onerror = () => reject(new Error('Script load error'));
@@ -366,13 +366,13 @@ async function loadFBXLoader() {
     const THREE = window.THREE || {};
     
     // Create a warning stub that won't break the application
-    const FBXLoaderStub = class FBXLoaderStub {
+    const GLBLoaderStub = class GLBLoaderStub {
         constructor() {
-            console.warn('[FBX-HANDLER] Using FBXLoader stub - real loader failed to load');
+            console.warn('[GLB-HANDLER] Using GLBLoader stub - real loader failed to load');
         }
         
         load(url, onLoad, onProgress, onError) {
-            const warning = `FBXLoader stub: Cannot load ${url} - real loader unavailable`;
+            const warning = `GLBLoader stub: Cannot load ${url} - real loader unavailable`;
             console.warn(warning);
             
             // Create empty group as fallback
@@ -381,11 +381,11 @@ async function loadFBXLoader() {
             try {
                 if (typeof THREE !== 'undefined' && THREE.Group) {
                     emptyGroup = new THREE.Group();
-                    emptyGroup.name = 'FBXLoader-Stub-Group';
+                    emptyGroup.name = 'GLBLoader-Stub-Group';
                 } else {
                     emptyGroup = { 
                         type: 'Group', 
-                        name: 'FBXLoader-Stub-Group',
+                        name: 'GLBLoader-Stub-Group',
                         children: [],
                         position: { x: 0, y: 0, z: 0 },
                         rotation: { x: 0, y: 0, z: 0 },
@@ -393,7 +393,7 @@ async function loadFBXLoader() {
                     };
                 }
             } catch (err) {
-                console.error('[FBX-HANDLER] Error creating fallback group:', err);
+                console.error('[GLB-HANDLER] Error creating fallback group:', err);
                 emptyGroup = { type: 'Group', children: [] };
             }
                 
@@ -414,31 +414,31 @@ async function loadFBXLoader() {
 }
 
 // Immediately start loading
-loadFBXLoader().then(success => {
+loadGLBLoader().then(success => {
     if (success) {
-        debugLog('Successfully loaded FBXLoader');
+        debugLog('Successfully loaded GLBLoader');
     } else {
-        debugLog('Failed to load real FBXLoader, using stub');
+        debugLog('Failed to load real GLBLoader, using stub');
     }
 });
 
 /**
- * Check if FBXLoader is ready
- * @returns {boolean} - True if FBXLoader is available
+ * Check if GLBLoader is ready
+ * @returns {boolean} - True if GLBLoader is available
  */
-export function isFBXLoaderReady() {
-    return typeof window.FBXLoader === 'function';
+export function isGLBLoaderReady() {
+    return typeof window.glbLoader === 'function';
 }
 
 /**
- * Get FBXLoader, waiting if necessary
+ * Get GLBLoader, waiting if necessary
  * @param {number} timeoutMs - Maximum time to wait in milliseconds
- * @returns {Promise<Function>} - The FBXLoader constructor
+ * @returns {Promise<Function>} - The GLBLoader constructor
  */
-export async function getFBXLoader(timeoutMs = 5000) {
+export async function getGLBLoader(timeoutMs = 5000) {
     // If already available, return immediately
-    if (isFBXLoaderReady()) {
-        return window.FBXLoader;
+    if (isGLBLoaderReady()) {
+        return window.glbLoader;
     }
     
     // Otherwise wait for it to become available
@@ -447,23 +447,23 @@ export async function getFBXLoader(timeoutMs = 5000) {
         
         const checkInterval = setInterval(() => {
             // Check if loader is now available
-            if (isFBXLoaderReady()) {
+            if (isGLBLoaderReady()) {
                 clearInterval(checkInterval);
                 clearTimeout(timeoutId);
-                resolve(window.FBXLoader);
+                resolve(window.glbLoader);
             }
             
             // Check if we've waited too long
             if (Date.now() - startTime > timeoutMs) {
                 clearInterval(checkInterval);
-                reject(new Error(`Timed out waiting for FBXLoader (${timeoutMs}ms)`));
+                reject(new Error(`Timed out waiting for GLBLoader (${timeoutMs}ms)`));
             }
         }, 100);
         
         // Set a timeout as a backup
         const timeoutId = setTimeout(() => {
             clearInterval(checkInterval);
-            reject(new Error(`Timed out waiting for FBXLoader (${timeoutMs}ms)`));
+            reject(new Error(`Timed out waiting for GLBLoader (${timeoutMs}ms)`));
         }, timeoutMs);
     });
 }

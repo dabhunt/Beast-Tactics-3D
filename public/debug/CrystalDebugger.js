@@ -1,7 +1,7 @@
 /**
  * CrystalDebugger.js
  * Debug utility for diagnosing and fixing crystal shard loading issues
- * Provides tools to verify FBX loader functionality and crystal spawn logic
+ * Provides tools to verify GLB loader functionality and crystal spawn logic
  */
 
 // Crystal debug config
@@ -9,7 +9,7 @@ const DEBUG_CONFIG = {
   forceLoadModel: true,         // Force model loading attempts
   overrideSpawnChance: 0.8,     // Higher spawn chance for testing (80%)
   logModelLoadAttempts: true,   // Log detailed model loading attempts
-  logFBXLoaderState: true,      // Output FBX loader state
+  logGLBLoaderState: true,      // Output GLB loader state
   checkFilePaths: true,         // Verify file paths exist
   forceFallback: false          // Force fallback crystals for testing
 };
@@ -134,7 +134,7 @@ function applyDebugPatches(manager) {
   // Store original methods for later reference
   const originalTrySpawn = manager.trySpawnCrystalShard;
   const originalLoadModel = manager.loadCrystalModel;
-  const originalInitLoader = manager.initializeFBXLoader;
+  const originalInitLoader = manager.initializeGLBLoader;
   
   // Override the trySpawnCrystalShard method
   manager.trySpawnCrystalShard = async function(hex) {
@@ -182,15 +182,15 @@ function applyDebugPatches(manager) {
     return originalLoadModel.call(this, hex);
   };
   
-  // Override the initializeFBXLoader method
-  manager.initializeFBXLoader = async function() {
-    console.log('[CRYSTAL-DEBUG] Enhanced initializeFBXLoader called with debugging');
+  // Override the initializeGLBLoader method
+  manager.initializeGLBLoader = async function() {
+    console.log('[CRYSTAL-DEBUG] Enhanced initializeGLBLoader called with debugging');
     
-    // Check if FBXLoader exists in global scope before attempting initialization
-    console.log('[CRYSTAL-DEBUG] FBXLoader availability check:', {
-      windowFBXLoader: typeof window.FBXLoader,
-      threeFBXLoader: typeof this.THREE?.FBXLoader,
-      globalFBXLoader: typeof FBXLoader
+    // Check if GLBLoader exists in global scope before attempting initialization
+    console.log('[CRYSTAL-DEBUG] GLBLoader availability check:', {
+      windowGLBLoader: typeof window.glbLoader,
+      threeGLBLoader: typeof this.THREE?.glbLoader,
+      globalGLBLoader: typeof GLBLoader
     });
     
     return await originalInitLoader.call(this);
@@ -209,10 +209,10 @@ function applyDebugPatches(manager) {
     try {
       this.crystalLoader.load(
         path,
-        (fbx) => {
+        (GLB) => {
           console.log('[CRYSTAL-DEBUG] Model loaded successfully:', {
-            children: fbx?.children?.length || 0,
-            type: typeof fbx
+            children: GLB?.children?.length || 0,
+            type: typeof GLB
           });
           return true;
         },
@@ -245,7 +245,7 @@ async function forceModelLoad(manager) {
   // Ensure loader is initialized
   if (!manager._loaderInitialized) {
     console.log('[CRYSTAL-DEBUG] Loader not initialized, attempting initialization');
-    await manager.initializeFBXLoader();
+    await manager.initializeGLBLoader();
   }
   
   if (!manager.crystalLoader) {
@@ -360,7 +360,7 @@ async function resetAndReinitializeLoaders(manager) {
   
   // Reinitialize everything
   try {
-    const result = await manager.initializeFBXLoader();
+    const result = await manager.initializeGLBLoader();
     console.log('[CRYSTAL-DEBUG] Loader reinitialization result:', result);
     
     // Check result
@@ -469,8 +469,8 @@ function runDiagnostics(manager) {
     crystalLoader: !!manager.crystalLoader,
     loaderType: manager.crystalLoader ? typeof manager.crystalLoader : 'none',
     hasLoadMethod: manager.crystalLoader && typeof manager.crystalLoader.load === 'function',
-    globalFBXLoader: typeof window.FBXLoader,
-    threeFBXLoader: typeof manager.THREE?.FBXLoader
+    globalGLBLoader: typeof window.glbLoader,
+    threeGLBLoader: typeof manager.THREE?.glbLoader
   });
   
   // Check configuration
@@ -493,7 +493,7 @@ function runDiagnostics(manager) {
   console.log('[CRYSTAL-DEBUG] DIAGNOSTIC RECOMMENDATIONS:');
   
   if (!manager._loaderInitialized || !manager.crystalLoader) {
-    console.log('[CRYSTAL-DEBUG] 💡 Try reinitializing the FBX loader: crystalDebug.resetLoaders()');
+    console.log('[CRYSTAL-DEBUG] 💡 Try reinitializing the GLB loader: crystalDebug.resetLoaders()');
   }
   
   console.log('[CRYSTAL-DEBUG] 💡 Try spawning test crystals: crystalDebug.spawnCrystalAt(0, 0, 0)');
