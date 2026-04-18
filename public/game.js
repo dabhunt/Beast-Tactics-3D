@@ -972,7 +972,6 @@ function setupScene() {
   let fireBeast = null;
   let arrowDebugger = null;
 
-
   // Import the debugger tools with dynamic imports to handle module loading properly
   let ArrowDebugger;
   let GifDebugger;
@@ -1001,7 +1000,6 @@ function setupScene() {
 
   // Start loading debugger modules
   loadDebuggerModules();
-
 
   // Initialize the Arrow Debugger
   debugLog("Initializing Arrow Debugger for directional movement debugging");
@@ -1167,15 +1165,6 @@ function setupScene() {
         
         // Log detailed debug info every 1000 frames
         if (frameCount === 1 || frameCount % 1000 === 0) {
-          console.log('[CRYSTAL] Crystal manager debug info:', {
-            managerExists: !!mapGenerator.crystalShardManager,
-            hasParticleEffect: !!mapGenerator.crystalShardManager.particleEffect,
-            particleSystemsCount: mapGenerator.crystalShardManager.particleEffect ? 
-              mapGenerator.crystalShardManager.particleEffect.particleSystems.length : 0,
-            activeCrystalsCount: mapGenerator.crystalShardManager.activeCrystals ? 
-              mapGenerator.crystalShardManager.activeCrystals.length : 0,
-            hasCamera: !!mapGenerator.crystalShardManager.camera
-          });
         }
         
         // Ensure crystal manager has reference to the camera for view-dependent effects
@@ -1190,12 +1179,6 @@ function setupScene() {
         
         // Log update periodically (less frequently to avoid console spam)
         if (frameCount % 300 === 0) { // Log every ~5 seconds at 60fps
-          console.log('[CRYSTAL] Updated particle and glow effects', {
-            deltaTime: deltaTime.toFixed(4) + 's',
-            frameCount: frameCount,
-            hasCamera: mapGenerator.crystalShardManager.camera ? true : false,
-            timestamp: new Date().toISOString()
-          });
         }
       } catch (err) {
         console.error('[GAME] Error updating crystal particles:', err);

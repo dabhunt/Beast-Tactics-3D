@@ -18,11 +18,6 @@ try {
   const testImport = async () => {
     try {
       const THREE = await import("/libs/three/three.module.js");
-      console.log("[MODULE-VALIDATOR] Successfully imported THREE.js:", {
-        version: THREE.REVISION,
-        hasCamera: !!THREE.PerspectiveCamera,
-        hasFontLoader: !!THREE.FontLoader
-      });
       
       // Test specific modules
       try {

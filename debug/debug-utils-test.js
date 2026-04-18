@@ -68,11 +68,8 @@
     beastLogger.debug('Beast constructor called with parameters', { type: 'Fire', position: { x: 0, y: 1, z: 0 } });
     
     // This should be suppressed because DEBUG=false for camera.js
-    cameraLogger.debug('Camera debug log that should be suppressed');
     
     // These should always show regardless of DEBUG flag
-    cameraLogger.error('Camera error that should always show');
-    cameraLogger.warn('Camera warning that should always show');
     
     // Use namespaced loggers for subsystems
     const animationLogger = beastLogger.namespace('animation');

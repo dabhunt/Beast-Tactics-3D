@@ -306,7 +306,6 @@ const _lut = [ '00', '01', '02', '03', '04', '05', '06', '07', '08', '09', '0a',
 
 let _seed = 1234567;
 
-
 const DEG2RAD = Math.PI / 180;
 const RAD2DEG = 180 / Math.PI;
 
@@ -1683,7 +1682,6 @@ const ColorManagement = {
 	},
 
 };
-
 
 function SRGBToLinear( c ) {
 
@@ -4733,7 +4731,6 @@ class Box3 {
 					}
 
 					_box$4.copy( object.boundingBox );
-
 
 				} else {
 
@@ -8554,7 +8551,6 @@ class Color {
 
 		}
 
-
 		let m;
 
 		if ( m = /^(\w+)\(([^\)]*)\)/.exec( style ) ) {
@@ -10379,7 +10375,6 @@ class Float16BufferAttribute extends BufferAttribute {
 	}
 
 }
-
 
 class Float32BufferAttribute extends BufferAttribute {
 
@@ -12396,7 +12391,6 @@ class Camera extends Object3D {
 const _v3$1 = /*@__PURE__*/ new Vector3();
 const _minTarget = /*@__PURE__*/ new Vector2();
 const _maxTarget = /*@__PURE__*/ new Vector2();
-
 
 class PerspectiveCamera extends Camera {
 
@@ -15927,7 +15921,6 @@ function WebGLClipping( properties ) {
 
 		}
 
-
 	};
 
 	function resetGlobalState() {
@@ -16762,8 +16755,6 @@ class PMREMGenerator {
 
 }
 
-
-
 function _createPlanes( lodMax ) {
 
 	const lodPlanes = [];
@@ -17186,7 +17177,6 @@ function WebGLCubeUVMaps( renderer ) {
 		}
 
 		return count === length;
-
 
 	}
 
@@ -17864,7 +17854,6 @@ function WebGLMorphtargets( gl, capabilities, textures ) {
 
 				const morphBaseInfluence = geometry.morphTargetsRelative ? 1 : 1 - morphInfluencesSum;
 
-
 				program.getUniforms().setValue( gl, 'morphTargetBaseInfluence', morphBaseInfluence );
 				program.getUniforms().setValue( gl, 'morphTargetInfluences', objectInfluences );
 
@@ -18118,7 +18107,6 @@ class DepthTexture extends Texture {
 
 	}
 
-
 	copy( source ) {
 
 		super.copy( source );
@@ -18183,7 +18171,6 @@ class DepthTexture extends Texture {
  * 		like .set for an optional property of the object
  *
  */
-
 
 const emptyTexture = /*@__PURE__*/ new Texture();
 
@@ -18691,7 +18678,6 @@ function setValueV4ui( gl, v ) {
 
 }
 
-
 // Single texture (2D / Cube)
 
 function setValueT1( gl, v, textures ) {
@@ -18813,7 +18799,6 @@ function getSingularSetter( type ) {
 
 }
 
-
 // Array of scalars
 
 function setValueV1fArray( gl, v ) {
@@ -18930,7 +18915,6 @@ function setValueV4uiArray( gl, v ) {
 
 }
 
-
 // Array of textures (2D / 3D / Cube / 2DArray)
 
 function setValueT1Array( gl, v, textures ) {
@@ -19028,7 +19012,6 @@ function setValueT2DArrayArray( gl, v, textures ) {
 	}
 
 }
-
 
 // Helper to pick the right setter for a pure (bottom-level) array
 
@@ -21286,7 +21269,6 @@ function reversePainterSortStable( a, b ) {
 
 }
 
-
 function WebGLRenderList() {
 
 	const renderItems = [];
@@ -21609,8 +21591,6 @@ function ShadowUniformsCache() {
 	};
 
 }
-
-
 
 let nextVersion = 0;
 
@@ -23197,7 +23177,6 @@ function WebGLState( gl, extensions, capabilities ) {
 			}
 
 		}
-
 
 	}
 
@@ -25443,7 +25422,6 @@ function WebGLTextures( _gl, extensions, state, properties, capabilities, utils,
 
 	}
 
-
 	// Setup storage for internal depth/stencil buffers and bind to correct framebuffer
 	function setupRenderBufferStorage( renderbuffer, renderTarget, isMultisample ) {
 
@@ -25508,7 +25486,6 @@ function WebGLTextures( _gl, extensions, state, properties, capabilities, utils,
 				_gl.renderbufferStorage( _gl.RENDERBUFFER, _gl.DEPTH_STENCIL, renderTarget.width, renderTarget.height );
 
 			}
-
 
 			_gl.framebufferRenderbuffer( _gl.FRAMEBUFFER, _gl.DEPTH_STENCIL_ATTACHMENT, _gl.RENDERBUFFER, renderbuffer );
 
@@ -26017,7 +25994,6 @@ function WebGLTextures( _gl, extensions, state, properties, capabilities, utils,
 					_gl.invalidateFramebuffer( _gl.READ_FRAMEBUFFER, invalidationArray );
 
 				}
-
 
 			}
 
@@ -26776,7 +26752,6 @@ class WebXRController {
 				}
 
 			}
-
 
 		}
 
@@ -28573,10 +28548,8 @@ function WebGLUniformsGroups( gl, info, capabilities, state ) {
 					uniform.__data = new Float32Array( info.storage / Float32Array.BYTES_PER_ELEMENT );
 					uniform.__offset = offset;
 
-
 					// Update the global offset
 					offset += info.storage;
-
 
 				}
 
@@ -29394,7 +29367,6 @@ class WebGLRenderer {
 
 		}
 
-
 		function releaseMaterialProgramReferences( material ) {
 
 			const programs = properties.get( material ).programs;
@@ -29780,7 +29752,6 @@ class WebGLRenderer {
 
 			if ( camera !== undefined && camera.isCamera !== true ) {
 
-				console.error( 'THREE.WebGLRenderer.render: camera is not an instance of THREE.Camera.' );
 				return;
 
 			}
@@ -29847,7 +29818,6 @@ class WebGLRenderer {
 			//
 
 			if ( this.info.autoReset === true ) this.info.reset();
-
 
 			//
 
@@ -32093,7 +32063,6 @@ function transformVertex( vertexPosition, mvPosition, center, scale, sin, cos ) 
 
 	}
 
-
 	vertexPosition.copy( mvPosition );
 	vertexPosition.x += _rotatedPosition.x;
 	vertexPosition.y += _rotatedPosition.y;
@@ -32181,8 +32150,6 @@ class LOD extends Object3D {
 		return this._currentLevel;
 
 	}
-
-
 
 	getObjectForDistance( distance ) {
 
@@ -34182,7 +34149,6 @@ class LineBasicMaterial extends Material {
 
 	}
 
-
 	copy( source ) {
 
 		super.copy( source );
@@ -35132,7 +35098,6 @@ class Curve {
 		normals[ 0 ].crossVectors( tangents[ 0 ], vec );
 		binormals[ 0 ].crossVectors( tangents[ 0 ], normals[ 0 ] );
 
-
 		// compute the slowly-varying normal and binormal vectors for each segment on the curve
 
 		for ( let i = 1; i <= segments; i ++ ) {
@@ -35403,7 +35368,6 @@ class ArcCurve extends EllipseCurve {
  * curve.type accepts centripetal(default), chordal and catmullrom
  * curve.tension is used for catmullrom which defaults to 0.5
  */
-
 
 /*
 Based on an optimized c++ solution in
@@ -37623,7 +37587,6 @@ class PolyhedronGeometry extends BufferGeometry {
 
 		}
 
-
 		// Angle above the XZ plane.
 
 		function inclination( vector ) {
@@ -38855,7 +38818,6 @@ function addContour( vertices, contour ) {
  * }
  */
 
-
 class ExtrudeGeometry extends BufferGeometry {
 
 	constructor( shapes = new Shape( [ new Vector2( 0.5, 0.5 ), new Vector2( - 0.5, 0.5 ), new Vector2( - 0.5, - 0.5 ), new Vector2( 0.5, - 0.5 ) ] ), options = {} ) {
@@ -38978,7 +38940,6 @@ class ExtrudeGeometry extends BufferGeometry {
 
 			}
 
-
 			const faces = ShapeUtils.triangulateShape( vertices, holes );
 
 			/* Vertices */
@@ -38993,7 +38954,6 @@ class ExtrudeGeometry extends BufferGeometry {
 
 			}
 
-
 			function scalePt2( pt, vec, size ) {
 
 				if ( ! vec ) console.error( 'THREE.ExtrudeGeometry: vec does not exist' );
@@ -39004,9 +38964,7 @@ class ExtrudeGeometry extends BufferGeometry {
 
 			const vlen = vertices.length, flen = faces.length;
 
-
 			// Find directions for point movement
-
 
 			function getBevelVec( inPt, inPrev, inNext ) {
 
@@ -39131,7 +39089,6 @@ class ExtrudeGeometry extends BufferGeometry {
 
 			}
 
-
 			const contourMovements = [];
 
 			for ( let i = 0, il = contour.length, j = il - 1, k = i + 1; i < il; i ++, j ++, k ++ ) {
@@ -39169,7 +39126,6 @@ class ExtrudeGeometry extends BufferGeometry {
 				verticesMovements = verticesMovements.concat( oneHoleMovements );
 
 			}
-
 
 			// Loop bevelSegments, 1 for the front, 1 for the back
 
@@ -39267,7 +39223,6 @@ class ExtrudeGeometry extends BufferGeometry {
 
 			}
 
-
 			// Add bevel segments planes
 
 			//for ( b = 1; b <= bevelSegments; b ++ ) {
@@ -39322,7 +39277,6 @@ class ExtrudeGeometry extends BufferGeometry {
 			// Sides faces
 
 			buildSideFaces();
-
 
 			/////  Internal functions
 
@@ -39401,9 +39355,7 @@ class ExtrudeGeometry extends BufferGeometry {
 
 				}
 
-
 				scope.addGroup( start, verticesArray.length / 3 - start, 1 );
-
 
 			}
 
@@ -39445,7 +39397,6 @@ class ExtrudeGeometry extends BufferGeometry {
 
 			}
 
-
 			function f3( a, b, c ) {
 
 				addVertex( a );
@@ -39471,7 +39422,6 @@ class ExtrudeGeometry extends BufferGeometry {
 				addVertex( c );
 				addVertex( d );
 
-
 				const nextIndex = verticesArray.length / 3;
 				const uvs = uvgen.generateSideWallUV( scope, verticesArray, nextIndex - 6, nextIndex - 3, nextIndex - 2, nextIndex - 1 );
 
@@ -39492,7 +39442,6 @@ class ExtrudeGeometry extends BufferGeometry {
 				verticesArray.push( placeholder[ index * 3 + 2 ] );
 
 			}
-
 
 			function addUV( vector2 ) {
 
@@ -39883,7 +39832,6 @@ class ShapeGeometry extends BufferGeometry {
 		this.setAttribute( 'position', new Float32BufferAttribute( vertices, 3 ) );
 		this.setAttribute( 'normal', new Float32BufferAttribute( normals, 3 ) );
 		this.setAttribute( 'uv', new Float32BufferAttribute( uvs, 2 ) );
-
 
 		// helper functions
 
@@ -41624,7 +41572,6 @@ class MeshMatcapMaterial extends Material {
 
 	}
 
-
 	copy( source ) {
 
 		super.copy( source );
@@ -43043,7 +42990,6 @@ class AnimationClip {
 
 	}
 
-
 	static parse( json ) {
 
 		const tracks = [],
@@ -44452,7 +44398,6 @@ class DataTextureLoader extends Loader {
 			if ( onLoad ) onLoad( texture, texData );
 
 		}, onProgress, onError );
-
 
 		return texture;
 
@@ -46433,7 +46378,6 @@ class ObjectLoader extends Loader {
 					const deserializedImage = deserializeImage( image.url );
 					images[ image.uuid ] = new Source( deserializedImage );
 
-
 				}
 
 			}
@@ -48163,7 +48107,6 @@ class AudioAnalyser {
 
 	}
 
-
 	getFrequencyData() {
 
 		this.analyser.getByteFrequencyData( this.data );
@@ -48440,7 +48383,6 @@ class PropertyMixer {
 
 	}
 
-
 	// mix functions
 
 	_select( buffer, dstOffset, srcOffset, t, stride ) {
@@ -48621,7 +48563,6 @@ class PropertyBinding {
 		this.setValue = this._setValue_unbound;
 
 	}
-
 
 	static create( root, path, parsedPath ) {
 
@@ -49039,7 +48980,6 @@ class PropertyBinding {
 					targetObject = targetObject[ objectName ];
 
 			}
-
 
 			if ( objectIndex !== undefined ) {
 
@@ -49946,7 +49886,6 @@ class AnimationAction {
 
 			} else {
 
-
 				this._startTime = null; // unschedule
 				deltaTime = timeDirection * timeRunning;
 
@@ -50300,7 +50239,6 @@ class AnimationAction {
 
 const _controlInterpolantsResultBuffer = new Float32Array( 1 );
 
-
 class AnimationMixer extends EventDispatcher {
 
 	constructor( root ) {
@@ -50467,12 +50405,10 @@ class AnimationMixer extends EventDispatcher {
 		// 	actionByRoot: AnimationAction - lookup
 		// }
 
-
 		this._bindings = []; // 'nActiveBindings' followed by inactive ones
 		this._nActiveBindings = 0;
 
 		this._bindingsByRootAndName = {}; // inside: Map< name, PropertyMixer >
-
 
 		this._controlInterpolants = []; // same game as above
 		this._nActiveControlInterpolants = 0;
@@ -50579,7 +50515,6 @@ class AnimationMixer extends EventDispatcher {
 
 		action._cacheIndex = null;
 
-
 		const clipUuid = action._clip.uuid,
 			actionsByClip = this._actionsByClip,
 			actionsForClip = actionsByClip[ clipUuid ],
@@ -50595,7 +50530,6 @@ class AnimationMixer extends EventDispatcher {
 		knownActionsForClip.pop();
 
 		action._byClipCacheIndex = null;
-
 
 		const actionByRoot = actionsForClip.actionByRoot,
 			rootUuid = ( action._localRoot || this._root ).uuid;
@@ -50758,7 +50692,6 @@ class AnimationMixer extends EventDispatcher {
 		bindings[ prevIndex ] = lastActiveBinding;
 
 	}
-
 
 	// Memory management of Interpolants for weight and time scale
 
@@ -51398,7 +51331,6 @@ function intersect( object, raycaster, intersects, recursive ) {
  * The azimuthal angle (theta) is measured from the positive z-axis.
  */
 
-
 class Spherical {
 
 	constructor( radius = 1, phi = 0, theta = 0 ) {
@@ -51953,7 +51885,6 @@ const _vector$2 = /*@__PURE__*/ new Vector3();
 const _boneMatrix = /*@__PURE__*/ new Matrix4();
 const _matrixWorldInv = /*@__PURE__*/ new Matrix4();
 
-
 class SkeletonHelper extends LineSegments {
 
 	constructor( object ) {
@@ -52046,7 +51977,6 @@ class SkeletonHelper extends LineSegments {
 
 }
 
-
 function getBoneList( object ) {
 
 	const boneList = [];
@@ -52086,7 +52016,6 @@ class PointLightHelper extends Mesh {
 		this.matrixAutoUpdate = false;
 
 		this.update();
-
 
 		/*
 	// TODO: delete this comment?
@@ -52690,7 +52619,6 @@ class CameraHelper extends LineSegments {
 
 }
 
-
 function setPoint( point, pointMap, geometry, camera, x, y, z ) {
 
 	_vector.set( x, y, z ).unproject( camera );
@@ -53281,7 +53209,6 @@ class ShapePath {
 
 		// only Holes? -> probably all Shapes with wrong orientation
 		if ( ! newShapes[ 0 ] )	return	toShapesNoHoles( subPaths );
-
 
 		if ( newShapes.length > 1 ) {
 

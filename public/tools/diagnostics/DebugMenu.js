@@ -695,7 +695,6 @@ export class DebugMenu {
         console.log("[DEBUG] Resetting camera position");
         this.cameraManager.resetPosition();
       } else {
-        console.warn("[DEBUG] Camera manager not set");
       }
     });
     container.appendChild(resetButton);
@@ -799,7 +798,6 @@ export class DebugMenu {
    */
   setCameraManager(cameraManager) {
     this.cameraManager = cameraManager;
-    console.log("[DEBUG] Camera manager connected to debug menu");
   }
 
   /**

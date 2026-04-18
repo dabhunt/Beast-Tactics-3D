@@ -16,7 +16,6 @@ const DEBUG = true;
  */
 export class CameraManager {
   constructor(scene) {
-    console.log("[CAMERA] Initializing CameraManager");
     
     this.scene = scene;
     
@@ -66,11 +65,6 @@ export class CameraManager {
     // Set up event listeners
     this._setupEventListeners();
     
-    console.log("[CAMERA] CameraManager initialized with settings:", {
-      position: this.camera.position.toArray().map(v => v.toFixed(1)),
-      target: this.target.toArray().map(v => v.toFixed(1)),
-      fov: this.settings.fov
-    });
   }
   
   /**

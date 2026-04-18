@@ -77,7 +77,7 @@ export class CrystalShardManager {
       crystalSpawnChance: 0.3, // 30% chance to spawn a crystal per hex (increased for better visibility)
       crystalHeightOffset: 0.5, // Height above the hexagon
       crystalScaleFactor: 0.25, // Size of the crystal (increased from 0.005 which was likely too small)
-      crystalModelPath: "./assets/Crystal.glb", // Updated to use GLB format that exists
+      crystalModelPath: "Crystal.glb", // Corrected path - no ./assets/ prefix to match actual file location
       
       // Particle effect configuration
       enableParticles: true,           // Whether to enable particle effects
@@ -176,9 +176,8 @@ export class CrystalShardManager {
         return null;
       }
       
-      // Mark hex as having a crystal to prevent duplicates
-      hex.userData.crystal = true;
-
+      // CRITICAL FIX: DO NOT mark hex as having a crystal yet - only do this after successful loading
+      // This early assignment was preventing multiple crystals from spawning
       console.log(
         `[CRYSTAL] Spawning crystal shard on hex at (${hex.userData.q}, ${hex.userData.r})`,
       );
@@ -189,30 +188,46 @@ export class CrystalShardManager {
         `[CRYSTAL] Crystal loader initialization result: ${loaderInitialized ? "SUCCESS" : "FAILED"}`,
       );
 
+      let crystal = null;
+      
       // If we have a crystal loader, use it to load the model
       if (this.crystalLoader) {
         console.log("[CRYSTAL] Using GLTF loader to load crystal model");
-        this.loadCrystalModel(hex);
-      } else {
-        // Otherwise use the fallback crystal method
+        try {
+          // CRITICAL FIX: Actually await the result of loadCrystalModel
+          // This ensures we properly track success/failure
+          crystal = await this.loadCrystalModel(hex);
+          console.log(`[CRYSTAL] Model loading completed successfully:`, { 
+            crystalType: crystal?.type || 'unknown',
+            isInScene: crystal && this.scene.children.includes(crystal)
+          });
+          return crystal;
+        } catch (loadError) {
+          console.error("[CRYSTAL] Error loading crystal model:", loadError);
+          // Don't return yet - try fallback instead
+        }
+      }
+      
+      // If we got here, either there was no loader or loading failed
+      // Try the fallback crystal method
+      if (!crystal) {
         console.log(
-          "[CRYSTAL] Using fallback crystal method as loader is not available",
+          "[CRYSTAL] Using fallback crystal method",
         );
-        this.createFallbackCrystal(hex);
+        try {
+          crystal = this.createFallbackCrystal(hex);
+          return crystal;
+        } catch (fallbackError) {
+          console.error("[CRYSTAL] Fallback crystal creation failed:", fallbackError);
+          return null;
+        }
       }
     } catch (error) {
       console.error("[CRYSTAL] Critical error in trySpawnCrystalShard:", error);
       console.error("[CRYSTAL] Error details:", error.message);
       console.error("[CRYSTAL] Stack trace:", error.stack);
-      // Attempt to create a fallback crystal as a last resort
-      try {
-        this.createFallbackCrystal(hex);
-      } catch (fallbackError) {
-        console.error(
-          "[CRYSTAL] Even fallback crystal creation failed:",
-          fallbackError,
-        );
-      }
+      // Do not mark hex as having crystal when errors occur
+      return null;
     }
   }
   
@@ -267,7 +282,8 @@ export class CrystalShardManager {
         methods: this.crystalLoader ? Object.keys(this.crystalLoader) : 'null'
       });
       this.crystalLoader = null; // Reset invalid loader
-
+    }
+    
     try {
       // ===== STEP 1: Check if GLTFLoader is already ready =====
       debugLog("STEP 1: Checking if GLTFLoader is ready via handler");
@@ -450,7 +466,6 @@ export class CrystalShardManager {
         this._initializingLoader = false;
         return false;
       }
-    }
   }
   
   /**
@@ -676,14 +691,64 @@ export class CrystalShardManager {
     console.log(`[CRYSTAL] Attempting to load crystal model for hex at (${hex.userData.q}, ${hex.userData.r})`);
     console.log(`[CRYSTAL] Using model path: ${this.config.crystalModelPath}`);
     
-    // Ensure we have a loader
-    if (!this.crystalLoader) {
-      console.warn(
-        "[CRYSTAL] No crystal loader available, using fallback crystal",
-        { hexPosition: hex.position }
-      );
-      return this.createFallbackCrystal(hex);
-    }
+    // IMPORTANT: Return a Promise to properly track the loading status
+    return new Promise((resolve, reject) => {
+      // DEBUGGING - Check if the file exists using a fetch request
+      // Use multiple path variations to find where the file actually is
+      const paths = [
+        this.config.crystalModelPath,                 // Original path
+        './assets/' + this.config.crystalModelPath,   // With assets folder
+        '/' + this.config.crystalModelPath,           // Root path
+        'Crystal.glb'                                 // Direct filename
+      ];
+      
+      // Try each path
+      Promise.all(paths.map(path => 
+        fetch(path)
+          .then(response => ({
+            path,
+            status: response.status,
+            ok: response.ok
+          }))
+          .catch(() => ({ path, ok: false, status: 'error' }))
+      ))
+      .then(results => {
+        // Log all results
+        console.log(`[CRYSTAL] File existence check results:`, results);
+        
+        // Find first successful path
+        const success = results.find(r => r.ok);
+        if (success) {
+          console.log(`[CRYSTAL] File found at: ${success.path}`);
+          // Update the path for future loads
+          if (success.path !== this.config.crystalModelPath) {
+            console.log(`[CRYSTAL] Updating path from ${this.config.crystalModelPath} to ${success.path}`);
+            this.config.crystalModelPath = success.path;
+          }
+        } else {
+          console.error(`[CRYSTAL] File not found in any tested path`, {
+            testedPaths: paths
+          });
+        }
+      });
+      
+      // Ensure we have a loader
+      if (!this.crystalLoader) {
+        console.warn(
+          "[CRYSTAL] No crystal loader available, using fallback crystal",
+          { hexPosition: hex.position }
+        );
+        // Return result of createFallbackCrystal wrapped in Promise.resolve
+        // to maintain consistent Promise-based return type
+        const fallback = this.createFallbackCrystal(hex);
+        if (fallback) {
+          resolve(fallback);
+          return; // Exit early after resolving
+        } else {
+          reject(new Error('Fallback crystal creation failed'));
+          return; // Exit early after rejecting
+        }
+      }
     
     console.log(`[CRYSTAL] Loading crystal model for hex at (${hex.userData.q}, ${hex.userData.r})`);
     
@@ -709,7 +774,9 @@ export class CrystalShardManager {
               sceneChildCount: gltf.scene?.children?.length || 0,
               type: typeof gltf,
               hasScene: gltf?.scene != null,
-              animations: gltf?.animations?.length || 0
+              hasSceneUuid: gltf?.scene?.uuid ? true : false,
+              animations: gltf?.animations?.length || 0,
+              fullObject: JSON.stringify(Object.keys(gltf)).substring(0, 100)
             }
           );
         
@@ -762,6 +829,8 @@ export class CrystalShardManager {
           
           // Add to the scene and associate with hex
           this.scene.add(model);
+          
+          // NOW mark hex as having the crystal (important: only after successful model processing)
           hex.userData.crystal = model;
           
           // Log addition to scene
@@ -795,11 +864,25 @@ export class CrystalShardManager {
             `[CRYSTAL] Crystal successfully placed on hex (${hex.userData.q}, ${hex.userData.r})`,
             { modelType: "GLTF" }
           );
+          
+          // Resolve the promise with the model
+          resolve(model);
         } catch (error) {
           console.error("[CRYSTAL] Error processing loaded GLTF model:", error);
           console.error("[CRYSTAL] Error stack:", error.stack);
+          // Do not set hex.userData.crystal here so other crystals can spawn
           // Try fallback if model processing fails
-          this.createFallbackCrystal(hex);
+          try {
+            const fallback = this.createFallbackCrystal(hex);
+            if (fallback) {
+              resolve(fallback);
+            } else {
+              reject(new Error("Failed to create fallback crystal"));
+            }
+          } catch (fallbackError) {
+            console.error("[CRYSTAL] Fallback crystal creation failed:", fallbackError);
+            reject(fallbackError);
+          }
         }
       },
       
@@ -816,14 +899,34 @@ export class CrystalShardManager {
         console.error("[CRYSTAL] Error loading GLTF model:", error);
         console.error("[CRYSTAL] Error details:", error.message);
         // Create fallback crystal on error
-        this.createFallbackCrystal(hex);
+        try {
+          const fallback = this.createFallbackCrystal(hex);
+          if (fallback) {
+            resolve(fallback);
+          } else {
+            reject(new Error("Failed to create fallback crystal after model load error"));
+          }
+        } catch (fallbackError) {
+          console.error("[CRYSTAL] Fallback crystal creation failed:", fallbackError);
+          reject(fallbackError);
+        }
       }
     );
     } catch (err) {
       console.error("[CRYSTAL] Exception during model loading attempt:", err);
       console.error("[CRYSTAL] Stack trace:", err.stack);
-      return this.createFallbackCrystal(hex);
-    }
+      try {
+        const fallback = this.createFallbackCrystal(hex);
+        if (fallback) {
+          resolve(fallback);
+        } else {
+          reject(new Error("Failed to create fallback crystal"));
+        }
+      } catch (fallbackError) {
+        console.error("[CRYSTAL] Final fallback crystal creation failed:", fallbackError);
+        reject(fallbackError);
+      }
+    });
   }
   
   /**
@@ -838,7 +941,7 @@ export class CrystalShardManager {
       position: hex.position
         ? [hex.position.x, hex.position.y, hex.position.z]
         : "undefined",
-      userData: hex.userData || "missing userData",
+      userData: hex.userData || "missing userData"
     });
 
     try {
@@ -846,7 +949,7 @@ export class CrystalShardManager {
       if (!hex || !hex.position) {
         console.error(
           "[CRYSTAL] Invalid hex object provided to createFallbackCrystal:",
-          hex,
+          hex
         );
         return null;
       }
@@ -900,7 +1003,7 @@ export class CrystalShardManager {
             emissiveIntensity: 0.6, // Stronger glow
             transparent: true, // Enable transparency
             opacity: 0.8, // Set to 80% opacity (semi-translucent)
-            reflectivity: 1.0, // Maximum reflectivity
+            reflectivity: 1.0 // Maximum reflectivity
           });
           console.log(
             "[CRYSTAL] Successfully created MeshPhysicalMaterial for crystal",
